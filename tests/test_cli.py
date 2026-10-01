@@ -4,7 +4,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from cs2edge.cli import build_parser, main
+from cs2gp.cli import build_parser, main
 
 
 class CommonOptionsTests(unittest.TestCase):

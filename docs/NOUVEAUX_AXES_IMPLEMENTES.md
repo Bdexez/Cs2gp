@@ -22,10 +22,10 @@ Cette série se termine à `06cc329`. Les travaux suivants sont décrits dans
 ## Utilisation
 
 ```bash
-python -m cs2edge train --no-gbdt --bundle models/analyzer.cs2edge
-python -m cs2edge predict navi g2 --model models/analyzer.cs2edge --date 2026-11-11
-python -m cs2edge slate --model models/analyzer.cs2edge --fixtures data/fixtures.csv --record data/journal.csv
-python -m cs2edge backtest --no-gbdt --bootstrap-samples 2000 --block-days 14
+python -m cs2gp train --no-gbdt --bundle models/analyzer.cs2gp
+python -m cs2gp predict navi g2 --model models/analyzer.cs2gp --date 2026-11-11
+python -m cs2gp slate --model models/analyzer.cs2gp --fixtures data/fixtures.csv --record data/journal.csv
+python -m cs2gp backtest --no-gbdt --bootstrap-samples 2000 --block-days 14
 ```
 
 L’archive garde les noms et les effectifs exacts de l’historique chargé, les

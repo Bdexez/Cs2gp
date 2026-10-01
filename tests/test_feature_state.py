@@ -1,8 +1,8 @@
 import datetime as dt
 import unittest
 
-from cs2edge.features import FeatureExtractor, _Recent
-from cs2edge.schema import MapResult
+from cs2gp.features import FeatureExtractor, _Recent
+from cs2gp.schema import MapResult
 
 
 class RecentStateTests(unittest.TestCase):

@@ -1,7 +1,7 @@
 import math
 import unittest
 
-from cs2edge.odds import devig_power, expected_value, find_value, kelly_fraction, simulate_flat
+from cs2gp.odds import devig_power, expected_value, find_value, kelly_fraction, simulate_flat
 
 
 class PowerDevigTests(unittest.TestCase):

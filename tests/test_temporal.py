@@ -5,10 +5,10 @@ from unittest.mock import patch
 
 import numpy as np
 
-from cs2edge.features import build_datasets
-from cs2edge.model import MatchPredictor, LogisticModel
-from cs2edge.schema import MapResult, group_matches
-from cs2edge.temporal import forward_splits
+from cs2gp.features import build_datasets
+from cs2gp.model import MatchPredictor, LogisticModel
+from cs2gp.schema import MapResult, group_matches
+from cs2gp.temporal import forward_splits
 
 
 class TemporalTests(unittest.TestCase):

@@ -4,8 +4,8 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from cs2edge.odds import implied
-from cs2edge.pronostic import Fixture, read_fixtures
+from cs2gp.odds import implied
+from cs2gp.pronostic import Fixture, read_fixtures
 
 
 class FixtureValidationTests(unittest.TestCase):

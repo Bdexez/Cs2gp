@@ -3,7 +3,7 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "cs2edge"
+name = "cs2gp"
 version = "0.1.0"
 description = "Analyse de matchs CS2 professionnels et estimation calibree des probabilites de victoire"
 requires-python = ">=3.9"
@@ -13,7 +13,7 @@ dependencies = ["numpy>=1.24"]
 gbdt = ["scikit-learn>=1.3"]
 
 [project.scripts]
-cs2edge = "cs2edge.cli:main"
+cs2gp = "cs2gp.cli:main"
 
 [tool.setuptools]
-packages = ["cs2edge"]
+packages = ["cs2gp"]

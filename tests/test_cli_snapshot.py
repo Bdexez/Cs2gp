@@ -8,12 +8,12 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from cs2edge.cli import _tipster, main
-from cs2edge.journal import load as load_journal
-from cs2edge.model import MatchPredictor
-from cs2edge.predict import Analyzer
-from cs2edge.schema import write_csv
-from cs2edge.sources import simulate_history
+from cs2gp.cli import _tipster, main
+from cs2gp.journal import load as load_journal
+from cs2gp.model import MatchPredictor
+from cs2gp.predict import Analyzer
+from cs2gp.schema import write_csv
+from cs2gp.sources import simulate_history
 
 
 class CliSnapshotTests(unittest.TestCase):
@@ -26,7 +26,7 @@ class CliSnapshotTests(unittest.TestCase):
         maps = simulate_history(n_teams=8, years=.5, seed=11, start=dt.date(2023, 1, 1))
         cls.on = (max(m.date for m in maps)+dt.timedelta(days=1)).isoformat()
         write_csv(str(data), maps)
-        cls.bundle = cls.root / "analyzer.cs2edge"
+        cls.bundle = cls.root / "analyzer.cs2gp"
         cls.output = io.StringIO()
         with contextlib.redirect_stdout(cls.output), contextlib.redirect_stderr(io.StringIO()):
             result = main(["train", "--data", str(data), "--no-gbdt", "--warmup", "4",
@@ -75,7 +75,7 @@ class CliSnapshotTests(unittest.TestCase):
 
     def test_missing_model_reports_a_clear_cli_error(self):
         with self.assertRaisesRegex(SystemExit, "erreur :"):
-            main(["predict", self.a, self.b, "--model", str(self.root / "missing.cs2edge")])
+            main(["predict", self.a, self.b, "--model", str(self.root / "missing.cs2gp")])
 
     def test_explicit_momentum_overrides_saved_value_and_automatic_mode(self):
         an = Analyzer.load(self.bundle)

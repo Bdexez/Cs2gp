@@ -62,7 +62,7 @@ def save_analyzer(an, path: str | Path) -> None:
     files["history.json"] = _json_bytes(history)
     files["calibration.json"] = _json_bytes(an.calibration_history().to_dict())
     manifest = dict(
-        format="cs2edge.analyzer", version=2, feature_pipeline=1, schemas=_schemas(),
+        format="cs2gp.analyzer", version=2, feature_pipeline=1, schemas=_schemas(),
         created_at=dt.datetime.now(dt.timezone.utc).isoformat(), package_version=__version__,
         sklearn_version=_sklearn_version() if an.match_model.gbdt is not None else None,
         elo=an.fx.elo.cfg.to_dict(), warmup_maps=an.warmup_maps,
@@ -100,7 +100,7 @@ def load_analyzer(path: str | Path):
                     or not _REQUIRED <= files or not files <= _ALLOWED):
                 raise ValueError("contenu d'instantane incomplet ou inconnu")
             manifest = json.loads(archive.read("manifest.json"))
-            if (manifest.get("format") != "cs2edge.analyzer" or manifest.get("version") not in (1, 2)
+            if (manifest.get("format") != "cs2gp.analyzer" or manifest.get("version") not in (1, 2)
                     or manifest.get("feature_pipeline") != 1 or manifest.get("schemas") != _schemas()):
                 raise ValueError("version ou schema d'instantane incompatible")
             if (manifest["version"] == 2) != ("calibration.json" in files):

@@ -4,10 +4,10 @@ import unittest
 
 import numpy as np
 
-from cs2edge.backtest import walk_forward
-from cs2edge.features import build_datasets
-from cs2edge.schema import group_matches, read_csv
-from cs2edge.sources import simulate_history, simulate_with_truth
+from cs2gp.backtest import walk_forward
+from cs2gp.features import build_datasets
+from cs2gp.schema import group_matches, read_csv
+from cs2gp.sources import simulate_history, simulate_with_truth
 
 
 class SimulationTests(unittest.TestCase):

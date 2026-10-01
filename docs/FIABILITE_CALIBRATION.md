@@ -42,9 +42,9 @@ séparation des résultats ou un manque d’information n’active pas l’effet
 ## Instantanés et compatibilité
 
 ```bash
-python -m cs2edge train --no-gbdt --bundle models/analyzer.cs2edge
-python -m cs2edge slate --model models/analyzer.cs2edge --fixtures data/fixtures.csv --record data/journal.csv
-python -m cs2edge tipster-backtest --no-gbdt
+python -m cs2gp train --no-gbdt --bundle models/analyzer.cs2gp
+python -m cs2gp slate --model models/analyzer.cs2gp --fixtures data/fixtures.csv --record data/journal.csv
+python -m cs2gp tipster-backtest --no-gbdt
 ```
 
 Les instantanés v2 embarquent les probabilités et leurs dates limites, sous

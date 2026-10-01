@@ -2,7 +2,7 @@ import datetime as dt
 from dataclasses import replace
 import unittest
 
-from cs2edge.pronostic import Pick, SettledPick, TipsterRecord
+from cs2gp.pronostic import Pick, SettledPick, TipsterRecord
 
 
 class RecordStatisticsTests(unittest.TestCase):

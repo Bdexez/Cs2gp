@@ -2,8 +2,8 @@ import copy
 import datetime as dt
 import unittest
 
-from cs2edge.ratings import EloConfig, EloEngine, TeamRating
-from cs2edge.schema import MapResult
+from cs2gp.ratings import EloConfig, EloEngine, TeamRating
+from cs2gp.schema import MapResult
 
 
 class RatingOrientationTests(unittest.TestCase):

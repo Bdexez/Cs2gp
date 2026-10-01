@@ -8,10 +8,10 @@ from zipfile import ZipFile
 
 import numpy as np
 
-from cs2edge.predict import Analyzer
-from cs2edge.ratings import EloConfig
-from cs2edge.pronostic import fit_decider_temperature
-from cs2edge.sources import simulate_history
+from cs2gp.predict import Analyzer
+from cs2gp.ratings import EloConfig
+from cs2gp.pronostic import fit_decider_temperature
+from cs2gp.sources import simulate_history
 
 
 class SnapshotTests(unittest.TestCase):
@@ -26,10 +26,10 @@ class SnapshotTests(unittest.TestCase):
         a, b = self.an.known_teams()[:2]
         expected = self.an.predict(a, b, on=self.on)
         with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "analyzer.cs2edge"
+            path = Path(tmp) / "analyzer.cs2gp"
             self.an.save(path)
             with patch.object(Analyzer, "train", side_effect=AssertionError("nouvel entrainement")), \
-                    patch("cs2edge.model.MatchPredictor.fit", side_effect=AssertionError("refit")):
+                    patch("cs2gp.model.MatchPredictor.fit", side_effect=AssertionError("refit")):
                 restored = Analyzer.load(path)
                 actual = restored.predict(a, b, on=self.on)
                 self.assertEqual(fit_decider_temperature(restored), fit_decider_temperature(self.an))
@@ -50,7 +50,7 @@ class SnapshotTests(unittest.TestCase):
         a, b = self.an.known_teams()[:2]
         expected = self.an.predict(a, b, on=on)
         with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "analyzer.cs2edge"
+            path = Path(tmp) / "analyzer.cs2gp"
             self.an.save(path)
             restored = Analyzer.load(path)
             self.assertEqual(restored.predict(a, b, on=on), expected)
@@ -59,7 +59,7 @@ class SnapshotTests(unittest.TestCase):
 
     def test_corrupt_history_is_rejected_before_loading_models(self):
         with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "analyzer.cs2edge"
+            path = Path(tmp) / "analyzer.cs2gp"
             self.an.save(path)
             with ZipFile(path) as archive:
                 files = {name: archive.read(name) for name in archive.namelist()}
@@ -67,13 +67,13 @@ class SnapshotTests(unittest.TestCase):
             with ZipFile(path, "w") as archive:
                 for name, blob in files.items():
                     archive.writestr(name, blob)
-            with patch("cs2edge.model.MatchPredictor.load", side_effect=AssertionError("trop tot")):
+            with patch("cs2gp.model.MatchPredictor.load", side_effect=AssertionError("trop tot")):
                 with self.assertRaisesRegex(ValueError, "somme de controle.*history"):
                     Analyzer.load(path)
 
     def test_incompatible_schema_and_unknown_archive_members_are_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "analyzer.cs2edge"
+            path = Path(tmp) / "analyzer.cs2gp"
             for mode in ("schema", "version", "path"):
                 self.an.save(path)
                 with ZipFile(path) as archive:
@@ -95,10 +95,10 @@ class SnapshotTests(unittest.TestCase):
 
     def test_failed_save_preserves_previous_artifact_and_cleans_temporary_file(self):
         with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "analyzer.cs2edge"
+            path = Path(tmp) / "analyzer.cs2gp"
             self.an.save(path)
             previous = path.read_bytes()
-            with patch("cs2edge.snapshot.os.replace", side_effect=OSError("disque indisponible")):
+            with patch("cs2gp.snapshot.os.replace", side_effect=OSError("disque indisponible")):
                 with self.assertRaises(OSError):
                     self.an.save(path)
             self.assertEqual(path.read_bytes(), previous)
@@ -106,7 +106,7 @@ class SnapshotTests(unittest.TestCase):
 
     def test_legacy_bundle_still_loads_and_calibration_can_be_built_on_demand(self):
         with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "legacy.cs2edge"
+            path = Path(tmp) / "legacy.cs2gp"
             self.an.save(path)
             with ZipFile(path) as archive:
                 files = {name: archive.read(name) for name in archive.namelist()}
@@ -118,7 +118,7 @@ class SnapshotTests(unittest.TestCase):
             with ZipFile(path, "w") as archive:
                 for name, blob in files.items():
                     archive.writestr(name, blob)
-            with patch("cs2edge.model.MatchPredictor.fit", side_effect=AssertionError("refit")):
+            with patch("cs2gp.model.MatchPredictor.fit", side_effect=AssertionError("refit")):
                 restored = Analyzer.load(path)
                 self.assertIsNone(restored._calibration_history)
                 a, b = self.an.known_teams()[:2]

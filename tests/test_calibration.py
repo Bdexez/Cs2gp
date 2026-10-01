@@ -5,11 +5,11 @@ from unittest.mock import patch
 
 import numpy as np
 
-from cs2edge.calibration import CalibrationHistory, prequential_maps
-from cs2edge.model import MatchPredictor
-from cs2edge.predict import Analyzer
-from cs2edge.pronostic import _fit_decider_on, fit_decider_temperature
-from cs2edge.sources import simulate_history
+from cs2gp.calibration import CalibrationHistory, prequential_maps
+from cs2gp.model import MatchPredictor
+from cs2gp.predict import Analyzer
+from cs2gp.pronostic import _fit_decider_on, fit_decider_temperature
+from cs2gp.sources import simulate_history
 
 
 class PrequentialCalibrationTests(unittest.TestCase):
@@ -55,7 +55,7 @@ class PrequentialCalibrationTests(unittest.TestCase):
     def test_live_calibration_reuses_cached_predictions_and_invalidates_on_training(self):
         an = Analyzer().load_maps(self.maps).train(use_gbdt=False)
         first = an.calibration_history()
-        with patch("cs2edge.calibration.prequential_maps", side_effect=AssertionError("recalcul")):
+        with patch("cs2gp.calibration.prequential_maps", side_effect=AssertionError("recalcul")):
             self.assertIs(an.calibration_history(), first)
             temperature = fit_decider_temperature(an)
         self.assertEqual(temperature, _fit_decider_on(an.match_ds, first, len(an.match_ds)))

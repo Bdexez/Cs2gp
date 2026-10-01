@@ -2,8 +2,8 @@ import unittest
 
 import numpy as np
 
-from cs2edge import metrics
-from cs2edge.model import LogisticModel, MatchPredictor, recency_weights
+from cs2gp import metrics
+from cs2gp.model import LogisticModel, MatchPredictor, recency_weights
 
 
 class NumericContractsTests(unittest.TestCase):

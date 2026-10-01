@@ -20,7 +20,7 @@ MAX_CONFIDENCE = 0.96
 # En dessous de ce volume de maps, on ne fait pas confiance a la note.
 RELIABLE_MAPS = 60
 # Poids du modele match face a la lecture par maps. Valeur mesuree par backtest
-# (`cs2edge backtest` affiche l'optimum sur vos propres donnees) : les deux
+# (`cs2gp backtest` affiche l'optimum sur vos propres donnees) : les deux
 # estimateurs se valent et se completent, l'optimum est plat autour de 0.5.
 MATCH_MODEL_WEIGHT = 0.5
 # Ecart entre les deux estimateurs a partir duquel il vaut la peine de prevenir.

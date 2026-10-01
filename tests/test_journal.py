@@ -7,9 +7,9 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from cs2edge import journal
-from cs2edge.pronostic import Analysis, Fixture, Pick, read_fixtures
-from cs2edge.schema import MapResult, group_matches
+from cs2gp import journal
+from cs2gp.pronostic import Analysis, Fixture, Pick, read_fixtures
+from cs2gp.schema import MapResult, group_matches
 
 
 class JournalTests(unittest.TestCase):
@@ -79,7 +79,7 @@ class JournalTests(unittest.TestCase):
     def test_failed_atomic_replace_preserves_previous_journal(self):
         journal.record([self.pick], self.path)
         previous = self.path.read_bytes()
-        with patch("cs2edge.journal.os.replace", side_effect=OSError("interruption")):
+        with patch("cs2gp.journal.os.replace", side_effect=OSError("interruption")):
             with self.assertRaises(OSError):
                 journal.record([replace(self.pick, match_id="two")], self.path)
         self.assertEqual(self.path.read_bytes(), previous)

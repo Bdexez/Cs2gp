@@ -33,19 +33,19 @@ jobs:
         if: matrix.python == '3.9'
         run: python -m pip install numpy==1.24.0
       - run: python -m unittest discover -s tests -v
-      - run: cs2edge backtest --no-gbdt
+      - run: cs2gp backtest --no-gbdt
       - name: Reuse trained analyzer without CSV input
         run: |
-          cs2edge train --no-gbdt --bundle /tmp/analyzer.cs2edge
-          cs2edge predict navi g2 --model /tmp/analyzer.cs2edge --date 2026-11-11
-          cs2edge slate --model /tmp/analyzer.cs2edge --fixtures data/fixtures.csv --record /tmp/journal.csv
+          cs2gp train --no-gbdt --bundle /tmp/analyzer.cs2gp
+          cs2gp predict navi g2 --model /tmp/analyzer.cs2gp --date 2026-11-11
+          cs2gp slate --model /tmp/analyzer.cs2gp --fixtures data/fixtures.csv --record /tmp/journal.csv
 
   gbdt:
     name: Optional GBDT / Python 3.12
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      CS2EDGE_REQUIRE_GBDT: '1'
+      CS2GP_REQUIRE_GBDT: '1'
       OMP_NUM_THREADS: '1'
       OPENBLAS_NUM_THREADS: '1'
     steps:
@@ -55,9 +55,9 @@ jobs:
           python-version: '3.12'
       - run: python -m pip install -e '.[gbdt]'
       - run: python -m unittest discover -s tests -v
-      - run: cs2edge backtest
+      - run: cs2gp backtest
       - name: Reuse trained GBDT analyzer
         run: |
-          cs2edge train --bundle /tmp/analyzer.cs2edge
-          cs2edge predict navi g2 --model /tmp/analyzer.cs2edge --date 2026-11-11
-          cs2edge slate --model /tmp/analyzer.cs2edge --fixtures data/fixtures.csv --record /tmp/journal.csv
+          cs2gp train --bundle /tmp/analyzer.cs2gp
+          cs2gp predict navi g2 --model /tmp/analyzer.cs2gp --date 2026-11-11
+          cs2gp slate --model /tmp/analyzer.cs2gp --fixtures data/fixtures.csv --record /tmp/journal.csv

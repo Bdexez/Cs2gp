@@ -1,4 +1,4 @@
-# Axes d’amélioration de Cs2edge
+# Axes d’amélioration de Cs2gp
 
 Audit du 10 novembre 2026, sur le commit `b48231a`, avec Python 3.14.8 et
 NumPy 2.5.4. Les constats viennent de la lecture du code, du backtest et de
@@ -24,12 +24,12 @@ servi et de garantir l’intégrité des données et du journal.
 
 **1. Aligner prédiction et backtests**
 
-Dans [predict.py](../cs2edge/predict.py#L321), `Analyzer.predict` appelle
+Dans [predict.py](../cs2gp/predict.py#L321), `Analyzer.predict` appelle
 `combine_probability` sans `certainty`. Dans
-[backtest.py](../cs2edge/backtest.py#L153), `walk_forward` fournit cette valeur.
+[backtest.py](../cs2gp/backtest.py#L153), `walk_forward` fournit cette valeur.
 Le facteur qui réduit la confiance suit donc deux règles différentes.
 `simulate_tipster` omet également `certainty` dans son appel, vers la ligne 729
-de [pronostic.py](../cs2edge/pronostic.py#L729).
+de [pronostic.py](../cs2gp/pronostic.py#L729).
 
 Reproduction sur les 496 paires des 32 équipes du CSV fourni, au 6 septembre
 2026, avec les mêmes modèles entraînés et les mêmes probabilités brutes :
@@ -54,7 +54,7 @@ y compris pour une équipe peu connue ou inactive et avec l’option GBDT.
 
 **2. Isoler la validation du réglage**
 
-Dans [backtest.py](../cs2edge/backtest.py#L269), `tune` affecte
+Dans [backtest.py](../cs2gp/backtest.py#L269), `tune` affecte
 `fit_matches, holdout = matches[:cut], matches`. Le score présenté comme
 validation est donc un backtest sur l’historique complet.
 
@@ -82,7 +82,7 @@ ne change pas la configuration retenue pendant le réglage.
 
 **3. Garantir la date de connaissance des informations**
 
-Dans [predict.py](../cs2edge/predict.py#L276), changer `on` ne reconstruit ni
+Dans [predict.py](../cs2gp/predict.py#L276), changer `on` ne reconstruit ni
 l’état des équipes ni l’entraînement. Un appel demandant `navi` contre `g2`
 au **1er janvier 2025** utilise un modèle dont `last_date` vaut le
 **6 septembre 2026** et affiche des derniers résultats d’août/septembre 2026.
@@ -111,7 +111,7 @@ de la demande ; aucune information indisponible n’entre dans un fold.
 
 **4. Identifier les matchs dans le journal**
 
-Dans [journal.py](../cs2edge/journal.py#L94), l’index de règlement utilise
+Dans [journal.py](../cs2gp/journal.py#L94), l’index de règlement utilise
 seulement `(date, paire d’équipes)`. Deux rencontres entre les mêmes équipes
 le même jour s’écrasent. Le jeu fourni contient déjà 19 clés de ce type avec
 plusieurs rencontres.
@@ -140,7 +140,7 @@ crée une seule ligne ; une ambiguïté ne produit aucun règlement automatique.
 
 **5. Valider et préserver les données importées**
 
-Dans [schema.py](../cs2edge/schema.py#L167), l’import vérifie les colonnes et
+Dans [schema.py](../cs2gp/schema.py#L167), l’import vérifie les colonnes et
 convertit les valeurs, mais il accepte par exemple `rounds_a=-2`,
 `rounds_b=13.9` et `best_of=2`. Le score décimal est silencieusement tronqué à
 13. Une série BO3 contenant seulement une victoire de map obtient déjà un
@@ -167,7 +167,7 @@ valeurs de façon identique.
 
 **6. Corriger les handicaps BO5 du catalogue**
 
-Dans [markets.py](../cs2edge/markets.py#L254), `build_markets` étiquette le
+Dans [markets.py](../cs2gp/markets.py#L254), `build_markets` étiquette le
 sweep « handicap -1.5 » pour les BO3 et les BO5. En BO5, cette ligne couvre
 les scores 3-0 et 3-1 ; le sweep seul correspond à -2.5.
 
@@ -186,7 +186,7 @@ ligne égale la somme des probabilités des scores qui la couvrent.
 
 **7. Corriger la portée des options CLI**
 
-Dans [cli.py](../cs2edge/cli.py#L354), les options communes sont installées
+Dans [cli.py](../cs2gp/cli.py#L354), les options communes sont installées
 sur le parseur racine et sur les sous-commandes. Les valeurs par défaut de
 la sous-commande écrasent celles déjà lues.
 
@@ -216,7 +216,7 @@ sous-commande produit les mêmes paramètres et utilise le même fichier.
 Le CSV fourni contient 4 758 maps, 2 416 séries et aucun roster renseigné.
 Dans **395 séries, soit 16,35 %**, une même map apparaît plusieurs fois.
 Le générateur utilise des tirages avec remise dans
-[sources.py](../cs2edge/sources.py#L194), tandis que le veto projeté retire
+[sources.py](../cs2gp/sources.py#L194), tandis que le veto projeté retire
 les maps du pool. Les données de démonstration et la structure évaluée
 ne suivent donc pas le même mécanisme de sélection.
 
@@ -254,7 +254,7 @@ indique le nombre de rencontres distinctes derrière ses marges statistiques.
 
 `python -m tests.test_smoke` : **32/32 tests passent**.
 
-`python -m cs2edge backtest --no-gbdt --by-year` : **1 376 matchs évalués**,
+`python -m cs2gp backtest --no-gbdt --by-year` : **1 376 matchs évalués**,
 log-loss **0,4285**, Brier **0,1400**, exactitude **79,3 %**. Ces valeurs
 proviennent du CSV synthétique fourni et du pipeline actuel décrit plus haut.
 

@@ -1,10 +1,10 @@
-![cs2edge — model the match, measure the confidence](docs/visuals/cover.svg)
+![cs2gp — model the match, measure the confidence](docs/visuals/cover.svg)
 
-# cs2edge
+# cs2gp
 
 **A CS2 match model whose confidence can be checked.**
 
-cs2edge turns map-level match history into pre-match probabilities, accounts for map-veto structure, selects predictions and records them for later evaluation. Its NumPy core implements the ratings, logistic model and calibration explicitly.
+cs2gp turns map-level match history into pre-match probabilities, accounts for map-veto structure, selects predictions and records them for later evaluation. Its NumPy core implements the ratings, logistic model and calibration explicitly.
 
 `Python` · `NumPy` · `Elo + logistic regression` · `Probability calibration` · `Walk-forward evaluation`
 
@@ -36,24 +36,24 @@ automatic momentum when data or training options change.
 ## Quick start
 
 ```bash
-git clone https://github.com/Bdexez/Cs2edge.git
-cd Cs2edge
+git clone https://github.com/Bdexez/Cs2gp.git
+cd Cs2gp
 python -m venv .venv
 .venv/bin/pip install -e .
 
-.venv/bin/cs2edge ratings --top 15
-.venv/bin/cs2edge predict navi g2 --bo 3
-.venv/bin/cs2edge slate --fixtures data/fixtures.csv
+.venv/bin/cs2gp ratings --top 15
+.venv/bin/cs2gp predict navi g2 --bo 3
+.venv/bin/cs2gp slate --fixtures data/fixtures.csv
 ```
 
-The shipped CSV is ready for a first run. `cs2edge sample` regenerates synthetic history; `cs2edge fixtures` creates example upcoming matches. An optional GBDT ensemble is available with `pip install -e ".[gbdt]"`.
+The shipped CSV is ready for a first run. `cs2gp sample` regenerates synthetic history; `cs2gp fixtures` creates example upcoming matches. An optional GBDT ensemble is available with `pip install -e ".[gbdt]"`.
 
 Train once and reuse the complete analyzer:
 
 ```bash
-.venv/bin/cs2edge train --no-gbdt --bundle models/analyzer.cs2edge
-.venv/bin/cs2edge predict navi g2 --model models/analyzer.cs2edge
-.venv/bin/cs2edge slate --model models/analyzer.cs2edge --fixtures data/fixtures.csv
+.venv/bin/cs2gp train --no-gbdt --bundle models/analyzer.cs2gp
+.venv/bin/cs2gp predict navi g2 --model models/analyzer.cs2gp
+.venv/bin/cs2gp slate --model models/analyzer.cs2gp --fixtures data/fixtures.csv
 ```
 
 The bundle includes both models, configuration and history. Future predictions
@@ -81,8 +81,8 @@ For opposing outcomes, the core enforces **p(A) + p(B) = 1**. Calibration asks a
 ## Evaluation
 
 ```bash
-.venv/bin/cs2edge backtest --by-year
-.venv/bin/cs2edge tipster-backtest
+.venv/bin/cs2gp backtest --by-year
+.venv/bin/cs2gp tipster-backtest
 .venv/bin/python -m unittest discover -s tests -v
 ```
 
@@ -96,9 +96,9 @@ the evaluated period and does not establish performance under a different meta.
 Journal a slate before results are known, then inspect it later:
 
 ```bash
-.venv/bin/cs2edge slate --fixtures data/fixtures.csv --record data/journal.csv
-.venv/bin/cs2edge settle --journal data/journal.csv
-.venv/bin/cs2edge journal --journal data/journal.csv
+.venv/bin/cs2gp slate --fixtures data/fixtures.csv --record data/journal.csv
+.venv/bin/cs2gp settle --journal data/journal.csv
+.venv/bin/cs2gp journal --journal data/journal.csv
 ```
 
 Settlement uses results present in the history CSV. It is not a live score feed.
@@ -119,12 +119,12 @@ The application does not include a match scraper. See the [input schema and exam
 
 | Files | Responsibility |
 | :--- | :--- |
-| [`ratings.py`](cs2edge/ratings.py), [`features.py`](cs2edge/features.py) | Chronological ratings and feature extraction |
-| [`model.py`](cs2edge/model.py), [`metrics.py`](cs2edge/metrics.py) | Estimation, calibration and scoring |
-| [`snapshot.py`](cs2edge/snapshot.py) | Complete analyzer persistence and integrity checks |
-| [`calibration.py`](cs2edge/calibration.py) | Historical predictions made before their target days |
-| [`markets.py`](cs2edge/markets.py) | Veto and series-score distributions |
-| [`backtest.py`](cs2edge/backtest.py), [`pronostic.py`](cs2edge/pronostic.py) | Evaluation and selective prediction rules |
-| [`journal.py`](cs2edge/journal.py), [`cli.py`](cs2edge/cli.py) | Recorded predictions and command-line entry points |
+| [`ratings.py`](cs2gp/ratings.py), [`features.py`](cs2gp/features.py) | Chronological ratings and feature extraction |
+| [`model.py`](cs2gp/model.py), [`metrics.py`](cs2gp/metrics.py) | Estimation, calibration and scoring |
+| [`snapshot.py`](cs2gp/snapshot.py) | Complete analyzer persistence and integrity checks |
+| [`calibration.py`](cs2gp/calibration.py) | Historical predictions made before their target days |
+| [`markets.py`](cs2gp/markets.py) | Veto and series-score distributions |
+| [`backtest.py`](cs2gp/backtest.py), [`pronostic.py`](cs2gp/pronostic.py) | Evaluation and selective prediction rules |
+| [`journal.py`](cs2gp/journal.py), [`cli.py`](cs2gp/cli.py) | Recorded predictions and command-line entry points |
 
 Optional odds-based analysis, assumptions, calibration examples and the complete CLI guide are in the [technical reference](docs/REFERENCE.md). Real-world validation needs a representative chronological dataset; missing roster or event context limits the model's information.
