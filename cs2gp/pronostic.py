@@ -94,7 +94,10 @@ class Fixture:
         self.lan = _to_bool(self.lan)
         for key in ("odds_a", "odds_b", "odds_over", "odds_under", "odds_a_sweep", "odds_b_sweep"):
             value = getattr(self, key)
-            if value is not None and (not math.isfinite(value) or value <= 1):
+            if value is not None and (
+                isinstance(value, bool) or not isinstance(value, (int, float))
+                or not math.isfinite(value) or value <= 1
+            ):
                 raise ValueError(f"cote decimale invalide pour {key} : {value}")
 
     @property
@@ -333,8 +336,13 @@ class Tipster:
                 "streak_diff": "la serie en cours",
                 "rest_diff": "les jours de repos",
                 "workload_diff": "la charge de matchs recente",
+                "experience_diff": "l'experience cumulee",
+                "roster_tenure_diff": "la stabilite de l'effectif",
                 "elo_diff_x_lan": "le contexte LAN",
                 "elo_diff_x_bo3": "le format long",
+                "elo_diff_x_certainty": "la fiabilite de l'ecart de niveau",
+                "trajectory_diff": "la trajectoire recente",
+                "perf_residual_diff": "la performance au-dessus du niveau attendu",
             }.get(name, name)
             if abs(contrib) > 0.08:
                 out.append(f"{libelle.capitalize()} penche vers {who}.")
@@ -515,19 +523,28 @@ class Tipster:
                 edge = p_model - p_market
                 if edge < self.edge_min or expected_value(p_model, odds) <= 0:
                     continue
+                verdict = "SUSPECT" if edge > EDGE_ABSURDE else "VALEUR"
+                extra = [
+                    "Marche derive de la loi du score : les cotes de total de maps "
+                    "sont souvent posees a partir d'un modele i.i.d. qui ignore "
+                    "la structure du veto."
+                ]
+                if verdict == "SUSPECT":
+                    extra.append(
+                        f"Ecart de {edge:+.0%} avec le marche : trop gros pour etre credible. "
+                        "Le marche sait probablement quelque chose que l'historique ignore "
+                        "(remplacant, roster change, forfait). Verifier la compo avant d'agir."
+                    )
+                stake = 0.0 if verdict == "SUSPECT" else kelly_fraction(p_model, odds)
                 picks.append(
                     Pick(
                         date=fx.date, team_a=pred.team_a, team_b=pred.team_b,
                         best_of=fx.best_of, event=fx.event, market=label,
                         selection="oui", probability=p_model, tier=_tier(p_model),
-                        verdict="VALEUR", odds=odds, edge=edge,
+                        verdict=verdict, odds=odds, edge=edge,
                         ev=expected_value(p_model, odds),
-                        stake=kelly_fraction(p_model, odds),
-                        rationale=[
-                            "Marche derive de la loi du score : les cotes de total de maps "
-                            "sont souvent posees a partir d'un modele i.i.d. qui ignore "
-                            "la structure du veto."
-                        ],
+                        stake=stake,
+                        rationale=extra,
                     )
                 )
 
@@ -550,21 +567,30 @@ class Tipster:
                 edge = p_model - 1.0 / odds
                 if edge < self.edge_min or expected_value(p_model, odds) <= 0:
                     continue
+                verdict = "SUSPECT" if edge > EDGE_ABSURDE else "VALEUR"
+                extra = [
+                    f"Le veto laisse a {team} ses meilleurs terrains : le "
+                    f"sweep ({need}-0) est plus probable ({p_model:.0%}) que ne "
+                    "le croit un book qui traite les maps comme independantes.",
+                    "Edge mesure contre la cote brute (pas de cote +1.5 pour "
+                    "retirer la marge) : lecture volontairement prudente.",
+                ]
+                if verdict == "SUSPECT":
+                    extra.append(
+                        f"Ecart de {edge:+.0%} avec le marche : trop gros pour etre credible. "
+                        "Le marche sait probablement quelque chose que l'historique ignore "
+                        "(remplacant, roster change, forfait). Verifier la compo avant d'agir."
+                    )
+                stake = 0.0 if verdict == "SUSPECT" else kelly_fraction(p_model, odds)
                 picks.append(
                     Pick(
                         date=fx.date, team_a=pred.team_a, team_b=pred.team_b,
                         best_of=fx.best_of, event=fx.event,
                         market=f"handicap -{hline}", selection=team,
-                        probability=p_model, tier=_tier(p_model), verdict="VALEUR",
+                        probability=p_model, tier=_tier(p_model), verdict=verdict,
                         odds=odds, edge=edge, ev=expected_value(p_model, odds),
-                        stake=kelly_fraction(p_model, odds),
-                        rationale=[
-                            f"Le veto laisse a {team} ses meilleurs terrains : le "
-                            f"sweep ({need}-0) est plus probable ({p_model:.0%}) que ne "
-                            "le croit un book qui traite les maps comme independantes.",
-                            "Edge mesure contre la cote brute (pas de cote +1.5 pour "
-                            "retirer la marge) : lecture volontairement prudente.",
-                        ],
+                        stake=stake,
+                        rationale=extra,
                     )
                 )
         return _cap_correlated_stakes(picks)
