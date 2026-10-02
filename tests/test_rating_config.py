@@ -8,7 +8,8 @@ class RatingConfigTests(unittest.TestCase):
         for values in (dict(idle_halflife_days=0), dict(rd_growth_days=-1),
                        dict(rd_reference=0), dict(rd_min=301), dict(rd_initial=float("nan")),
                        dict(k_base=-1), dict(map_prior_weight=-.1), dict(roster_shock=1.1),
-                       dict(lan_bonus=float("inf")), dict(use_mov="false"), dict(fast_multiplier=True)):
+                       dict(lan_bonus=float("inf")), dict(lan_bonus=True),
+                       dict(use_mov="false"), dict(fast_multiplier=True)):
             with self.subTest(values=values), self.assertRaises(ValueError):
                 EloConfig.from_dict(values)
 

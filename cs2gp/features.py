@@ -315,7 +315,7 @@ class FeatureExtractor:
 
     def match_context(self, a: str, b: str, on: dt.date) -> dict:
         """Meme contexte de fiabilite pour les features, le service et les relectures."""
-        ta, tb = self.elo._team(a), self.elo._team(b)
+        ta, tb = self.elo._read_team(a), self.elo._read_team(b)
         h2h = len(self.h2h.get((min(a, b), max(a, b)), ()))
         return {
             "maps_a": ta.maps_played, "maps_b": tb.maps_played,

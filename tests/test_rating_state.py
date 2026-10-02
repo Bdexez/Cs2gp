@@ -55,6 +55,23 @@ class MapInactivityTests(unittest.TestCase):
         self.engine.observe(MapResult("return", future, "a", "b", "nuke", 13, 5, best_of=1))
         self.assertAlmostEqual(self.engine.teams["a"].map_ratings["nuke"], expected)
 
+    def test_reading_unknown_team_does_not_register_it(self):
+        from cs2gp.features import FeatureExtractor
+
+        original = copy.deepcopy(self.engine.teams)
+        self.assertEqual(self.engine.rating("ghost", self.day), 1500.0)
+        self.assertEqual(self.engine.deviation("ghost", self.day), self.engine.cfg.rd_initial)
+        self.assertEqual(self.engine.trajectory("ghost", self.day), 0.0)
+        self.assertEqual(self.engine.map_rating("ghost", "mirage", self.day), 1500.0)
+        self.assertEqual(self.engine.maps_played("ghost"), 0)
+        self.assertEqual(self.engine.teams, original)
+
+        fx = FeatureExtractor()
+        fx.match_features("ghost_a", "ghost_b", self.day)
+        fx.map_features("ghost_a", "ghost_b", self.day, "mirage")
+        fx.match_context("ghost_a", "ghost_b", self.day)
+        self.assertEqual(fx.elo.teams, {})
+
 
 if __name__ == "__main__":
     unittest.main()
