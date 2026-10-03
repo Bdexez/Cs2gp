@@ -122,6 +122,7 @@ def walk_forward(
     c'est-a-dire exactement ce que sert `Analyzer.predict`.
     """
     finite_number("blend", blend, maximum=1.0)
+    finite_number("momentum", momentum, minimum=-math.inf)
     if isinstance(bootstrap_samples, bool) or not isinstance(bootstrap_samples, int) or bootstrap_samples < 0:
         raise ValueError("bootstrap_samples doit etre un entier positif ou nul")
     positive_integer("block_days", block_days)
@@ -129,7 +130,7 @@ def walk_forward(
     splits = forward_splits(ds.dates, initial_frac, min_train, refit_every, evaluation_start)
     start = splits[0][0]
 
-    from .predict import combine_probability  # import local : evite un cycle
+    from .predict import MAX_CONFIDENCE, combine_probability, reliability  # import local : evite un cycle
 
     use_maps = map_ds is not None and ds.pool_X is not None
     p_match = np.zeros(n - start)
@@ -144,7 +145,7 @@ def walk_forward(
             # Le modele map ne voit que les maps jouees avant la date du 1er match
             # predit : meme frontiere temporelle que le modele match.
             cutoff = ds.dates[i]
-            k = sum(1 for d in map_ds.dates if d < cutoff)
+            k = bisect_left(map_ds.dates, cutoff)
             # Logistique seule au niveau map. Le GBDT a ete essaye ici (son
             # dataset est pourtant le plus gros, 4758 lignes contre 2416) :
             # +0.0005 de log-loss pour +0.0011 d'erreur type appariee, soit
@@ -175,18 +176,18 @@ def walk_forward(
             for r in range(len(y))
         ])
         grid = np.arange(0.0, 1.001, 0.05)
+        rel = np.array([
+            reliability(
+                ds.meta[start + r].get("maps_played_min", 999),
+                ds.meta[start + r].get("days_idle_max", 0),
+                ds.meta[start + r].get("certainty"),
+            )
+            for r in range(len(y))
+        ])
 
         def _ll(w: float) -> float:
-            pw = np.array([
-                combine_probability(
-                    p_match[r], p_maps[r],
-                    ds.meta[start + r].get("maps_played_min", 999),
-                    ds.meta[start + r].get("days_idle_max", 0),
-                    weight=w,
-                    certainty=ds.meta[start + r].get("certainty"),
-                )[0]
-                for r in range(len(y))
-            ])
+            pb = w * p_match + (1.0 - w) * p_maps
+            pw = np.clip(0.5 + (pb - 0.5) * rel, 1.0 - MAX_CONFIDENCE, MAX_CONFIDENCE)
             return log_loss(y, pw)
 
         best = float(min(grid, key=_ll))
@@ -226,6 +227,7 @@ def bet_backtest(
     """
     from .odds import find_value, simulate_flat
 
+    finite_number("min_edge", min_edge, maximum=1.0)
     plays = []
     for p, y, meta in zip(result.predictions, result.y, result.meta):
         odds = odds_lookup.get(meta["match_id"])
