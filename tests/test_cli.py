@@ -42,6 +42,23 @@ class CommonOptionsTests(unittest.TestCase):
             with self.assertRaisesRegex(SystemExit, "aucun resultat"):
                 main(["teams", "--data", str(path)])
 
+    def test_incomplete_odds_and_invalid_bounds_fail_fast(self):
+        with self.assertRaisesRegex(SystemExit, "odds-a et --odds-b"):
+            main(["predict", "navi", "g2", "--odds-a", "1.80"])
+        with self.assertRaisesRegex(SystemExit, "top"):
+            main(["ratings", "--top", "0"])
+        with self.assertRaisesRegex(SystemExit, "min-maps"):
+            main(["ratings", "--min-maps", "-1"])
+        with self.assertRaisesRegex(SystemExit, "teams"):
+            main(["fixtures", "--teams", "1"])
+        with self.assertRaisesRegex(SystemExit, "count"):
+            main(["fixtures", "--count", "0"])
+
+    def test_settle_and_tipster_backtest_accept_window_and_refit_options(self):
+        parser = build_parser()
+        self.assertEqual(parser.parse_args(["settle", "--window-days", "5"]).window_days, 5)
+        self.assertEqual(parser.parse_args(["tipster-backtest", "--refit-every", "80"]).refit_every, 80)
+
 
 if __name__ == "__main__":
     unittest.main()

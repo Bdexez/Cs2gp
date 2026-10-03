@@ -22,6 +22,7 @@ from .pronostic import (
 from . import journal as journal_mod
 from .schema import group_matches, parse_date, write_csv
 from .sources import simulate_history
+from .validation import positive_integer
 
 DEFAULT_DATA = "data/sample_matches.csv"
 
@@ -79,6 +80,9 @@ def cmd_teams(args) -> int:
 
 
 def cmd_ratings(args) -> int:
+    positive_integer("top", args.top)
+    if args.min_maps < 0:
+        raise ValueError("min-maps doit etre positif ou nul")
     an = _analyzer(args, train=False)
     on = max(m.date for m in an.matches)
     board = an.fx.elo.leaderboard(on=on, min_maps=args.min_maps)
@@ -151,6 +155,8 @@ def cmd_backtest(args) -> int:
 
 
 def cmd_predict(args) -> int:
+    if (args.odds_a is None) != (args.odds_b is None):
+        raise ValueError("--odds-a et --odds-b doivent etre fournis ensemble")
     an = _analyzer(args)
     on = parse_date(args.date) if args.date else None
     pred = an.predict(args.team_a, args.team_b, best_of=args.bo, lan=args.lan, on=on)
@@ -229,6 +235,9 @@ def cmd_fixtures(args) -> int:
     import csv
     import itertools
 
+    if args.teams < 2:
+        raise ValueError("teams doit etre au moins 2")
+    positive_integer("count", args.count)
     an = _analyzer(args, train=False)
     on = args.date or max(dt.date.today(), max(m.date for m in an.matches))
     board = [t for t, _r, _n in an.fx.elo.leaderboard(on=on, min_maps=40)][: args.teams]
@@ -267,7 +276,7 @@ def cmd_slate(args) -> int:
 
 def cmd_settle(args) -> int:
     an = _analyzer(args, train=False)
-    stats = journal_mod.settle(args.journal, an.matches)
+    stats = journal_mod.settle(args.journal, an.matches, window_days=args.window_days)
     print(f"Pointage : {stats['pointes']} nouveau(x) resultat(s), "
           f"{stats['en_attente']} en attente, "
           f"{stats['introuvables']} introuvable(s), {stats['ambigus']} ambigu(s).")
@@ -301,6 +310,7 @@ def cmd_tipster_backtest(args) -> int:
     rec = simulate_tipster(
         an.match_ds, an.map_ds,
         initial_frac=args.initial_frac,
+        refit_every=args.refit_every,
         abstention=args.abstention,
         momentum=args.momentum,
         use_gbdt=not args.no_gbdt,
@@ -473,6 +483,8 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("settle", parents=[common],
                        help="pointe les pronostics archives contre les resultats")
     s.add_argument("--journal", default="data/journal.csv")
+    s.add_argument("--window-days", type=int, default=3,
+                   help="tolerance de date en jours pour les lignes sans match_id (defaut 3)")
     s.set_defaults(func=cmd_settle)
 
     s = sub.add_parser("journal", parents=[common],
@@ -490,6 +502,7 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("tipster-backtest", parents=[common],
                        help="bilan historique du pronostiqueur (paliers, marches)")
     s.add_argument("--initial-frac", type=float, default=0.4)
+    s.add_argument("--refit-every", type=int, default=150)
     s.add_argument("--abstention", type=float, default=0.60,
                    help="probabilite minimale pour se prononcer")
     s.add_argument("--momentum", type=float, default=0.0,
