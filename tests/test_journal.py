@@ -155,6 +155,13 @@ class JournalTests(unittest.TestCase):
                 self.assertEqual(stats["pointes"], 1)
                 self.assertEqual(journal.load(path)[0]["resultat"], "gagne")
 
+    def test_noop_settle_does_not_rewrite_journal(self):
+        journal.record([replace(self.pick, match_id="missing")], self.path)
+        with patch("cs2gp.journal._write") as mocked_write:
+            stats = journal.settle(self.path, self.results)
+        self.assertEqual(stats["pointes"], 0)
+        mocked_write.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()
