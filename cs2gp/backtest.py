@@ -16,7 +16,10 @@ from dataclasses import dataclass
 import numpy as np
 
 from .features import Dataset
-from .metrics import format_summary, log_loss, paired_block_bootstrap, reliability_table, summarize
+from .metrics import (
+    brier_decomposition, calibration_slope_intercept, format_summary, log_loss,
+    paired_block_bootstrap, reliability_table, summarize,
+)
 from .model import MatchPredictor, map_predictor
 from .ratings import expected_score
 from .schema import ACTIVE_DUTY
@@ -83,6 +86,52 @@ class BacktestResult:
             lines.append(
                 f"  {row['bin']:<10} n={row['n']:<5} annonce {row['predicted']:.1%} "
                 f"observe {row['observed']:.1%}  ecart {gap:+.1%}"
+            )
+        cox = calibration_slope_intercept(self.y, self.predictions)
+        if cox["converged"]:
+            lines.append(
+                f"\nCalibration logistique (Cox) : pente={cox['slope']:.3f} (ideal 1.000), "
+                f"intercept={cox['intercept']:+.3f} (ideal 0.000)."
+            )
+        murphy = brier_decomposition(self.y, self.predictions)
+        lines.append(
+            f"Decomposition de Brier (Murphy) : fiabilite={murphy['reliability']:.4f}, "
+            f"resolution={murphy['resolution']:.4f}, BSS={murphy['brier_skill_score']:+.1%}."
+        )
+        return "\n".join(lines)
+
+    def breakdown(self, key, *, min_n: int = 10) -> dict[str, dict]:
+        """Ventile les metriques par segment (ex: 'best_of', 'lan', 'tier' ou callable)."""
+        positive_integer("min_n", min_n)
+        extractor = key if callable(key) else (lambda m: str(m.get(key, "inconnu")))
+        groups: dict[str, list[int]] = {}
+        for idx, meta in enumerate(self.meta):
+            groups.setdefault(str(extractor(meta)), []).append(idx)
+        out: dict[str, dict] = {}
+        for label, indices in sorted(groups.items()):
+            if len(indices) < min_n:
+                continue
+            y_sub = self.y[indices]
+            p_sub = self.predictions[indices]
+            elo_sub = self.elo_only[indices]
+            summary = summarize(y_sub, p_sub)
+            elo_ll = log_loss(y_sub, elo_sub)
+            out[label] = {
+                **summary,
+                "elo_log_loss": elo_ll,
+                "log_loss_gain_vs_elo": float(elo_ll - summary["log_loss"]),
+            }
+        return out
+
+    def format_breakdown(self, title: str, key, *, min_n: int = 10) -> str:
+        segments = self.breakdown(key, min_n=min_n)
+        if not segments:
+            return ""
+        lines = [f"\n{title} :"]
+        for label, stats in segments.items():
+            lines.append(
+                f"{format_summary('  ' + label, stats)}  "
+                f"gain_elo={stats['log_loss_gain_vs_elo']:+.4f}"
             )
         return "\n".join(lines)
 
