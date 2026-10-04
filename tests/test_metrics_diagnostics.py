@@ -1,0 +1,73 @@
+import datetime as dt
+import unittest
+
+import numpy as np
+
+from cs2gp import metrics
+
+
+class MetricsDiagnosticsTests(unittest.TestCase):
+    def test_murphy_brier_decomposition_identity_and_skill(self):
+        rng = np.random.default_rng(42)
+        p = rng.uniform(0.1, 0.9, size=400)
+        y = (rng.random(400) < p).astype(float)
+        d = metrics.brier_decomposition(y, p, bins=10)
+        self.assertGreaterEqual(d["reliability"], 0.0)
+        self.assertGreaterEqual(d["resolution"], 0.0)
+        self.assertGreater(d["uncertainty"], 0.0)
+        self.assertGreater(d["brier_skill_score"], 0.0)
+        # Binned Murphy identity holds closely up to within-bin variance of p
+        self.assertAlmostEqual(
+            d["brier"], d["reliability"] - d["resolution"] + d["uncertainty"], delta=0.01
+        )
+        # Constant prediction equals base rate -> zero resolution, zero skill
+        p_const = np.full_like(y, y.mean())
+        d_const = metrics.brier_decomposition(y, p_const)
+        self.assertAlmostEqual(d_const["reliability"], 0.0, places=10)
+        self.assertAlmostEqual(d_const["resolution"], 0.0, places=10)
+        self.assertAlmostEqual(d_const["brier_skill_score"], 0.0, places=10)
+
+    def test_calibration_slope_detects_overconfidence_and_underconfidence(self):
+        rng = np.random.default_rng(7)
+        z = rng.normal(0.0, 1.4, size=2000)
+        true_p = 1.0 / (1.0 + np.exp(-z))
+        y = (rng.random(2000) < true_p).astype(float)
+
+        calibrated = metrics.calibration_slope_intercept(y, true_p)
+        self.assertTrue(calibrated["converged"])
+        self.assertAlmostEqual(calibrated["slope"], 1.0, delta=0.15)
+        self.assertAlmostEqual(calibrated["intercept"], 0.0, delta=0.15)
+
+        overconfident_p = 1.0 / (1.0 + np.exp(-2.0 * z))
+        over = metrics.calibration_slope_intercept(y, overconfident_p)
+        self.assertTrue(over["converged"])
+        self.assertLess(over["slope"], 0.65)
+
+        underconfident_p = 1.0 / (1.0 + np.exp(-0.5 * z))
+        under = metrics.calibration_slope_intercept(y, underconfident_p)
+        self.assertTrue(under["converged"])
+        self.assertGreater(under["slope"], 1.5)
+
+    def test_calibration_slope_handles_degenerate_inputs(self):
+        res = metrics.calibration_slope_intercept([1, 1, 1], [0.8, 0.7, 0.9])
+        self.assertFalse(res["converged"])
+        self.assertIsNone(res["slope"])
+        res_const = metrics.calibration_slope_intercept([1, 0, 1, 0], [0.5, 0.5, 0.5, 0.5])
+        self.assertFalse(res_const["converged"])
+
+    def test_paired_block_bootstrap_supports_brier_metric(self):
+        dates = [dt.date(2026, 1, 1) + dt.timedelta(days=i) for i in range(40)]
+        y = np.array([1, 0] * 20, dtype=float)
+        p = np.array([0.8, 0.2] * 20, dtype=float)
+        ref = np.full(40, 0.5)
+        res = metrics.paired_block_bootstrap(y, p, ref, dates, samples=200, block_days=5, metric="brier")
+        self.assertEqual(res["metric"], "brier")
+        expected_gain = metrics.brier(y, ref) - metrics.brier(y, p)
+        self.assertAlmostEqual(res["gain"], expected_gain, places=10)
+        self.assertGreater(res["low"], 0.0)
+        with self.assertRaises(ValueError):
+            metrics.paired_block_bootstrap(y, p, ref, dates, metric="unknown")
+
+
+if __name__ == "__main__":
+    unittest.main()
