@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from .ratings import EloConfig, EloEngine
-from .schema import ACTIVE_DUTY, Match, MapResult
+from .schema import ACTIVE_DUTY, Match, MapResult, active_duty_on
 
 FORM_HALFLIFE_DAYS = 75.0
 FORM_WINDOW = 30
@@ -87,12 +87,16 @@ class FeatureExtractor:
         "h2h_map_diff",
     )
 
-    def __init__(self, elo_config: EloConfig | None = None) -> None:
+    def __init__(self, elo_config: EloConfig | None = None, *, versioned_pool: bool = False) -> None:
         self.elo = EloEngine(elo_config)
+        self.versioned_pool = versioned_pool
         self.recent: dict[str, _Recent] = defaultdict(_Recent)
         # h2h[(min,max)] = deque de (date, gagnant)
         self.h2h: dict[tuple[str, str], deque] = defaultdict(lambda: deque(maxlen=40))
         self.h2h_map: dict[tuple[str, str, str], deque] = defaultdict(lambda: deque(maxlen=20))
+
+    def pool_on(self, on: dt.date | None = None) -> tuple[str, ...]:
+        return active_duty_on(on, versioned=self.versioned_pool)
 
     # ------------------------------------------------------------- statistiques
 
@@ -207,7 +211,7 @@ class FeatureExtractor:
         """Avantage de A sur B, map par map, en points Elo."""
         return {
             m: self.elo.map_rating(team_a, m, on) - self.elo.map_rating(team_b, m, on)
-            for m in ACTIVE_DUTY
+            for m in self.pool_on(on)
         }
 
     def match_features(
@@ -360,13 +364,15 @@ def build_datasets(
     matches: list[Match],
     elo_config: EloConfig | None = None,
     warmup_maps: int = 12,
+    *,
+    versioned_pool: bool = False,
 ) -> tuple[Dataset, Dataset, FeatureExtractor]:
     """Passe chronologique unique -> (dataset match, dataset map, etat final).
 
     `warmup_maps` ecarte de l'entrainement les matchs ou une equipe n'a pas
     encore assez d'historique : ses features sont du bruit.
     """
-    fx = FeatureExtractor(elo_config)
+    fx = FeatureExtractor(elo_config, versioned_pool=versioned_pool)
     mX, my, mdates, mmeta, mpool = [], [], [], [], []
     pX, py, pdates, pmeta = [], [], [], []
 
@@ -391,7 +397,7 @@ def build_datasets(
                         **fx.match_context(a, b, match.date),
                     }
                 )
-                mpool.append([fx.map_features(a, b, match.date, m) for m in ACTIVE_DUTY])
+                mpool.append([fx.map_features(a, b, match.date, m) for m in fx.pool_on(match.date)])
                 for mp in match.maps:
                     pX.append(fx.map_features(a, b, match.date, mp.map_name))
                     py.append(mp.a_won)

@@ -22,6 +22,29 @@ ACTIVE_DUTY = (
     "train",
 )
 
+# Historique des rotations officielles du pool Active Duty CS2 (7 maps).
+# Utilise quand `versioned=True` pour eviter d'evaluer une map absente du pool
+# a la date historique d'un match reel.
+ACTIVE_DUTY_HISTORY: tuple[tuple[dt.date, tuple[str, ...]], ...] = (
+    (dt.date(2023, 9, 27), ("ancient", "anubis", "inferno", "mirage", "nuke", "overpass", "vertigo")),
+    (dt.date(2024, 4, 25), ("ancient", "anubis", "dust2", "inferno", "mirage", "nuke", "vertigo")),
+    (dt.date(2025, 1, 6), ("ancient", "anubis", "dust2", "inferno", "mirage", "nuke", "train")),
+    (dt.date(2025, 7, 15), ("ancient", "dust2", "inferno", "mirage", "nuke", "overpass", "train")),
+)
+
+
+def active_duty_on(on: dt.date | None = None, *, versioned: bool = False) -> tuple[str, ...]:
+    """Retourne le pool Active Duty (fixe par defaut, ou versionne par date)."""
+    if not versioned or on is None:
+        return ACTIVE_DUTY
+    pool = ACTIVE_DUTY_HISTORY[0][1]
+    for effective_date, maps in ACTIVE_DUTY_HISTORY:
+        if on >= effective_date:
+            pool = maps
+        else:
+            break
+    return pool
+
 # Tiers d'evenement -> poids de fiabilite du resultat (K-factor Elo).
 TIER_WEIGHT = {"s": 1.30, "a": 1.10, "b": 1.00, "c": 0.80, "d": 0.60}
 
