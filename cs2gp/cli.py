@@ -337,10 +337,17 @@ def cmd_slate(args) -> int:
     an = _analyzer(args)
     fixtures = read_fixtures(args.fixtures)
     card = _tipster(an, args).card(fixtures)
+    added = journal_mod.record_card(card, args.record) if args.record else None
+    if args.json:
+        payload = {
+            "analyses": [a.to_dict() for a in card],
+            "recorded": added,
+        }
+        print(json.dumps(payload, indent=2, ensure_ascii=False))
+        return 0
     print()
     print(format_card(card, verbose=args.verbose))
     if args.record:
-        added = journal_mod.record_card(card, args.record)
         print(f"\n{added} ligne(s) archivee(s) dans {args.record} (pronostics et abstentions).")
         print("Ils pourront etre pointes apres coup : cs2gp settle --journal "
               f"{args.record}")
@@ -394,6 +401,9 @@ def cmd_tipster_backtest(args) -> int:
         momentum=args.momentum,
         use_gbdt=not args.no_gbdt,
     )
+    if args.json:
+        print(json.dumps(rec.to_dict(), indent=2, ensure_ascii=False))
+        return 0
     print()
     print(rec.report())
     print(
@@ -566,6 +576,7 @@ def build_parser() -> argparse.ArgumentParser:
                    help="probabilite minimale pour se prononcer sans cotes (defaut 0.60)")
     s.add_argument("--edge-min", type=float, default=None,
                    help="ecart minimal avec le marche pour un pari avec cotes (defaut 0.04)")
+    s.add_argument("--json", action="store_true", help="sortie JSON structuree")
     s.set_defaults(func=cmd_slate)
 
     s = sub.add_parser("settle", parents=[common],
@@ -597,6 +608,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--momentum", type=float, default=0.0,
                    help="decalage momentum en logit a appliquer (defaut 0 ; mesurer "
                         "d'abord avec `slate --momentum auto`)")
+    s.add_argument("--json", action="store_true", help="sortie JSON structuree")
     s.set_defaults(func=cmd_tipster_backtest)
     return p
 
