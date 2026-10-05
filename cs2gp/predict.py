@@ -127,6 +127,38 @@ class Prediction:
     def fair_odds(self) -> tuple[float, float]:
         return 1.0 / max(self.p_a, 1e-6), 1.0 / max(1 - self.p_a, 1e-6)
 
+    def to_dict(self) -> dict:
+        oa, ob = self.fair_odds()
+        return {
+            "team_a": self.team_a,
+            "team_b": self.team_b,
+            "date": self.date.isoformat(),
+            "best_of": self.best_of,
+            "lan": self.lan,
+            "p_a": self.p_a,
+            "p_b": 1.0 - self.p_a,
+            "p_a_match_model": self.p_a_match_model,
+            "p_a_from_maps": self.p_a_from_maps,
+            "favorite": self.favorite,
+            "p_favorite": self.p_favorite,
+            "fair_odds_a": oa,
+            "fair_odds_b": ob,
+            "confidence": self.confidence,
+            "drivers": [{"feature": name, "contribution": val} for name, val in self.drivers],
+            "map_edges": [
+                {
+                    "map": e.map_name,
+                    "elo_edge": e.elo_edge,
+                    "p_a": e.p_a,
+                    "a_experience": e.a_experience,
+                    "b_experience": e.b_experience,
+                }
+                for e in self.map_edges
+            ],
+            "data_quality": dict(self.data_quality),
+            "warnings": list(self.warnings),
+        }
+
     def report(self) -> str:
         oa, ob = self.fair_odds()
         lines = [

@@ -716,6 +716,18 @@ class TipsterRecord:
             ]
         return "\n".join(lines)
 
+    def to_dict(self) -> dict:
+        return {
+            "n_fixtures": self.n_fixtures,
+            "n_skipped": self.n_skipped,
+            "n_settled": len(self.settled),
+            "n_pending": self.n_pending,
+            "coverage_known": self.coverage_known,
+            "by_tier": self.by(lambda p: p.tier),
+            "by_market": self.by(lambda p: p.market),
+            "dispersions": list(self.dispersions),
+        }
+
 
 def _settle(pick: Pick, meta: dict, y_a: float) -> bool:
     """Un pronostic est-il tombe juste ? Determine a partir du resultat reel."""
