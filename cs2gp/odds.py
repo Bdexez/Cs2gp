@@ -68,6 +68,27 @@ def expected_value(p: float, odds: float) -> float:
     return float(p * (odds - 1.0) - (1.0 - p))
 
 
+def closing_line_value(
+    taken_odds: float, closing_odds_a: float, closing_odds_b: float, side: str = "a"
+) -> dict:
+    """Valeur face a la ligne de cloture (CLV), sans marge.
+
+    Mesure a faible variance de la qualite d'un prix pris : battre la ligne de
+    cloture regulierement est un signal bien plus fiable que le ROI sur peu de paris.
+    """
+    if side not in ("a", "b"):
+        raise ValueError("side doit valoir 'a' ou 'b'")
+    taken_p = implied(taken_odds)
+    pa, pb = devig_power(closing_odds_a, closing_odds_b)
+    closing_p = pa if side == "a" else pb
+    return {
+        "closing_p": float(closing_p),
+        "taken_implied": float(taken_p),
+        "clv_prob": float(closing_p - taken_p),
+        "clv_ev": float(expected_value(closing_p, taken_odds)),
+    }
+
+
 def kelly_fraction(p: float, odds: float, cap: float = 0.05, scale: float = 0.25) -> float:
     """Kelly fractionnaire et plafonne.
 
@@ -133,8 +154,27 @@ def simulate_flat(results: list[tuple[float, float, int]], stake: float = 1.0) -
         if won not in (0, 1):
             raise ValueError("le resultat d'un pari doit etre 0 ou 1")
     if not results:
-        return {"bets": 0, "roi": 0.0, "profit": 0.0, "turnover": 0.0, "hit_rate": 0.0}
-    profit = sum((odds - 1.0) * stake if won else -stake for _p, odds, won in results)
+        return {
+            "bets": 0, "roi": 0.0, "profit": 0.0, "turnover": 0.0,
+            "hit_rate": 0.0, "max_drawdown": 0.0, "max_losing_streak": 0,
+        }
+    equity = peak = max_dd = 0.0
+    streak = max_streak = 0
+    for _p, odds, won in results:
+        if won:
+            equity += (odds - 1.0) * stake
+            streak = 0
+        else:
+            equity -= stake
+            streak += 1
+            if streak > max_streak:
+                max_streak = streak
+        if equity > peak:
+            peak = equity
+        dd = peak - equity
+        if dd > max_dd:
+            max_dd = dd
+    profit = equity
     turnover = stake * len(results)
     return {
         "bets": len(results),
@@ -143,4 +183,6 @@ def simulate_flat(results: list[tuple[float, float, int]], stake: float = 1.0) -
         "roi": float(profit / turnover),
         "hit_rate": float(np.mean([w for *_x, w in results])),
         "avg_odds": float(np.mean([o for _p, o, _w in results])),
+        "max_drawdown": float(max_dd),
+        "max_losing_streak": int(max_streak),
     }

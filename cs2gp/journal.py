@@ -304,12 +304,27 @@ def financial_summary(journal_path: str | Path) -> dict | None:
     if not rows:
         return None
     flat_profit = 0.0
+    flat_peak = 0.0
+    max_drawdown_flat = 0.0
+    streak = max_streak = 0
     kelly_profit = 0.0
     kelly_staked = 0.0
     for r in rows:
         odds = float(r["cote"])
         won = r["resultat"] == "gagne"
-        flat_profit += (odds - 1.0) if won else -1.0
+        if won:
+            flat_profit += odds - 1.0
+            streak = 0
+        else:
+            flat_profit -= 1.0
+            streak += 1
+            if streak > max_streak:
+                max_streak = streak
+        if flat_profit > flat_peak:
+            flat_peak = flat_profit
+        dd = flat_peak - flat_profit
+        if dd > max_drawdown_flat:
+            max_drawdown_flat = dd
         stake = float(r["mise"]) if r.get("mise") else 0.0
         kelly_staked += stake
         kelly_profit += stake * (odds - 1.0) if won else -stake
@@ -320,6 +335,8 @@ def financial_summary(journal_path: str | Path) -> dict | None:
         "cote_moyenne": sum(float(r["cote"]) for r in rows) / n,
         "profit_mise_fixe": flat_profit,
         "roi_mise_fixe": flat_profit / n,
+        "max_drawdown_mise_fixe": max_drawdown_flat,
+        "pire_serie_defaites": max_streak,
         "profit_kelly": kelly_profit,
         "mise_kelly_totale": kelly_staked,
         "roi_kelly": kelly_profit / kelly_staked if kelly_staked > 1e-9 else 0.0,
