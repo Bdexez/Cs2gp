@@ -66,6 +66,7 @@ def save_analyzer(an, path: str | Path) -> None:
         created_at=dt.datetime.now(dt.timezone.utc).isoformat(), package_version=__version__,
         sklearn_version=_sklearn_version() if an.match_model.gbdt is not None else None,
         elo=an.fx.elo.cfg.to_dict(), warmup_maps=an.warmup_maps,
+        versioned_pool=getattr(an, "versioned_pool", False),
         momentum=an.momentum, momentum_auto=an._momentum_auto,
         training_options={name: getattr(an.match_model, name) for name in _MODEL_OPTIONS},
         sha256={name: hashlib.sha256(blob).hexdigest() for name, blob in files.items()},
@@ -131,8 +132,11 @@ def load_analyzer(path: str | Path):
             row["date"] = parse_date(row["date"])
             row["roster_a"], row["roster_b"] = tuple(row["roster_a"]), tuple(row["roster_b"])
             history.append(MapResult(**row))
+        versioned_pool = manifest.get("versioned_pool", False)
+        if not isinstance(versioned_pool, bool):
+            raise ValueError("versioned_pool doit etre un booleen")
         an = Analyzer(EloConfig.from_dict(manifest["elo"]), manifest["warmup_maps"],
-                      manifest["momentum"]).load_maps(history)
+                      manifest["momentum"], versioned_pool=versioned_pool).load_maps(history)
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             for name in files - {"history.json", "calibration.json"}:

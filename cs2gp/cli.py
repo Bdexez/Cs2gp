@@ -31,9 +31,10 @@ DEFAULT_DATA = "data/sample_matches.csv"
 
 def _analyzer(args, train: bool = True) -> Analyzer:
     if getattr(args, "model", None):
-        if args.data is not None or args.warmup is not None or args.no_gbdt or args.elo_config:
+        if (args.data is not None or args.warmup is not None or args.no_gbdt
+                or args.elo_config or getattr(args, "versioned_pool", False)):
             raise ValueError("--model fournit deja les donnees et la configuration ; "
-                             "retirer --data, --warmup, --no-gbdt et --elo-config")
+                             "retirer --data, --warmup, --no-gbdt, --elo-config et --versioned-pool")
         an = Analyzer.load(args.model)
         print(f"Analyseur charge depuis {args.model} : {len(an.maps)} maps, "
               f"historique jusqu'au {an.match_model.last_date}", file=sys.stderr)
@@ -48,7 +49,11 @@ def _analyzer(args, train: bool = True) -> Analyzer:
     elo = EloConfig.load(args.elo_config) if getattr(args, "elo_config", None) else None
     if elo is not None:
         print(f"Constantes de notation chargees depuis {args.elo_config}", file=sys.stderr)
-    an = Analyzer(elo_config=elo, warmup_maps=12 if args.warmup is None else args.warmup).load_csv(path)
+    an = Analyzer(
+        elo_config=elo,
+        warmup_maps=12 if args.warmup is None else args.warmup,
+        versioned_pool=getattr(args, "versioned_pool", False),
+    ).load_csv(path)
     if not an.matches:
         raise ValueError(f"aucun resultat exploitable dans {path}")
     print(
@@ -463,6 +468,8 @@ def _common_options(parser: argparse.ArgumentParser) -> None:
                         help="regression logistique seule")
     parser.add_argument("--elo-config", default=argparse.SUPPRESS,
                         help="JSON de constantes de notation (voir `tune`)")
+    parser.add_argument("--versioned-pool", action="store_true", default=argparse.SUPPRESS,
+                        help="utilise le pool Active Duty historique a la date de chaque match")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -491,7 +498,7 @@ def build_parser() -> argparse.ArgumentParser:
     common = argparse.ArgumentParser(add_help=False)
     _common_options(common)
     _common_options(p)
-    p.set_defaults(data=None, warmup=None, no_gbdt=False, elo_config=None)
+    p.set_defaults(data=None, warmup=None, no_gbdt=False, elo_config=None, versioned_pool=False)
     sub = p.add_subparsers(dest="cmd", required=True)
 
     s = sub.add_parser("sample", help="genere un historique synthetique", parents=[common])

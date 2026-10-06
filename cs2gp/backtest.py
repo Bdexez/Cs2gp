@@ -22,7 +22,7 @@ from .metrics import (
 )
 from .model import MatchPredictor, map_predictor
 from .ratings import expected_score
-from .schema import ACTIVE_DUTY
+from .schema import ACTIVE_DUTY, active_duty_on
 from .temporal import forward_splits
 from .validation import finite_number, positive_integer
 
@@ -166,13 +166,17 @@ def _elo_reference(ds: Dataset) -> np.ndarray:
 
 
 def _pool_to_series(
-    map_model: MatchPredictor, pool_x: np.ndarray, best_of: int, momentum: float = 0.0
+    map_model: MatchPredictor,
+    pool_x: np.ndarray,
+    best_of: int,
+    momentum: float = 0.0,
+    pool_names: tuple[str, ...] = ACTIVE_DUTY,
 ) -> float:
     """Probabilites des 7 maps -> probabilite de serie, via le veto projete."""
     from .predict import probability_from_pool  # import local : evite un cycle
 
     ps = map_model.predict_proba(np.asarray(pool_x, dtype=float))
-    return probability_from_pool(list(zip(ACTIVE_DUTY, ps.tolist())), best_of, momentum)
+    return probability_from_pool(list(zip(pool_names, ps.tolist())), best_of, momentum)
 
 
 def walk_forward(
@@ -225,8 +229,9 @@ def walk_forward(
             map_model = map_predictor(**model_kwargs)
             map_model.fit(map_ds.X[:k], map_ds.y[:k], map_ds.dates[:k], map_ds.feature_names)
             for r in range(i, j):
+                pool_names = active_duty_on(ds.dates[r], versioned=ds.versioned_pool)
                 p_maps[r - start] = _pool_to_series(
-                    map_model, ds.pool_X[r], ds.meta[r].get("best_of", 3), momentum
+                    map_model, ds.pool_X[r], ds.meta[r].get("best_of", 3), momentum, pool_names
                 )
         folds += 1
 

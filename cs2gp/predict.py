@@ -206,9 +206,12 @@ class Analyzer:
         elo_config: EloConfig | None = None,
         warmup_maps: int = 12,
         momentum: float = 0.0,
+        *,
+        versioned_pool: bool = False,
     ) -> None:
         self.elo_config = elo_config
         self.warmup_maps = warmup_maps
+        self.versioned_pool = bool(versioned_pool)
         # Effet d'enchainement entre maps. A mesurer sur vos donnees
         # (`markets.estimate_momentum`) avant d'etre suppose non nul.
         self.momentum = momentum
@@ -246,7 +249,9 @@ class Analyzer:
         """Remplace l'historique valide ; un echec conserve l'analyseur precedent."""
         maps = list(maps)
         matches = group_matches(maps)
-        match_ds, map_ds, fx = build_datasets(matches, self.elo_config, self.warmup_maps)
+        match_ds, map_ds, fx = build_datasets(
+            matches, self.elo_config, self.warmup_maps, versioned_pool=self.versioned_pool
+        )
         self.maps, self.matches = maps, matches
         self.match_ds, self.map_ds, self.fx = match_ds, map_ds, fx
         self.match_model = self.map_model = None
@@ -295,7 +300,8 @@ class Analyzer:
             if not maps:
                 raise ValueError(f"aucun resultat anterieur au {on}")
             past = Analyzer(self.elo_config, self.warmup_maps,
-                            momentum=0.0 if self._momentum_auto else self.momentum)
+                            momentum=0.0 if self._momentum_auto else self.momentum,
+                            versioned_pool=self.versioned_pool)
             past.load_maps(maps).train(**self._training_options)
             if self._momentum_auto:
                 past.apply_estimated_momentum()
@@ -385,7 +391,7 @@ class Analyzer:
         p_match = self.match_model.predict_one(x)
 
         edges: list[MapEdge] = []
-        for m in ACTIVE_DUTY:
+        for m in self.fx.pool_on(on):
             xm = self.fx.map_features(a, b, on, m)
             edges.append(
                 MapEdge(
