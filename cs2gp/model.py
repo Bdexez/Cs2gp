@@ -63,6 +63,7 @@ class LogisticModel:
     weights: np.ndarray | None = None
     scales: np.ndarray | None = None
     resid: np.ndarray | None = None
+    cov: np.ndarray | None = None
     feature_names: tuple[str, ...] = ()
 
     def _fit_residualizer(self, X: np.ndarray, w: np.ndarray) -> None:
@@ -129,6 +130,14 @@ class LogisticModel:
             if np.max(np.abs(step)) < self.tol:
                 break
         self.weights = beta
+        # Matrice d'information de Fisher sur l'echantillon non dedouble -> covariance asymptotique.
+        p_orig = sigmoid(Xs @ beta)
+        s_orig = w * np.clip(p_orig * (1.0 - p_orig), 1e-9, None)
+        fisher = (Xs.T * s_orig) @ Xs + self.l2 * np.eye(Xs.shape[1])
+        try:
+            self.cov = np.linalg.inv(fisher)
+        except np.linalg.LinAlgError:
+            self.cov = np.linalg.pinv(fisher)
         return self
 
     def decision(self, X: np.ndarray) -> np.ndarray:
@@ -137,6 +146,15 @@ class LogisticModel:
         X = feature_matrix(np.atleast_2d(X), columns=len(self.weights))
         Xr = self._apply_residual(X)
         return (Xr / self.scales) @ self.weights
+
+    def decision_se(self, X: np.ndarray) -> np.ndarray:
+        """Erreur type analytique du logit (approximation de Laplace / Fisher)."""
+        if self.weights is None or self.scales is None or self.cov is None:
+            raise RuntimeError("covariance indisponible (modele non entraine ou ancien format)")
+        X = feature_matrix(np.atleast_2d(X), columns=len(self.weights))
+        Xs = self._apply_residual(X) / self.scales
+        var = np.einsum("ij,jk,ik->i", Xs, self.cov, Xs)
+        return np.sqrt(np.maximum(var, 0.0))
 
     def predict_proba(self, X: np.ndarray) -> np.ndarray:
         return sigmoid(self.decision(X))
@@ -272,6 +290,18 @@ class MatchPredictor:
     def predict_one(self, x: np.ndarray) -> float:
         return float(self.predict_proba(np.asarray(x, dtype=float).reshape(1, -1))[0])
 
+    def predict_interval(self, x: np.ndarray, z_score: float = 1.959963984540054) -> tuple[float, float]:
+        """Intervalle de confiance analytique sur la probabilite predite (defaut 95%)."""
+        finite_number("z_score", z_score, strict=True)
+        row = np.asarray(x, dtype=float).reshape(1, -1)
+        z = float(self._raw_decision(row)[0])
+        weight_log = (1.0 - self.gbdt_weight) if self.gbdt is not None else 1.0
+        se = float(self.logistic.decision_se(row)[0]) * weight_log
+        temp = max(self.temperature, 1e-6)
+        lo = float(sigmoid((z - z_score * se) / temp))
+        hi = float(sigmoid((z + z_score * se) / temp))
+        return lo, hi
+
     def explain(self, x: np.ndarray, top: int = 6) -> list[tuple[str, float]]:
         """Contribution de chaque feature au logit, en points de logit."""
         if self.logistic.weights is None or self.logistic.scales is None:
@@ -317,6 +347,7 @@ class MatchPredictor:
             "weights": self.logistic.weights.tolist(),
             "scales": self.logistic.scales.tolist(),
             "resid": self.logistic.resid.tolist() if self.logistic.resid is not None else [],
+            "cov": self.logistic.cov.tolist() if self.logistic.cov is not None else None,
             "trained_on": self.trained_on,
             "last_date": self.last_date,
             "has_gbdt": self.gbdt is not None,
@@ -351,6 +382,11 @@ class MatchPredictor:
         m.last_date = payload.get("last_date", "")
         m.logistic = LogisticModel(l2=payload["l2"], feature_names=m.feature_names)
         m.logistic.weights, m.logistic.scales, m.logistic.resid = weights, scales, resid
+        if payload.get("cov") is not None:
+            cov = np.asarray(payload["cov"], dtype=float)
+            if cov.shape != (len(weights), len(weights)) or not np.all(np.isfinite(cov)):
+                raise ValueError("matrice de covariance invalide")
+            m.logistic.cov = cov
         blob = path.with_suffix(".gbdt.pkl")
         if has_gbdt:
             if not blob.is_file():
