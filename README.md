@@ -22,6 +22,10 @@ series probabilities and calibration using predictions made before each result.
 The [input and state audit](docs/FIABILITE_ENTREES_ET_ETAT.md) adds strict date and
 CSV validation, preserves a usable analyzer after failed updates and refreshes
 automatic momentum when data or training options change.
+The [engineering and data-analysis cycle](docs/AMELIORATIONS_CYCLE_2026_11.md)
+adds pure Elo reads, weighted residualization, Cox/Murphy calibration
+diagnostics, stratified backtests (`--by-segment`), `cs2gp audit`, `--json`
+CLI output, date-versioned Active Duty pools, CLV and drawdown metrics.
 
 ## Why this project is interesting
 
