@@ -3,7 +3,7 @@ import unittest
 
 import numpy as np
 
-from cs2gp.backtest import BacktestResult
+from cs2gp.backtest import BacktestResult, benchmark_against_truth
 from cs2gp.metrics import summarize
 
 
@@ -47,6 +47,16 @@ class BacktestSegmentTests(unittest.TestCase):
         report = res.report()
         self.assertIn("Calibration logistique (Cox)", report)
         self.assertIn("Decomposition de Brier (Murphy)", report)
+
+    def test_benchmark_against_truth_computes_excess_losses(self):
+        res = self._sample_result()
+        truth = {f"m{i}": 0.80 if i % 2 == 0 else 0.20 for i in range(40)}
+        bench = benchmark_against_truth(res, truth)
+        self.assertEqual(bench["n_matched"], 40)
+        self.assertAlmostEqual(bench["mean_abs_prob_error"], 0.05, places=10)
+        self.assertGreater(bench["elo_excess_log_loss"], bench["excess_log_loss"])
+        with self.assertRaises(ValueError):
+            benchmark_against_truth(res, {"unknown": 0.5})
 
 
 if __name__ == "__main__":

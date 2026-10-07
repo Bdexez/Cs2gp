@@ -17,7 +17,7 @@ import numpy as np
 
 from .features import Dataset
 from .metrics import (
-    brier_decomposition, calibration_slope_intercept, format_summary, log_loss,
+    brier, brier_decomposition, calibration_slope_intercept, format_summary, log_loss,
     paired_block_bootstrap, reliability_table, summarize,
 )
 from .model import MatchPredictor, map_predictor
@@ -318,6 +318,37 @@ def bet_backtest(
     out = simulate_flat(plays)
     out["matches_with_odds"] = sum(1 for m in result.meta if m["match_id"] in odds_lookup)
     return out
+
+
+def benchmark_against_truth(result: BacktestResult, truth: dict[str, float]) -> dict:
+    """Mesure l'ecart residuel face aux probabilites vraies d'une simulation.
+
+    Permet de savoir combien de signal reste sur la table entre le modele evalue
+    et le plafond atteignable (oracle connaissant les niveaux latents).
+    """
+    indices = [i for i, m in enumerate(result.meta) if m.get("match_id") in truth]
+    if not indices:
+        raise ValueError("aucun match evalue ne correspond aux identifiants de truth")
+    y = result.y[indices]
+    p_model = result.predictions[indices]
+    p_elo = result.elo_only[indices]
+    p_true = np.array([truth[result.meta[i]["match_id"]] for i in indices], dtype=float)
+    model_ll = log_loss(y, p_model)
+    oracle_ll = log_loss(y, p_true)
+    elo_ll = log_loss(y, p_elo)
+    model_brier = brier(y, p_model)
+    oracle_brier = brier(y, p_true)
+    return {
+        "n_matched": len(indices),
+        "model_log_loss": model_ll,
+        "oracle_log_loss": oracle_ll,
+        "excess_log_loss": float(model_ll - oracle_ll),
+        "elo_excess_log_loss": float(elo_ll - oracle_ll),
+        "model_brier": model_brier,
+        "oracle_brier": oracle_brier,
+        "excess_brier": float(model_brier - oracle_brier),
+        "mean_abs_prob_error": float(np.mean(np.abs(p_model - p_true))),
+    }
 
 
 # ---------------------------------------------------------------------------
