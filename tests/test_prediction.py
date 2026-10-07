@@ -109,6 +109,17 @@ class PredictionParityTests(unittest.TestCase):
         self.assertEqual(normalize_team(resolved), "mousesports")
         self.assertEqual(self.an.resolve_team("MOUZ"), resolved)
 
+    def test_prediction_exposes_95_confidence_interval_in_report_and_dict(self):
+        a, b = self.an.known_teams()[:2]
+        on = max(m.date for m in self.an.matches) + dt.timedelta(days=1)
+        pred = self.an.predict(a, b, on=on)
+        self.assertIsNotNone(pred.p_a_interval)
+        lo, hi = pred.p_a_interval
+        self.assertLess(lo, pred.p_a_match_model)
+        self.assertLess(pred.p_a_match_model, hi)
+        self.assertIn("IC 95% modele match", pred.report())
+        self.assertEqual(pred.to_dict()["p_a_interval"], [lo, hi])
+
 
 if __name__ == "__main__":
     unittest.main()
