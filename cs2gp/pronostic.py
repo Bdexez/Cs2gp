@@ -718,6 +718,23 @@ class TipsterRecord:
             }
         return out
 
+    def scoring(self) -> dict | None:
+        """Scores propres (log-loss, Brier, ECE) sur les pronostics regles."""
+        if not self.settled:
+            return None
+        from .metrics import brier, expected_calibration_error, log_loss
+
+        y = [1.0 if s.won else 0.0 for s in self.settled]
+        p = [s.pick.probability for s in self.settled]
+        return {
+            "n": len(self.settled),
+            "log_loss": log_loss(y, p),
+            "brier": brier(y, p),
+            "ece": expected_calibration_error(y, p),
+            "mean_predicted": float(sum(p) / len(p)),
+            "mean_observed": float(sum(y) / len(y)),
+        }
+
     def report(self) -> str:
         introduction = (
             f"Bilan du pronostiqueur : {self.n_fixtures} matchs presentes, "
@@ -750,6 +767,14 @@ class TipsterRecord:
                 f"  {name:<20}{s['n']:>6}{s['n_matchs']:>7}{s['annonce']:>9.1%}{s['observe']:>10.1%}"
                 f"{s['ecart']:>+9.1%}  +/-{2 * s['erreur_type']:.1%}{_flag(s)}"
             )
+        scores = self.scoring()
+        if scores is not None:
+            lines += [
+                "",
+                f"Qualite probabiliste ({scores['n']} pronostics regles) : "
+                f"logloss={scores['log_loss']:.4f}  brier={scores['brier']:.4f}  "
+                f"ece={scores['ece']:.3f}",
+            ]
         if self.dispersions:
             lo, hi = min(self.dispersions), max(self.dispersions)
             lines += [
@@ -767,6 +792,7 @@ class TipsterRecord:
             "n_settled": len(self.settled),
             "n_pending": self.n_pending,
             "coverage_known": self.coverage_known,
+            "scoring": self.scoring(),
             "by_tier": self.by(lambda p: p.tier),
             "by_market": self.by(lambda p: p.market),
             "dispersions": list(self.dispersions),
