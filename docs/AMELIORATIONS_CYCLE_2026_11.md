@@ -59,3 +59,28 @@ outillage domaine CS2 et sortie structuree).
   `closing_line_value` (CLV face a la ligne de cloture sans marge), ainsi que
   `max_drawdown` et la pire serie de defaites dans `simulate_flat` et
   `journal.financial_summary`.
+
+## Cycle 4 : Profondeur statistique et integration bout-en-bout
+
+- **Pool versionne bout-en-bout** (`predict.py`, `features.py`, `backtest.py`,
+  `pronostic.py`, `snapshot.py`, `cli.py`) : option `versioned_pool` /
+  `--versioned-pool` propagee de la construction des datasets jusqu'a
+  `Analyzer.predict`, aux backtests et aux instantanes.
+- **Intervalles de confiance analytiques** (`model.py`) : covariance
+  asymptotique de Fisher dans `LogisticModel.decision_se` et intervalle de
+  confiance 95 % dans `MatchPredictor.predict_interval`, persiste en JSON.
+- **Audit et benchmark oracle** (`audit.py`, `backtest.py`) : detection des
+  trous calendaires, equipes sous le rodage et collisions sur un meme jour ;
+  `benchmark_against_truth` mesure l'exces de log-loss et de Brier face aux
+  probabilites latentes de `simulate_with_truth`.
+
+## Cycle 5 : Incertitude en sortie, scoring du journal et rosters simules
+
+- **IC 95 % dans `Prediction`** (`predict.py`) : exposition de `p_a_interval`
+  dans le rapport texte et dans `Prediction.to_dict()`.
+- **Scores propres du pronostiqueur** (`pronostic.py`) : `TipsterRecord.scoring()`
+  calcule log-loss, Brier et ECE sur les pronostics regles (rapport et JSON).
+- **Rosters dans le simulateur** (`sources.py`, `cli.py`) : `with_rosters=True`
+  (et `--with-rosters` sur `cs2gp sample`) genere des effectifs de 5 joueurs
+  renouveles lors des remaniements sans perturber le flux aleatoire, permettant
+  des experiences A/B pures et la validation bout-en-bout sur regime `realiste`.
