@@ -50,6 +50,38 @@ class SimulationTests(unittest.TestCase):
             with self.subTest(options=options), self.assertRaises(ValueError):
                 simulate_history(**options)
 
+    def test_with_rosters_preserves_matches_and_tracks_reshuffles(self):
+        from cs2gp.audit import audit_history
+
+        opts = dict(n_teams=8, years=1.0, seed=7, start=dt.date(2024, 1, 1), regime="realiste")
+        plain = simulate_history(**opts)
+        rostered = simulate_history(**opts, with_rosters=True)
+        self.assertEqual([(m.match_id, m.rounds_a, m.rounds_b) for m in plain],
+                         [(m.match_id, m.rounds_a, m.rounds_b) for m in rostered])
+        self.assertTrue(all(len(m.roster_a) == 5 and len(m.roster_b) == 5 for m in rostered))
+        distinct_rosters = {m.roster_a for m in rostered if m.team_a == rostered[0].team_a}
+        self.assertGreaterEqual(len(distinct_rosters), 1)
+        self.assertEqual(audit_history(rostered)["roster_coverage"], 1.0)
+
+        truth_rostered, truth = simulate_with_truth(**opts, veto_samples=30, with_rosters=True)
+        self.assertEqual(truth_rostered, rostered)
+        self.assertEqual(set(truth), {m.match_id for m in rostered})
+
+    def test_realistic_regime_oracle_benchmark(self):
+        from cs2gp.backtest import benchmark_against_truth
+
+        rows, truth = simulate_with_truth(
+            n_teams=12, years=1.5, seed=7, start=dt.date(2024, 1, 1),
+            regime="realiste", veto_samples=50, with_rosters=True,
+        )
+        ds, pds, _ = build_datasets(group_matches(rows))
+        res = walk_forward(ds, pds, initial_frac=0.5, use_gbdt=False)
+        bench = benchmark_against_truth(res, truth)
+        self.assertEqual(bench["n_matched"], len(res.y))
+        self.assertGreater(bench["oracle_log_loss"], 0.45)
+        self.assertLess(abs(bench["excess_log_loss"]), 0.05)
+        self.assertLess(bench["mean_abs_prob_error"], 0.15)
+
 
 if __name__ == "__main__":
     unittest.main()

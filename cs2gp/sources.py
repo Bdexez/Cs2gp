@@ -154,12 +154,16 @@ def simulate_history(
     seed: int = 7,
     start: dt.date | None = None,
     regime: "str | Regime" = "facile",
+    *,
+    with_rosters: bool = False,
 ) -> list[MapResult]:
     """Genere un historique credible : niveaux latents qui derivent, forces par
     map, changements de roster, tiers d'evenements, calendrier irregulier.
 
     `regime` : "facile" (defaut, lisible) ou "realiste" (aussi imprevisible que
     le vrai circuit). Voir `Regime`.
+    `with_rosters` : peuple 5 joueurs par equipe et en remplace 2 a chaque
+    remaniement, sans consommer le generateur aleatoire (comparaison A/B pure).
     """
     cfg = _simulation_config(n_teams, years, regime)
     rng = random.Random(seed)
@@ -169,6 +173,8 @@ def simulate_history(
     skill = {t: rng.gauss(0, cfg.skill_spread) for t in names}
     map_skill = {t: {m: rng.gauss(0, cfg.map_spread) for m in ACTIVE_DUTY} for t in names}
     pool = {t: rng.sample(list(ACTIVE_DUTY), 6) for t in names}
+    rosters = {t: tuple(sorted(f"{t}_p{i}" for i in range(1, 6))) for t in names} if with_rosters else {}
+    next_player = {t: 6 for t in names} if with_rosters else {}
 
     rows: list[MapResult] = []
     day = start
@@ -183,6 +189,10 @@ def simulate_history(
                 skill[t] += rng.gauss(0, cfg.reshuffle_shock)
                 for m in ACTIVE_DUTY:
                     map_skill[t][m] = 0.6 * map_skill[t][m] + rng.gauss(0, cfg.map_spread * 0.85)
+                if with_rosters:
+                    k = next_player[t]
+                    rosters[t] = tuple(sorted((*rosters[t][:3], f"{t}_p{k}", f"{t}_p{k + 1}")))
+                    next_player[t] = k + 2
 
         tier = rng.choices(["s", "a", "b", "c"], weights=[0.10, 0.25, 0.40, 0.25])[0]
         lan = tier in ("s", "a") and rng.random() < 0.7
@@ -218,6 +228,7 @@ def simulate_history(
                         rounds_a=ra, rounds_b=rb, best_of=best_of,
                         event=f"sim {tier.upper()} {day.year}", tier=tier, lan=lan,
                         map_index=idx,
+                        roster_a=rosters.get(a, ()), roster_b=rosters.get(b, ()),
                     )
                 )
         day += dt.timedelta(days=rng.randint(1, 3))
@@ -266,6 +277,8 @@ def simulate_with_truth(
     start: dt.date | None = None,
     regime: "str | Regime" = "facile",
     veto_samples: int = 400,
+    *,
+    with_rosters: bool = False,
 ) -> tuple[list[MapResult], dict[str, float]]:
     """Comme `simulate_history`, plus la probabilite vraie de chaque match.
 
@@ -285,6 +298,8 @@ def simulate_with_truth(
     skill = {t: rng.gauss(0, cfg.skill_spread) for t in names}
     map_skill = {t: {m: rng.gauss(0, cfg.map_spread) for m in ACTIVE_DUTY} for t in names}
     pool = {t: rng.sample(list(ACTIVE_DUTY), 6) for t in names}
+    rosters = {t: tuple(sorted(f"{t}_p{i}" for i in range(1, 6))) for t in names} if with_rosters else {}
+    next_player = {t: 6 for t in names} if with_rosters else {}
 
     rows: list[MapResult] = []
     truth: dict[str, float] = {}
@@ -306,6 +321,10 @@ def simulate_with_truth(
                 skill[t] += rng.gauss(0, cfg.reshuffle_shock)
                 for m in ACTIVE_DUTY:
                     map_skill[t][m] = 0.6 * map_skill[t][m] + rng.gauss(0, cfg.map_spread * 0.85)
+                if with_rosters:
+                    k = next_player[t]
+                    rosters[t] = tuple(sorted((*rosters[t][:3], f"{t}_p{k}", f"{t}_p{k + 1}")))
+                    next_player[t] = k + 2
 
         tier = rng.choices(["s", "a", "b", "c"], weights=[0.10, 0.25, 0.40, 0.25])[0]
         lan = tier in ("s", "a") and rng.random() < 0.7
@@ -352,6 +371,7 @@ def simulate_with_truth(
                         rounds_a=ra, rounds_b=rb, best_of=best_of,
                         event=f"sim {tier.upper()} {day.year}", tier=tier, lan=lan,
                         map_index=idx,
+                        roster_a=rosters.get(a, ()), roster_b=rosters.get(b, ()),
                     )
                 )
         day += dt.timedelta(days=rng.randint(1, 3))
