@@ -182,6 +182,54 @@ def _fit_temperature(z: np.ndarray, y: np.ndarray) -> float:
     return float((lo + hi) / 2.0)
 
 
+def select_l2(
+    X: np.ndarray,
+    y: np.ndarray,
+    dates: list[dt.date] | None = None,
+    grid: tuple[float, ...] = (0.5, 2.0, 8.0, 25.0, 80.0),
+    val_frac: float = 0.2,
+    recency_halflife: float = RECENCY_HALFLIFE_DAYS,
+    feature_names: tuple[str, ...] = (),
+) -> dict:
+    """Selection chronologique de la penalite ridge L2 sur la fin du jeu d'entrainement.
+
+    Ne touche jamais a la periode d'evaluation ni au holdout de calibration.
+    """
+    y = binary_labels(y)
+    X = feature_matrix(X, rows=len(y))
+    finite_number("val_frac", val_frac, strict=True)
+    if val_frac >= 1.0:
+        raise ValueError("val_frac doit etre dans ]0, 1[")
+    finite_number("recency_halflife", recency_halflife, strict=True)
+    if not grid:
+        raise ValueError("grid doit contenir au moins une valeur de l2")
+    for v in grid:
+        finite_number("l2", v)
+    if dates is not None:
+        if len(dates) != len(y):
+            raise ValueError("une date est requise pour chaque resultat")
+        validate_dates(dates)
+
+    n_val = int(len(y) * val_frac)
+    n_fit = len(y) - n_val
+    if dates and n_val:
+        n_fit = calibration_boundary(dates, n_fit, minimum=30)
+        n_val = len(y) - n_fit
+    if n_fit < 30 or n_val < 20 or len(np.unique(y[:n_fit])) < 2:
+        return {"best_l2": float(grid[0]), "scores": [], "n_train": n_fit, "n_val": n_val}
+
+    Xf, yf = X[:n_fit], y[:n_fit]
+    Xv, yv = X[n_fit:], y[n_fit:]
+    w = recency_weights(dates[:n_fit], recency_halflife) if dates else None
+    scores: list[tuple[float, float]] = []
+    for v in grid:
+        mdl = LogisticModel(l2=float(v), feature_names=feature_names).fit(Xf, yf, sample_weight=w)
+        ll = log_loss(yv, mdl.predict_proba(Xv))
+        scores.append((float(v), float(ll)))
+    best_l2 = min(scores, key=lambda kv: kv[1])[0]
+    return {"best_l2": best_l2, "scores": scores, "n_train": n_fit, "n_val": n_val}
+
+
 @dataclass
 class MatchPredictor:
     """Ensemble logistique (+ GBDT optionnel) avec calibration temperature."""
@@ -191,6 +239,7 @@ class MatchPredictor:
     gbdt_weight: float = 0.35
     calibration_frac: float = 0.2
     recency_halflife: float = RECENCY_HALFLIFE_DAYS
+    l2_grid: tuple[float, ...] | None = None
     logistic: LogisticModel = field(default_factory=LogisticModel)
     gbdt: object | None = None
     temperature: float = 1.0
@@ -210,6 +259,11 @@ class MatchPredictor:
             raise ValueError("calibration_frac doit etre dans [0, 1[")
         if not isinstance(self.use_gbdt, bool):
             raise ValueError("use_gbdt doit etre un booleen")
+        if self.l2_grid is not None:
+            if not self.l2_grid:
+                raise ValueError("l2_grid doit contenir au moins une valeur")
+            for v in self.l2_grid:
+                finite_number("l2_grid", v)
 
     # ------------------------------------------------------------------- train
 
@@ -238,7 +292,14 @@ class MatchPredictor:
             n_fit = calibration_boundary(dates, n_fit)
             n_cal = len(y) - n_fit
         Xf, yf = X[:n_fit], y[:n_fit]
-        w = recency_weights(dates[:n_fit], self.recency_halflife) if dates else None
+        dates_fit = dates[:n_fit] if dates else None
+        if self.l2_grid is not None:
+            chosen = select_l2(
+                Xf, yf, dates_fit, grid=tuple(self.l2_grid),
+                recency_halflife=self.recency_halflife, feature_names=self.feature_names,
+            )
+            self.l2 = chosen["best_l2"]
+        w = recency_weights(dates_fit, self.recency_halflife) if dates_fit else None
 
         self.logistic = LogisticModel(l2=self.l2, feature_names=self.feature_names)
         self.logistic.fit(Xf, yf, sample_weight=w)
