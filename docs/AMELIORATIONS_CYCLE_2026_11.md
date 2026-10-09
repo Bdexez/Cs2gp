@@ -84,3 +84,16 @@ outillage domaine CS2 et sortie structuree).
   (et `--with-rosters` sur `cs2gp sample`) genere des effectifs de 5 joueurs
   renouveles lors des remaniements sans perturber le flux aleatoire, permettant
   des experiences A/B pures et la validation bout-en-bout sur regime `realiste`.
+
+## Cycle 6 : Regularisation chronologique, derive par fold et cotes historiques
+
+- **Selection chronologique de `l2`** (`model.py`) : `select_l2` et option
+  `MatchPredictor(..., l2_grid=...)` choisissant la penalite ridge sur la fin
+  du jeu d'entrainement, sans toucher au holdout de calibration ni a l'evaluation.
+- **Derive par fold et export CSV** (`backtest.py`, `cli.py`) :
+  `BacktestResult.drift_report()` (`--by-fold`) suit le log-loss, le gain face
+  a Elo, l'ECE et la pente de Cox fold par fold ; `export_csv()` (`--export-csv`)
+  exporte atomiquement les predictions hors-echantillon.
+- **Confrontation a des cotes historiques en CLI** (`backtest.py`, `cli.py`) :
+  `read_odds_csv` (validation stricte, rejet des doublons et cotes <= 1) et
+  `cs2gp backtest --odds-csv` affichant ROI, profit et drawdown.
