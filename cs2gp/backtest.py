@@ -403,7 +403,7 @@ def bet_backtest(
     Sans cotes reelles, cette fonction ne renvoie rien d'exploitable : ne pas
     substituer des cotes moyennes ou reconstituees, le biais serait total.
     """
-    from .odds import find_value, simulate_flat
+    from .odds import find_value, simulate_flat, simulate_kelly
 
     finite_number("min_edge", min_edge, maximum=1.0)
     plays = []
@@ -417,6 +417,7 @@ def bet_backtest(
         won = int((bet.side == meta["team_a"] and y == 1) or (bet.side == meta["team_b"] and y == 0))
         plays.append((bet.model_p, bet.odds, won))
     out = simulate_flat(plays)
+    out["kelly"] = simulate_kelly(plays)
     out["matches_with_odds"] = sum(1 for m in result.meta if m["match_id"] in odds_lookup)
     return out
 

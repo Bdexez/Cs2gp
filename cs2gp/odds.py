@@ -186,3 +186,62 @@ def simulate_flat(results: list[tuple[float, float, int]], stake: float = 1.0) -
         "max_drawdown": float(max_dd),
         "max_losing_streak": int(max_streak),
     }
+
+
+def simulate_kelly(
+    results: list[tuple[float, float, int]],
+    initial_bankroll: float = 1.0,
+    cap: float = 0.05,
+    scale: float = 0.25,
+) -> dict:
+    """Simulation multiplicative de bankroll en Kelly fractionnaire plafonne."""
+    finite_number("initial_bankroll", initial_bankroll, strict=True)
+    finite_number("cap", cap, maximum=1.0)
+    finite_number("scale", scale, maximum=1.0)
+    for p, odds, won in results:
+        _probability(p)
+        implied(odds)
+        if won not in (0, 1):
+            raise ValueError("le resultat d'un pari doit etre 0 ou 1")
+    if not results:
+        return {
+            "bets": 0, "final_bankroll": float(initial_bankroll), "return_pct": 0.0,
+            "turnover": 0.0, "roi": 0.0, "hit_rate": 0.0,
+            "max_drawdown_pct": 0.0, "max_losing_streak": 0,
+        }
+    bankroll = float(initial_bankroll)
+    peak = bankroll
+    max_dd_pct = 0.0
+    turnover = 0.0
+    streak = max_streak = 0
+    hits = 0
+    for p, odds, won in results:
+        frac = kelly_fraction(p, odds, cap=cap, scale=scale)
+        wager = bankroll * frac
+        turnover += wager
+        if won:
+            bankroll += wager * (odds - 1.0)
+            hits += 1
+            streak = 0
+        else:
+            bankroll -= wager
+            streak += 1
+            if streak > max_streak:
+                max_streak = streak
+        if bankroll > peak:
+            peak = bankroll
+        if peak > 0:
+            dd_pct = (peak - bankroll) / peak
+            if dd_pct > max_dd_pct:
+                max_dd_pct = dd_pct
+    profit = bankroll - float(initial_bankroll)
+    return {
+        "bets": len(results),
+        "final_bankroll": float(bankroll),
+        "return_pct": float(profit / float(initial_bankroll)),
+        "turnover": float(turnover),
+        "roi": float(profit / turnover) if turnover > 1e-12 else 0.0,
+        "hit_rate": float(hits / len(results)),
+        "max_drawdown_pct": float(max_dd_pct),
+        "max_losing_streak": int(max_streak),
+    }
