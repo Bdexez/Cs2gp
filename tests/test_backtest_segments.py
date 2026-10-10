@@ -9,7 +9,7 @@ import unittest
 
 import numpy as np
 
-from cs2gp.backtest import BacktestResult, benchmark_against_truth, read_odds_csv
+from cs2gp.backtest import BacktestResult, benchmark_against_truth, benchmark_regimes, read_odds_csv
 from cs2gp.cli import main
 from cs2gp.metrics import summarize
 from cs2gp.schema import write_csv
@@ -122,6 +122,18 @@ class BacktestSegmentTests(unittest.TestCase):
             self.assertIn("bet_backtest", payload)
             self.assertGreater(payload["bet_backtest"]["matches_with_odds"], 0)
             self.assertTrue(export_path.is_file())
+
+    def test_benchmark_regimes_aggregates_multiple_seeds(self):
+        report = benchmark_regimes(
+            regimes=("realiste",), seeds=(3, 7), n_teams=8, years=1.0,
+            veto_samples=20, initial_frac=0.5,
+        )
+        self.assertIn("realiste", report)
+        self.assertEqual(len(report["realiste"]["runs"]), 2)
+        self.assertIn("excess_log_loss", report["realiste"]["mean"])
+        self.assertGreaterEqual(report["realiste"]["std"]["model_log_loss"], 0.0)
+        with self.assertRaises(ValueError):
+            benchmark_regimes(regimes=(), seeds=(1,))
 
 
 if __name__ == "__main__":
