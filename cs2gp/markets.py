@@ -21,6 +21,7 @@ Sequence de veto standard (Valve / tournois majeurs) :
 from __future__ import annotations
 
 import math
+import random
 from dataclasses import dataclass, field
 
 from .validation import finite_number, positive_integer
@@ -132,6 +133,79 @@ def project_veto(map_probs: list[tuple[str, float]], best_of: int) -> VetoPlan:
     plan.decider = decider[0]
     plan.order = picks + [decider]
     return plan
+
+
+def _softmax_pick(pool: list[tuple[str, float]], scores: list[float], temperature: float, rng: random.Random) -> tuple[str, float]:
+    peak = max(scores)
+    weights = [math.exp((s - peak) / temperature) for s in scores]
+    total = sum(weights)
+    r = rng.random() * total
+    acc = 0.0
+    for idx, w in enumerate(weights):
+        acc += w
+        if r <= acc:
+            return pool.pop(idx)
+    return pool.pop()
+
+
+def stochastic_veto_distribution(
+    map_probs: list[tuple[str, float]],
+    best_of: int,
+    *,
+    momentum: float = 0.0,
+    temperature: float = 0.05,
+    samples: int = 400,
+    seed: int = 0,
+) -> SeriesDistribution:
+    """Loi du score moyennee sur des vetos stochastiques (choix softmax).
+
+    Permet de mesurer la sensibilite au veto lorsque deux maps ont des
+    probabilites proches. A `temperature=0`, coincide exactement avec le veto
+    deterministe `project_veto`.
+    """
+    _validate_format(best_of)
+    _validate_maps(map_probs)
+    finite_number("momentum", momentum, minimum=-math.inf)
+    finite_number("temperature", temperature)
+    positive_integer("samples", samples)
+    if not map_probs or (best_of >= 3 and len(map_probs) != 7):
+        raise ValueError(f"le veto bo{best_of} exige "
+                         + ("un pool de sept maps" if best_of >= 3 else "un pool non vide"))
+    if temperature == 0.0:
+        plan = project_veto(map_probs, best_of)
+        return series_distribution(plan.order, best_of, momentum)
+
+    rng = random.Random(seed)
+    base_pool = sorted(map_probs, key=lambda kv: (-kv[1], kv[0]))
+    acc: dict[tuple[int, int], float] = {}
+    for _ in range(samples):
+        pool = list(base_pool)
+        if best_of == 1:
+            turn_a = True
+            while len(pool) > 1:
+                # A bannit sa pire map (plus petit p), B bannit la meilleure de A (plus grand p)
+                scores = [-p for _, p in pool] if turn_a else [p for _, p in pool]
+                _softmax_pick(pool, scores, temperature, rng)
+                turn_a = not turn_a
+            order = [pool[0]]
+        else:
+            # Deux bans d'ouverture
+            _softmax_pick(pool, [-p for _, p in pool], temperature, rng)
+            _softmax_pick(pool, [p for _, p in pool], temperature, rng)
+            picks = []
+            for k in range(best_of - 1):
+                scores = [p for _, p in pool] if k % 2 == 0 else [-p for _, p in pool]
+                picks.append(_softmax_pick(pool, scores, temperature, rng))
+            if best_of == 3:
+                _softmax_pick(pool, [-p for _, p in pool], temperature, rng)
+                _softmax_pick(pool, [p for _, p in pool], temperature, rng)
+            decider = pool[0]
+            order = picks + [decider]
+        d = series_distribution(order, best_of, momentum)
+        for k, v in d.scores.items():
+            acc[k] = acc.get(k, 0.0) + v
+    scores = {k: v / samples for k, v in acc.items()}
+    return SeriesDistribution(scores=scores, order=project_veto(map_probs, best_of).order, best_of=best_of)
 
 
 @dataclass
