@@ -20,12 +20,18 @@ class CliJsonTests(unittest.TestCase):
             data = Path(tmp) / "history.csv"
             write_csv(str(data), rows)
 
-            # ratings --json
+            # ratings --json + --export-csv
+            ratings_csv = Path(tmp) / "ratings.csv"
             out = io.StringIO()
             with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
-                self.assertEqual(main(["ratings", "--data", str(data), "--top", "5", "--min-maps", "1", "--json"]), 0)
+                self.assertEqual(main([
+                    "ratings", "--data", str(data), "--top", "5", "--min-maps", "1",
+                    "--export-csv", str(ratings_csv), "--json",
+                ]), 0)
             ratings_payload = json.loads(out.getvalue())
             self.assertEqual(len(ratings_payload["ratings"]), 5)
+            self.assertTrue(ratings_csv.is_file())
+            self.assertEqual(len(ratings_csv.read_text(encoding="utf-8").splitlines()), 6)
             teams = [r["team"] for r in ratings_payload["ratings"]]
 
             # predict --json with odds

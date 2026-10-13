@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import datetime as dt
 import json
 import math
+import os
 import sys
+import tempfile
 from pathlib import Path
 
 from . import __version__
@@ -189,6 +192,35 @@ def cmd_ratings(args) -> int:
     an = _analyzer(args, train=False)
     on = max(m.date for m in an.matches)
     board = an.fx.elo.leaderboard(on=on, min_maps=args.min_maps)
+    if args.export_csv:
+        pool = list(an.fx.pool_on(on))
+        out_path = Path(args.export_csv)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = None
+        try:
+            with tempfile.NamedTemporaryFile(mode="w", newline="", encoding="utf-8",
+                                             dir=out_path.parent, prefix=f".{out_path.name}.",
+                                             suffix=".tmp", delete=False) as fh:
+                temporary = Path(fh.name)
+                writer = csv.writer(fh, lineterminator="\n")
+                writer.writerow(["rank", "team", "rating", "deviation", "trajectory",
+                                 "maps_played", "last_date", *pool])
+                for rank, (team, rating, played) in enumerate(board[: args.top], 1):
+                    tr = an.fx.elo._read_team(team)
+                    writer.writerow([
+                        rank, team, f"{rating:.2f}",
+                        f"{an.fx.elo.deviation(team, on):.2f}",
+                        f"{an.fx.elo.trajectory(team, on):.2f}",
+                        played, tr.last_date.isoformat() if tr.last_date else "",
+                        *(f"{an.fx.elo.map_rating(team, mp, on):.2f}" for mp in pool),
+                    ])
+                fh.flush()
+                os.fsync(fh.fileno())
+            os.replace(temporary, out_path)
+        finally:
+            if temporary is not None:
+                temporary.unlink(missing_ok=True)
+        print(f"{min(len(board), args.top)} equipes exportees -> {out_path}", file=sys.stderr)
     if args.json:
         rows = []
         for rank, (team, rating, played) in enumerate(board[: args.top], 1):
@@ -226,10 +258,13 @@ def cmd_train(args) -> int:
     p_in = an.match_model.predict_proba(ds.X)
     print("\nAjustement en echantillon (optimiste par construction, sert de controle) :")
     print(format_summary("modele", summarize(ds.y, p_in)))
-    print("\nPoids appris (features standardisees, vus de l'equipe A) :")
-    for name, w in an.match_model.logistic.coefficients():
-        bar = "#" * min(30, int(abs(w) * 10))
-        print(f"  {name:<22} {w:+.4f}  {bar}")
+    print("\nPoids appris (features standardisees, vus de l'equipe A ; * = |z| > 1.96) :")
+    for row in an.match_model.logistic.feature_diagnostics():
+        w = row["weight"]
+        bar = "#" * min(24, int(abs(w) * 10))
+        z_str = "   n/a" if row["z_score"] is None else f"{row['z_score']:+6.2f}"
+        star = "*" if row["significant"] else " "
+        print(f"  {row['feature']:<22} {w:+.4f}  z={z_str} {star}  {bar}")
     print(f"\nTemperature de calibration : {an.match_model.temperature:.3f}")
     print(f"GBDT actif : {an.match_model.gbdt is not None}")
     out = Path(args.bundle or args.out or "models/match.json")
@@ -501,7 +536,9 @@ def cmd_journal(args) -> int:
         print(f"  {money['paris']} paris, cote moyenne {money['cote_moyenne']:.2f}, "
               f"reussite {money['taux_reussite']:.1%}")
         print(f"  mise fixe : {money['profit_mise_fixe']:+.2f} unites, "
-              f"ROI {money['roi_mise_fixe']:+.1%}")
+              f"ROI {money['roi_mise_fixe']:+.1%}, "
+              f"drawdown max {money['max_drawdown_mise_fixe']:.2f} u, "
+              f"pire serie {money['pire_serie_defaites']} defaites")
         print(f"  Kelly     : {money['profit_kelly']:+.3f} pour "
               f"{money['mise_kelly_totale']:.2f} misees, ROI {money['roi_kelly']:+.1%}")
         print("  Sur moins de ~200 paris, ce ROI est domine par le hasard : "
@@ -654,6 +691,7 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("ratings", parents=[common], help="classement Elo et forces par map")
     s.add_argument("--top", type=int, default=20)
     s.add_argument("--min-maps", type=int, default=20)
+    s.add_argument("--export-csv", help="exporte le classement et les notes par map en CSV")
     s.add_argument("--json", action="store_true", help="sortie JSON structuree")
     s.set_defaults(func=cmd_ratings)
 
