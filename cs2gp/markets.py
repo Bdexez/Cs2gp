@@ -148,6 +148,32 @@ def _softmax_pick(pool: list[tuple[str, float]], scores: list[float], temperatur
     return pool.pop()
 
 
+def _sample_veto_order(
+    base_pool: list[tuple[str, float]],
+    best_of: int,
+    temperature: float,
+    rng: random.Random,
+) -> list[tuple[str, float]]:
+    pool = list(base_pool)
+    if best_of == 1:
+        turn_a = True
+        while len(pool) > 1:
+            scores = [-p for _, p in pool] if turn_a else [p for _, p in pool]
+            _softmax_pick(pool, scores, temperature, rng)
+            turn_a = not turn_a
+        return [pool[0]]
+    _softmax_pick(pool, [-p for _, p in pool], temperature, rng)
+    _softmax_pick(pool, [p for _, p in pool], temperature, rng)
+    picks = []
+    for k in range(best_of - 1):
+        scores = [p for _, p in pool] if k % 2 == 0 else [-p for _, p in pool]
+        picks.append(_softmax_pick(pool, scores, temperature, rng))
+    if best_of == 3:
+        _softmax_pick(pool, [-p for _, p in pool], temperature, rng)
+        _softmax_pick(pool, [p for _, p in pool], temperature, rng)
+    return picks + [pool[0]]
+
+
 def stochastic_veto_distribution(
     map_probs: list[tuple[str, float]],
     best_of: int,
@@ -161,7 +187,8 @@ def stochastic_veto_distribution(
 
     Permet de mesurer la sensibilite au veto lorsque deux maps ont des
     probabilites proches. A `temperature=0`, coincide exactement avec le veto
-    deterministe `project_veto`.
+    deterministe `project_veto` (et moyenne les deux ordres de premier pick
+    lorsque `momentum != 0` pour garantir p(A|B) + p(B|A) = 1).
     """
     _validate_format(best_of)
     _validate_maps(map_probs)
@@ -172,38 +199,30 @@ def stochastic_veto_distribution(
         raise ValueError(f"le veto bo{best_of} exige "
                          + ("un pool de sept maps" if best_of >= 3 else "un pool non vide"))
     if temperature == 0.0:
-        plan = project_veto(map_probs, best_of)
-        return series_distribution(plan.order, best_of, momentum)
+        plan_a = project_veto(map_probs, best_of)
+        dist_a = series_distribution(plan_a.order, best_of, momentum)
+        if momentum == 0.0 or best_of < 3:
+            return dist_a
+        plan_b = project_veto([(name, 1.0 - p) for name, p in map_probs], best_of)
+        dist_b = series_distribution(plan_b.order, best_of, momentum)
+        scores = {
+            (wa, wb): 0.5 * (dist_a.scores.get((wa, wb), 0.0) + dist_b.scores.get((wb, wa), 0.0))
+            for wa, wb in set(dist_a.scores) | {(wb, wa) for wa, wb in dist_b.scores}
+        }
+        return SeriesDistribution(scores=scores, order=plan_a.order, best_of=best_of)
 
-    rng = random.Random(seed)
-    base_pool = sorted(map_probs, key=lambda kv: (-kv[1], kv[0]))
+    rng_a = random.Random(seed)
+    rng_b = random.Random(seed)
+    pool_a = sorted(map_probs, key=lambda kv: (-kv[1], kv[0]))
+    pool_b = sorted([(name, 1.0 - p) for name, p in map_probs], key=lambda kv: (-kv[1], kv[0]))
     acc: dict[tuple[int, int], float] = {}
     for _ in range(samples):
-        pool = list(base_pool)
-        if best_of == 1:
-            turn_a = True
-            while len(pool) > 1:
-                # A bannit sa pire map (plus petit p), B bannit la meilleure de A (plus grand p)
-                scores = [-p for _, p in pool] if turn_a else [p for _, p in pool]
-                _softmax_pick(pool, scores, temperature, rng)
-                turn_a = not turn_a
-            order = [pool[0]]
-        else:
-            # Deux bans d'ouverture
-            _softmax_pick(pool, [-p for _, p in pool], temperature, rng)
-            _softmax_pick(pool, [p for _, p in pool], temperature, rng)
-            picks = []
-            for k in range(best_of - 1):
-                scores = [p for _, p in pool] if k % 2 == 0 else [-p for _, p in pool]
-                picks.append(_softmax_pick(pool, scores, temperature, rng))
-            if best_of == 3:
-                _softmax_pick(pool, [-p for _, p in pool], temperature, rng)
-                _softmax_pick(pool, [p for _, p in pool], temperature, rng)
-            decider = pool[0]
-            order = picks + [decider]
-        d = series_distribution(order, best_of, momentum)
-        for k, v in d.scores.items():
-            acc[k] = acc.get(k, 0.0) + v
+        da = series_distribution(_sample_veto_order(pool_a, best_of, temperature, rng_a), best_of, momentum)
+        db = series_distribution(_sample_veto_order(pool_b, best_of, temperature, rng_b), best_of, momentum)
+        for (wa, wb), v in da.scores.items():
+            acc[(wa, wb)] = acc.get((wa, wb), 0.0) + 0.5 * v
+        for (wb, wa), v in db.scores.items():
+            acc[(wa, wb)] = acc.get((wa, wb), 0.0) + 0.5 * v
     scores = {k: v / samples for k, v in acc.items()}
     return SeriesDistribution(scores=scores, order=project_veto(map_probs, best_of).order, best_of=best_of)
 
