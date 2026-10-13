@@ -70,6 +70,8 @@ class AuditTests(unittest.TestCase):
         self.assertEqual(report["teams_under_warmup"], 2)  # g2 (2 maps), faze (1 map); navi has 3
         self.assertTrue(any("trou calendaire" in w for w in report["warnings"]))
         self.assertTrue(any("meme jour" in w for w in report["warnings"]))
+        self.assertEqual(report["matches_by_year"], {"2026": 3})
+        self.assertEqual(report["map_balance_ratio"], 0.0)
 
 
 if __name__ == "__main__":
