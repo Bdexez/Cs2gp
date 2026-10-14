@@ -517,8 +517,10 @@ def cmd_settle(args) -> int:
 
 
 def cmd_journal(args) -> int:
-    record = journal_mod.scorecard(args.journal)
-    money = journal_mod.financial_summary(args.journal)
+    since = getattr(args, "since", None)
+    until = getattr(args, "until", None)
+    record = journal_mod.scorecard(args.journal, since=since, until=until)
+    money = journal_mod.financial_summary(args.journal, since=since, until=until)
     if getattr(args, "json", False):
         print(json.dumps({
             "scorecard": None if record is None else record.to_dict(),
@@ -773,6 +775,8 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("journal", parents=[common],
                        help="bilan des pronostics deja pointes")
     s.add_argument("--journal", default="data/journal.csv")
+    s.add_argument("--since", type=parse_date, help="inclut uniquement les matchs a partir de cette date")
+    s.add_argument("--until", type=parse_date, help="inclut uniquement les matchs jusqu'a cette date")
     s.add_argument("--json", action="store_true", help="sortie JSON structuree")
     s.set_defaults(func=cmd_journal)
 
