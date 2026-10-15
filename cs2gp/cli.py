@@ -26,7 +26,7 @@ from .pronostic import (
 )
 from . import journal as journal_mod
 from .schema import group_matches, parse_date, write_csv
-from .snapshot import inspect_analyzer
+from .snapshot import diff_analyzers, inspect_analyzer
 from .sources import simulate_history
 from .validation import positive_integer
 
@@ -143,6 +143,27 @@ def cmd_inspect(args) -> int:
         f"  Options : warmup={info['warmup_maps']}, versioned_pool={info['versioned_pool']}, "
         f"momentum={info['momentum']:+.3f} (auto={info['momentum_auto']})"
     )
+    return 0
+
+
+def cmd_diff(args) -> int:
+    delta = diff_analyzers(args.bundle_a, args.bundle_b)
+    if args.json:
+        print(json.dumps(delta, indent=2, ensure_ascii=False))
+        return 0
+    print()
+    print(f"Comparaison d'instantanes : {args.bundle_a} -> {args.bundle_b}")
+    print(f"  Historique  : {delta['delta_maps']:+d} maps, {delta['delta_matches']:+d} matchs")
+    print(f"  Periode A   : {delta['date_range_a'][0]} -> {delta['date_range_a'][1]}")
+    print(f"  Periode B   : {delta['date_range_b'][0]} -> {delta['date_range_b'][1]}")
+    print(
+        f"  Temperature : match {delta['match_temperature_delta']:+.3f} | "
+        f"map {delta['map_temperature_delta']:+.3f} | momentum {delta['momentum_delta']:+.3f}"
+    )
+    if delta["elo_changes"]:
+        print(f"  Elo modifie : {', '.join(delta['elo_changes'])}")
+    if delta["training_option_changes"]:
+        print(f"  Options     : {', '.join(delta['training_option_changes'])}")
     return 0
 
 
@@ -678,6 +699,12 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("bundle", help="chemin vers l'archive .cs2gp")
     s.add_argument("--json", action="store_true", help="sortie JSON structuree")
     s.set_defaults(func=cmd_inspect)
+
+    s = sub.add_parser("diff", help="compare deux instantanes .cs2gp sans unpickler le GBDT")
+    s.add_argument("bundle_a", help="premier instantane .cs2gp")
+    s.add_argument("bundle_b", help="second instantane .cs2gp")
+    s.add_argument("--json", action="store_true", help="sortie JSON structuree")
+    s.set_defaults(func=cmd_diff)
 
     s = sub.add_parser("h2h", parents=[common], help="bilan des confrontations directes entre deux equipes")
     s.add_argument("team_a")

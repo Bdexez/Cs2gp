@@ -103,10 +103,12 @@ class CliJsonTests(unittest.TestCase):
 
             # train --bundle + inspect --json
             bundle = Path(tmp) / "analyzer.cs2gp"
-            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            train_out = io.StringIO()
+            with contextlib.redirect_stdout(train_out), contextlib.redirect_stderr(io.StringIO()):
                 self.assertEqual(main([
                     "train", "--data", str(data), "--no-gbdt", "--bundle", str(bundle),
                 ]), 0)
+            self.assertIn("z=", train_out.getvalue())
             out = io.StringIO()
             with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
                 self.assertEqual(main(["inspect", str(bundle), "--json"]), 0)
@@ -114,6 +116,15 @@ class CliJsonTests(unittest.TestCase):
             self.assertEqual(inspect_payload["version"], 2)
             self.assertTrue(inspect_payload["has_calibration_history"])
             self.assertFalse(inspect_payload["has_gbdt"])
+
+            # diff --json (same bundle -> zero deltas)
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(main(["diff", str(bundle), str(bundle), "--json"]), 0)
+            diff_payload = json.loads(out.getvalue())
+            self.assertEqual(diff_payload["delta_maps"], 0)
+            self.assertEqual(diff_payload["delta_matches"], 0)
+            self.assertEqual(diff_payload["elo_changes"], {})
 
             # h2h --json
             out = io.StringIO()
