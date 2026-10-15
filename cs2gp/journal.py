@@ -358,13 +358,21 @@ def financial_summary(
         stake = float(r["mise"]) if r.get("mise") else 0.0
         kelly_staked += stake
         kelly_profit += stake * (odds - 1.0) if won else -stake
+    from .odds import roi_significance
+
     n = len(rows)
+    sig = roi_significance([
+        (float(r["probabilite"]), float(r["cote"]), int(r["resultat"] == "gagne"))
+        for r in rows
+    ])
     return {
         "paris": n,
         "taux_reussite": sum(1 for r in rows if r["resultat"] == "gagne") / n,
         "cote_moyenne": sum(float(r["cote"]) for r in rows) / n,
         "profit_mise_fixe": flat_profit,
         "roi_mise_fixe": flat_profit / n,
+        "roi_p_value": sig["p_value"],
+        "roi_significant_5pct": sig["significant_5pct"],
         "max_drawdown_mise_fixe": max_drawdown_flat,
         "pire_serie_defaites": max_streak,
         "profit_kelly": kelly_profit,
