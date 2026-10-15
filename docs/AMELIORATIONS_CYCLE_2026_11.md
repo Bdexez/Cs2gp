@@ -148,3 +148,14 @@ outillage domaine CS2 et sortie structuree).
 - **Filtres temporels sur le journal** (`journal.py`, `cli.py`) : options
   `since`/`until` (`--since`, `--until` sur `cs2gp journal`) pour evaluer une
   periode donnee sans modifier le CSV.
+
+## Cycle 11 : Significativite du ROI, diagnostics de cotes et diff d'instantanes
+
+- **Significativite du ROI et diagnostics de marche** (`odds.py`) :
+  `roi_significance` (t-statistique et p-value bilaterale) et
+  `market_diagnostics` (overround, vig, arbitrage, comparaison devig
+  proportionnel vs power).
+- **Comparateur d'instantanes (`cs2gp diff`)** (`snapshot.py`, `cli.py`) :
+  `diff_analyzers(a, b)` et `cs2gp diff <a.cs2gp> <b.cs2gp> [--json]` comparent
+  deux bundles (volume, dates, temperatures, momentum, Elo et options) sans
+  unpickler le GBDT.
