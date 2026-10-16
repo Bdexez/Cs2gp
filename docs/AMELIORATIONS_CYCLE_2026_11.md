@@ -159,3 +159,15 @@ outillage domaine CS2 et sortie structuree).
   `diff_analyzers(a, b)` et `cs2gp diff <a.cs2gp> <b.cs2gp> [--json]` comparent
   deux bundles (volume, dates, temperatures, momentum, Elo et options) sans
   unpickler le GBDT.
+
+## Cycle 12 : Fusion d'historiques, fiabilite par quantiles et significativite ROI
+
+- **Significativite ROI integree** (`backtest.py`, `journal.py`, `cli.py`) :
+  `roi_significance` expose dans `bet_backtest`, `financial_summary` et
+  `cs2gp journal`.
+- **Fusion d'historiques (`cs2gp merge`) et `write_csv` atomique** (`schema.py`,
+  `cli.py`) : `merge_histories()` deduplique par `(match_id, map_name)` (meme
+  en orientation inversee), enrichit les rosters/evenements manquants et
+  rejette tout conflit de score.
+- **Fiabilite par quantiles** (`metrics.py`) : `quantile_reliability_table()`
+  decoupe les predictions en tranches d'effectifs egaux.
