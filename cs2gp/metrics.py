@@ -68,6 +68,30 @@ def reliability_table(y: np.ndarray, p: np.ndarray, bins: int = 10) -> list[dict
     return rows
 
 
+def quantile_reliability_table(y: np.ndarray, p: np.ndarray, bins: int = 10) -> list[dict]:
+    """Courbe de fiabilite par quantiles (effectifs egaux par tranche)."""
+    y, p = probability_pair(y, p)
+    positive_integer("bins", bins)
+    order = np.argsort(p)
+    chunks = np.array_split(order, min(bins, len(y)))
+    rows = []
+    for idx in chunks:
+        if len(idx) == 0:
+            continue
+        pm = p[idx]
+        ym = y[idx]
+        pred_mean = float(pm.mean())
+        obs_mean = float(ym.mean())
+        rows.append({
+            "bin": f"{float(pm.min()):.2f}-{float(pm.max()):.2f}",
+            "n": int(len(idx)),
+            "predicted": pred_mean,
+            "observed": obs_mean,
+            "gap": obs_mean - pred_mean,
+        })
+    return rows
+
+
 def brier_decomposition(y: np.ndarray, p: np.ndarray, bins: int = 10) -> dict:
     """Decomposition de Murphy du score de Brier : fiabilite - resolution + incertitude.
 

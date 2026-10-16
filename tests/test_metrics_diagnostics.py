@@ -68,6 +68,16 @@ class MetricsDiagnosticsTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             metrics.paired_block_bootstrap(y, p, ref, dates, metric="unknown")
 
+    def test_quantile_reliability_table_creates_balanced_bins(self):
+        rng = np.random.default_rng(5)
+        p = rng.uniform(0.55, 0.90, size=100)
+        y = (rng.random(100) < p).astype(float)
+        rows = metrics.quantile_reliability_table(y, p, bins=5)
+        self.assertEqual(len(rows), 5)
+        self.assertEqual(sum(r["n"] for r in rows), 100)
+        self.assertTrue(all(r["n"] == 20 for r in rows))
+        self.assertTrue(all(a["predicted"] <= b["predicted"] for a, b in zip(rows, rows[1:])))
+
 
 if __name__ == "__main__":
     unittest.main()
