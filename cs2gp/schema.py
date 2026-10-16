@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import csv
 import datetime as dt
+import os
+from pathlib import Path
 import re
+import tempfile
 import unicodedata
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from decimal import Decimal, InvalidOperation
 from typing import Iterable, Iterator, Sequence
 
@@ -278,15 +281,66 @@ def write_csv(path: str, maps: Sequence[MapResult]) -> None:
         "match_id", "date", "team_a", "team_b", "map", "rounds_a", "rounds_b",
         "best_of", "event", "tier", "lan", "map_index", "roster_a", "roster_b",
     ]
-    with open(path, "w", newline="", encoding="utf-8") as fh:
-        w = csv.writer(fh, lineterminator="\n")
-        w.writerow(cols)
-        for m in maps:
-            w.writerow([
-                m.match_id, m.date.isoformat(), m.team_a, m.team_b, m.map_name,
-                m.rounds_a, m.rounds_b, m.best_of, m.event, m.tier,
-                int(m.lan), m.map_index, ",".join(m.roster_a), ",".join(m.roster_b),
-            ])
+    out_path = Path(path)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", newline="", encoding="utf-8",
+                                         dir=out_path.parent, prefix=f".{out_path.name}.",
+                                         suffix=".tmp", delete=False) as fh:
+            temporary = Path(fh.name)
+            w = csv.writer(fh, lineterminator="\n")
+            w.writerow(cols)
+            for m in maps:
+                w.writerow([
+                    m.match_id, m.date.isoformat(), m.team_a, m.team_b, m.map_name,
+                    m.rounds_a, m.rounds_b, m.best_of, m.event, m.tier,
+                    int(m.lan), m.map_index, ",".join(m.roster_a), ",".join(m.roster_b),
+                ])
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(temporary, out_path)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+
+
+def merge_histories(sources: Sequence[Sequence[MapResult]]) -> tuple[list[MapResult], dict]:
+    """Fusionne plusieurs historiques en deduplant (match_id, map_name) et en rejetant tout conflit."""
+    merged: dict[tuple[str, str], MapResult] = {}
+    total_in = 0
+    duplicates = 0
+    for source in sources:
+        for mp in source:
+            total_in += 1
+            key = (mp.match_id, mp.map_name)
+            if key not in merged:
+                merged[key] = mp
+                continue
+            prev = merged[key]
+            # Aligne l'orientation si les deux sources ont inverse team_a et team_b
+            cand = mp
+            if (mp.team_a, mp.team_b) == (prev.team_b, prev.team_a):
+                cand = replace(
+                    mp, team_a=prev.team_a, team_b=prev.team_b,
+                    rounds_a=mp.rounds_b, rounds_b=mp.rounds_a,
+                    roster_a=mp.roster_b, roster_b=mp.roster_a,
+                )
+            if (cand.date != prev.date or cand.team_a != prev.team_a or cand.team_b != prev.team_b
+                    or cand.rounds_a != prev.rounds_a or cand.rounds_b != prev.rounds_b
+                    or cand.best_of != prev.best_of):
+                raise ValueError(f"conflit de resultat pour {mp.match_id} ({mp.map_name})")
+            # Enrichit les champs optionnels si l'une des sources les fournit
+            merged[key] = replace(
+                prev,
+                event=prev.event or cand.event,
+                roster_a=prev.roster_a or cand.roster_a,
+                roster_b=prev.roster_b or cand.roster_b,
+            )
+            duplicates += 1
+    out = sorted(merged.values(), key=lambda m: (m.date, m.match_id, m.map_index))
+    group_matches(out)
+    return out, {"total_in": total_in, "unique_out": len(out), "duplicates_skipped": duplicates}
 
 
 def group_matches(maps: Iterable[MapResult]) -> list[Match]:
