@@ -23,7 +23,7 @@ from .csvio import read_rows
 from .features import Dataset
 from .metrics import (
     brier, brier_decomposition, calibration_slope_intercept, format_summary, log_loss,
-    paired_block_bootstrap, reliability_table, summarize,
+    paired_block_bootstrap, quantile_reliability_table, reliability_table, spiegelhalter_z, summarize,
 )
 from .model import MatchPredictor, map_predictor
 from .ratings import expected_score
@@ -153,8 +153,10 @@ class BacktestResult:
             "elo_metrics": dict(self.elo_metrics),
             "comparison": dict(self.comparison) if self.comparison is not None else None,
             "calibration": calibration_slope_intercept(self.y, self.predictions) if len(self.y) else None,
+            "spiegelhalter": spiegelhalter_z(self.y, self.predictions) if len(self.y) else None,
             "brier_decomposition": brier_decomposition(self.y, self.predictions) if len(self.y) else None,
             "reliability": reliability_table(self.y, self.predictions) if len(self.y) else [],
+            "quantile_reliability": quantile_reliability_table(self.y, self.predictions) if len(self.y) else [],
         }
         if self.match_only is not None:
             out["match_only_metrics"] = summarize(self.y, self.match_only)
