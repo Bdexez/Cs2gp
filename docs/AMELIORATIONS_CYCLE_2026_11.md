@@ -171,3 +171,12 @@ outillage domaine CS2 et sortie structuree).
   rejette tout conflit de score.
 - **Fiabilite par quantiles** (`metrics.py`) : `quantile_reliability_table()`
   decoupe les predictions en tranches d'effectifs egaux.
+
+## Cycle 13 : Test de Spiegelhalter, fiabilite par quantiles et export de carte
+
+- **Test analytique de Spiegelhalter** (`metrics.py`, `backtest.py`) :
+  `spiegelhalter_z(y, p)` teste formellement la calibration du score de Brier
+  (z-score et p-value bilaterale) ; expose avec `quantile_reliability` dans
+  `BacktestResult.to_dict()`.
+- **Export CSV de la carte (`cs2gp slate --export-csv`)** (`cli.py`) : ecriture
+  atomique de tous les pronostics et abstentions de la carte du jour.
