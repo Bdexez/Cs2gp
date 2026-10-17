@@ -78,6 +78,24 @@ class MetricsDiagnosticsTests(unittest.TestCase):
         self.assertTrue(all(r["n"] == 20 for r in rows))
         self.assertTrue(all(a["predicted"] <= b["predicted"] for a, b in zip(rows, rows[1:])))
 
+    def test_spiegelhalter_z_distinguishes_calibrated_from_miscalibrated(self):
+        rng = np.random.default_rng(19)
+        p = rng.uniform(0.15, 0.85, size=1000)
+        y = (rng.random(1000) < p).astype(float)
+        good = metrics.spiegelhalter_z(y, p)
+        self.assertIsNotNone(good["z_stat"])
+        self.assertFalse(good["miscalibrated_5pct"])
+
+        # Severely overconfident predictions fail Spiegelhalter test
+        bad_p = np.clip(0.5 + 1.8 * (p - 0.5), 0.02, 0.98)
+        bad = metrics.spiegelhalter_z(y, bad_p)
+        self.assertTrue(bad["miscalibrated_5pct"])
+        self.assertLess(bad["p_value"], 0.01)
+
+        # Constant 0.5 predictions have zero denominator -> graceful None
+        deg = metrics.spiegelhalter_z([1, 0, 1, 0], [0.5, 0.5, 0.5, 0.5])
+        self.assertIsNone(deg["z_stat"])
+
 
 if __name__ == "__main__":
     unittest.main()
