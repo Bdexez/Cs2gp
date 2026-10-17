@@ -70,18 +70,26 @@ class CliJsonTests(unittest.TestCase):
             self.assertIn("scorecard", j_payload)
             self.assertIn("financial", j_payload)
 
-            # slate --json
+            # slate --json + --export-csv
             fpath = Path(tmp) / "fixtures.csv"
+            slate_csv = Path(tmp) / "slate.csv"
             fpath.write_text(f"date,team_a,team_b,best_of\n2026-01-10,{teams[0]},{teams[1]},3\n")
             out = io.StringIO()
             with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
                 self.assertEqual(main([
                     "slate", "--data", str(data), "--no-gbdt", "--fixtures", str(fpath),
-                    "--momentum", "0", "--no-calibration", "--json",
+                    "--momentum", "0", "--no-calibration", "--export-csv", str(slate_csv), "--json",
                 ]), 0)
             slate_payload = json.loads(out.getvalue())
             self.assertEqual(len(slate_payload["analyses"]), 1)
             self.assertIn("fixture", slate_payload["analyses"][0])
+            self.assertTrue(slate_csv.is_file())
+
+            # merge CLI
+            merged_csv = Path(tmp) / "merged.csv"
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(main(["merge", str(data), str(data), "--out", str(merged_csv)]), 0)
+            self.assertTrue(merged_csv.is_file())
 
             # tipster-backtest --json
             out = io.StringIO()

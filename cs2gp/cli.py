@@ -523,6 +523,52 @@ def cmd_slate(args) -> int:
     fixtures = read_fixtures(args.fixtures)
     card = _tipster(an, args).card(fixtures)
     added = journal_mod.record_card(card, args.record) if args.record else None
+    if args.export_csv:
+        out_path = Path(args.export_csv)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = None
+        written = 0
+        try:
+            with tempfile.NamedTemporaryFile(mode="w", newline="", encoding="utf-8",
+                                             dir=out_path.parent, prefix=f".{out_path.name}.",
+                                             suffix=".tmp", delete=False) as fh:
+                temporary = Path(fh.name)
+                writer = csv.writer(fh, lineterminator="\n")
+                writer.writerow([
+                    "date", "match_id", "team_a", "team_b", "best_of", "event",
+                    "market", "selection", "probability", "fair_odds", "tier",
+                    "verdict", "odds", "edge", "ev", "stake", "skipped",
+                ])
+                for a in card:
+                    fx = a.fixture
+                    if a.picks:
+                        for pk in a.picks:
+                            writer.writerow([
+                                pk.date.isoformat(), pk.match_id, pk.team_a, pk.team_b,
+                                pk.best_of, pk.event, pk.market, pk.selection,
+                                f"{pk.probability:.6f}", f"{pk.fair_odds:.3f}", pk.tier,
+                                pk.verdict,
+                                "" if pk.odds is None else f"{pk.odds:.3f}",
+                                "" if pk.edge is None else f"{pk.edge:.6f}",
+                                "" if pk.ev is None else f"{pk.ev:.6f}",
+                                "" if pk.stake is None else f"{pk.stake:.6f}",
+                                "",
+                            ])
+                            written += 1
+                    else:
+                        writer.writerow([
+                            fx.date.isoformat(), fx.match_id, fx.team_a, fx.team_b,
+                            fx.best_of, fx.event, "abstention", "", "", "", "",
+                            "ABSTENTION", "", "", "", "", a.skipped or "",
+                        ])
+                        written += 1
+                fh.flush()
+                os.fsync(fh.fileno())
+            os.replace(temporary, out_path)
+        finally:
+            if temporary is not None:
+                temporary.unlink(missing_ok=True)
+        print(f"{written} ligne(s) de carte exportee(s) -> {out_path}", file=sys.stderr)
     if args.json:
         payload = {
             "analyses": [a.to_dict() for a in card],
@@ -806,6 +852,7 @@ def build_parser() -> argparse.ArgumentParser:
                    help="probabilite minimale pour se prononcer sans cotes (defaut 0.60)")
     s.add_argument("--edge-min", type=float, default=None,
                    help="ecart minimal avec le marche pour un pari avec cotes (defaut 0.04)")
+    s.add_argument("--export-csv", help="exporte la carte de pronostics et abstentions en CSV")
     s.add_argument("--json", action="store_true", help="sortie JSON structuree")
     s.set_defaults(func=cmd_slate)
 
