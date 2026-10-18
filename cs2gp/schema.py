@@ -2,18 +2,14 @@
 
 from __future__ import annotations
 
-import csv
 import datetime as dt
-import os
-from pathlib import Path
 import re
-import tempfile
 import unicodedata
 from dataclasses import dataclass, field, replace
 from decimal import Decimal, InvalidOperation
 from typing import Iterable, Iterator, Sequence
 
-from .csvio import read_rows
+from .csvio import atomic_write_csv, read_rows
 
 ACTIVE_DUTY = (
     "ancient",
@@ -281,28 +277,15 @@ def write_csv(path: str, maps: Sequence[MapResult]) -> None:
         "match_id", "date", "team_a", "team_b", "map", "rounds_a", "rounds_b",
         "best_of", "event", "tier", "lan", "map_index", "roster_a", "roster_b",
     ]
-    out_path = Path(path)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = None
-    try:
-        with tempfile.NamedTemporaryFile(mode="w", newline="", encoding="utf-8",
-                                         dir=out_path.parent, prefix=f".{out_path.name}.",
-                                         suffix=".tmp", delete=False) as fh:
-            temporary = Path(fh.name)
-            w = csv.writer(fh, lineterminator="\n")
-            w.writerow(cols)
-            for m in maps:
-                w.writerow([
-                    m.match_id, m.date.isoformat(), m.team_a, m.team_b, m.map_name,
-                    m.rounds_a, m.rounds_b, m.best_of, m.event, m.tier,
-                    int(m.lan), m.map_index, ",".join(m.roster_a), ",".join(m.roster_b),
-                ])
-            fh.flush()
-            os.fsync(fh.fileno())
-        os.replace(temporary, out_path)
-    finally:
-        if temporary is not None:
-            temporary.unlink(missing_ok=True)
+    rows = (
+        [
+            m.match_id, m.date.isoformat(), m.team_a, m.team_b, m.map_name,
+            m.rounds_a, m.rounds_b, m.best_of, m.event, m.tier,
+            int(m.lan), m.map_index, ",".join(m.roster_a), ",".join(m.roster_b),
+        ]
+        for m in maps
+    )
+    atomic_write_csv(path, cols, rows)
 
 
 def merge_histories(sources: Sequence[Sequence[MapResult]]) -> tuple[list[MapResult], dict]:
