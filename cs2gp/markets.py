@@ -227,6 +227,34 @@ def stochastic_veto_distribution(
     return SeriesDistribution(scores=scores, order=project_veto(map_probs, best_of).order, best_of=best_of)
 
 
+def veto_sensitivity(
+    map_probs: list[tuple[str, float]],
+    best_of: int,
+    *,
+    momentum: float = 0.0,
+    temperature: float = 0.05,
+    samples: int = 400,
+    seed: int = 0,
+) -> dict:
+    """Quantifie la sensibilite de la loi du score aux incertitudes du veto."""
+    det = stochastic_veto_distribution(map_probs, best_of, momentum=momentum, temperature=0.0)
+    sto = stochastic_veto_distribution(
+        map_probs, best_of, momentum=momentum, temperature=temperature, samples=samples, seed=seed
+    )
+    keys = set(det.scores) | set(sto.scores)
+    diffs = [abs(det.scores.get(k, 0.0) - sto.scores.get(k, 0.0)) for k in keys]
+    return {
+        "p_a_det": float(det.p_a),
+        "p_a_sto": float(sto.p_a),
+        "p_a_shift": float(sto.p_a - det.p_a),
+        "p_full_det": float(det.p_maps_played(best_of)),
+        "p_full_sto": float(sto.p_maps_played(best_of)),
+        "p_full_shift": float(sto.p_maps_played(best_of) - det.p_maps_played(best_of)),
+        "max_score_shift": float(max(diffs, default=0.0)),
+        "total_variation": float(0.5 * sum(diffs)),
+    }
+
+
 @dataclass
 class SeriesDistribution:
     """Loi complete du score de la serie."""

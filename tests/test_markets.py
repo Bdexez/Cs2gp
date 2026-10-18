@@ -2,7 +2,7 @@ import unittest
 
 from cs2gp.markets import (
     SeriesDistribution, build_markets, enforce_margins, project_veto,
-    series_distribution, stochastic_veto_distribution,
+    series_distribution, stochastic_veto_distribution, veto_sensitivity,
 )
 from cs2gp.pronostic import shape_series
 
@@ -123,6 +123,15 @@ class StochasticVetoTests(unittest.TestCase):
                 da = stochastic_veto_distribution(pool, bo, momentum=0.2, temperature=temp, samples=100, seed=5)
                 db = stochastic_veto_distribution(rev, bo, momentum=0.2, temperature=temp, samples=100, seed=5)
                 self.assertAlmostEqual(da.p_a + db.p_a, 1.0, places=10)
+
+    def test_veto_sensitivity_reports_zero_at_zero_temp_and_bounded_tv(self):
+        pool = [(f"m{i}", 0.25 + i * 0.08) for i in range(7)]
+        zero = veto_sensitivity(pool, 3, temperature=0.0)
+        self.assertEqual(zero["total_variation"], 0.0)
+        self.assertEqual(zero["max_score_shift"], 0.0)
+        sens = veto_sensitivity(pool, 3, temperature=0.10, samples=200, seed=3)
+        self.assertGreaterEqual(sens["total_variation"], 0.0)
+        self.assertLessEqual(sens["total_variation"], 1.0)
 
 
 if __name__ == "__main__":
