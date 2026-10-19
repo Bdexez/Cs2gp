@@ -73,6 +73,17 @@ class AuditTests(unittest.TestCase):
         self.assertEqual(report["matches_by_year"], {"2026": 3})
         self.assertEqual(report["map_balance_ratio"], 0.0)
 
+    def test_audit_flags_near_duplicate_team_names(self):
+        day = dt.date(2026, 4, 1)
+        maps = [
+            MapResult("m1", day, "vitality", "eternalfire", "mirage", 13, 8, best_of=1),
+            MapResult("m2", day, "vitality", "eternal-fire", "nuke", 13, 9, best_of=1),
+        ]
+        report = audit_history(maps)
+        self.assertEqual(len(report["similar_team_pairs"]), 1)
+        self.assertEqual(report["similar_team_pairs"][0][:2], ["eternal-fire", "eternalfire"])
+        self.assertTrue(any("alias" in w for w in report["warnings"]))
+
 
 if __name__ == "__main__":
     unittest.main()

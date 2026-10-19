@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import Counter
+from difflib import SequenceMatcher
 from typing import Sequence
 
 from .schema import ACTIVE_DUTY, MapResult, Match, group_matches
@@ -67,6 +68,16 @@ def audit_history(
         float(min(active_counts) / max(active_counts))
         if active_counts and max(active_counts) > 0 else None
     )
+    similar_teams: list[list] = []
+    for i, a in enumerate(teams):
+        if len(a) < 4:
+            continue
+        for b in teams[i + 1 :]:
+            if len(b) < 4:
+                continue
+            ratio = SequenceMatcher(None, a, b).ratio()
+            if ratio >= 0.85:
+                similar_teams.append([a, b, round(ratio, 3)])
 
     warnings: list[str] = []
     if incomplete:
@@ -103,6 +114,12 @@ def audit_history(
         warnings.append(
             f"pool Active Duty tres desequilibre (ratio min/max = {map_balance_ratio:.2f})."
         )
+    if similar_teams:
+        sample = ", ".join(f"{a}/{b}" for a, b, _ in similar_teams[:4])
+        warnings.append(
+            f"{len(similar_teams)} paire(s) de noms d'equipes tres proches ({sample}) : "
+            "verifier les alias manquants ou fautes de frappe."
+        )
 
     return {
         "n_maps": len(maps),
@@ -111,6 +128,7 @@ def audit_history(
         "n_incomplete_matches": incomplete,
         "n_teams": len(teams),
         "teams_under_warmup": teams_under_warmup,
+        "similar_team_pairs": similar_teams,
         "date_min": date_min,
         "date_max": date_max,
         "span_days": span_days,
