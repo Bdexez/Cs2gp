@@ -2,7 +2,7 @@ import math
 import unittest
 
 from cs2gp.odds import (
-    closing_line_value, devig_power, expected_value, find_value,
+    closing_line_value, devig_power, equity_curve, expected_value, find_value,
     kelly_fraction, market_diagnostics, roi_significance, simulate_flat, simulate_kelly,
 )
 
@@ -100,6 +100,16 @@ class OddsValidationTests(unittest.TestCase):
         strong = roi_significance([(0.7, 2.0, 1)] * 35 + [(0.7, 2.0, 0)] * 5)
         self.assertTrue(strong["significant_5pct"])
         self.assertLess(strong["p_value"], 0.01)
+
+    def test_equity_curve_tracks_flat_and_kelly_trajectories(self):
+        seq = [(0.6, 2.0, 1), (0.6, 2.0, 0)]
+        self.assertEqual(equity_curve(seq, mode="flat", stake=2.0), [0.0, 2.0, 0.0])
+        kcurve = equity_curve(seq, mode="kelly", initial_bankroll=100.0)
+        self.assertEqual(len(kcurve), 3)
+        self.assertAlmostEqual(kcurve[1], 105.0, places=10)
+        self.assertAlmostEqual(kcurve[2], 99.75, places=10)
+        with self.assertRaises(ValueError):
+            equity_curve(seq, mode="unknown")
 
 
 if __name__ == "__main__":
