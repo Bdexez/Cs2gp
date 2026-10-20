@@ -191,3 +191,14 @@ outillage domaine CS2 et sortie structuree).
 - **Sensibilite au veto** (`markets.py`) : `veto_sensitivity()` mesure la
   distance en variation totale entre la loi du score deterministe et la loi
   du score sous veto stochastique.
+
+## Cycle 15 : Spiegelhalter en rapport, detection d'alias et courbe d'equite
+
+- **Spiegelhalter dans `BacktestResult.report()`** (`backtest.py`) : affichage
+  direct du z-score et de la p-value de Spiegelhalter a cote de la
+  decomposition de Murphy.
+- **Detection d'alias manquants** (`audit.py`) : `audit_history` repere les
+  paires de noms d'equipes tres proches (`SequenceMatcher >= 0.85`) pour
+  prevenir la scission silencieuse d'une equipe dans un CSV reel.
+- **Courbe d'equite** (`odds.py`) : `equity_curve(results, mode="flat"|"kelly")`
+  retourne la trajectoire cumulee pari par pari.
