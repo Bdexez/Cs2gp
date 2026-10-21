@@ -26,6 +26,8 @@ class BacktestSegmentTests(unittest.TestCase):
         meta = [
             {
                 "match_id": f"m{i}",
+                "team_a": "a",
+                "team_b": "b",
                 "best_of": 3 if i < 24 else 1,
                 "lan": i % 2 == 0,
                 "tier": "s" if i < 20 else "b",
@@ -85,9 +87,17 @@ class BacktestSegmentTests(unittest.TestCase):
             self.assertEqual(rows[0]["match_id"], "m0")
 
             odds_path = Path(tmp) / "odds.csv"
-            odds_path.write_text("match_id,odds_a,odds_b\nm0,1.90,1.90\nm1,2.10,1.80\n", encoding="utf-8")
+            odds_path.write_text(
+                "match_id,odds_a,odds_b,closing_odds_a,closing_odds_b\n"
+                "m0,1.90,1.90,1.60,2.30\nm1,2.10,1.80,2.00,1.85\n",
+                encoding="utf-8",
+            )
             lookup = read_odds_csv(odds_path)
-            self.assertEqual(lookup["m0"], (1.90, 1.90))
+            self.assertEqual(lookup["m0"], (1.90, 1.90, 1.60, 2.30))
+            from cs2gp.backtest import bet_backtest
+            bb = bet_backtest(res, lookup, min_edge=0.04)
+            self.assertGreater(bb["clv_bets"], 0)
+            self.assertIsNotNone(bb["avg_clv_prob"])
 
             dup_path = Path(tmp) / "dup.csv"
             dup_path.write_text("match_id,odds_a,odds_b\nm0,1.90,1.90\nm0,2.00,1.85\n", encoding="utf-8")
