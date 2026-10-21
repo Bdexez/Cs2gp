@@ -125,6 +125,14 @@ class SeriesTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "conflit"):
             merge_histories([[m1_plain], [conflict]])
 
+    def test_normalize_team_supports_custom_extra_aliases(self):
+        from cs2gp.schema import normalize_team
+
+        self.assertEqual(
+            normalize_team("Eternal-Fire", extra_aliases={"eternal-fire": "eternalfire"}),
+            "eternalfire",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
