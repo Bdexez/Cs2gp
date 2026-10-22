@@ -373,12 +373,30 @@ def cmd_backtest(args) -> int:
             )
     if odds_summary is not None:
         print("\nConfrontation aux cotes historiques :")
+        vig_txt = (
+            f" (marge moy. {odds_summary['avg_overround'] - 1:.1%})"
+            if odds_summary.get("avg_overround") is not None else ""
+        )
+        sig = odds_summary.get("significance") or {}
+        p_txt = f" (p={sig['p_value']:.3f})" if sig.get("p_value") is not None else ""
         print(
-            f"  {odds_summary['bets']} paris sur {odds_summary['matches_with_odds']} matchs cotes | "
+            f"  {odds_summary['bets']} paris sur {odds_summary['matches_with_odds']} matchs cotes{vig_txt} | "
             f"reussite {odds_summary['hit_rate']:.1%} | "
-            f"profit {odds_summary['profit']:+.2f} u | ROI {odds_summary['roi']:+.1%} | "
+            f"profit {odds_summary['profit']:+.2f} u | ROI {odds_summary['roi']:+.1%}{p_txt} | "
             f"drawdown max {odds_summary['max_drawdown']:.2f} u"
         )
+        kelly = odds_summary.get("kelly")
+        if kelly and kelly["bets"]:
+            print(
+                f"  Kelly : rendement {kelly['return_pct']:+.1%} | "
+                f"ROI {kelly['roi']:+.1%} | drawdown max {kelly['max_drawdown_pct']:.1%}"
+            )
+        if odds_summary.get("clv_bets"):
+            print(
+                f"  CLV ({odds_summary['clv_bets']} paris) : "
+                f"ecart proba {odds_summary['avg_clv_prob']:+.2%} | "
+                f"EV cloture {odds_summary['avg_clv_ev']:+.2%}"
+            )
     return 0
 
 
@@ -629,14 +647,27 @@ def cmd_tipster_backtest(args) -> int:
 
 def cmd_tune(args) -> int:
     an = _analyzer(args, train=False)
-    print(
-        f"\nReglage temporel avec {args.holdout:.0%} de fin d'historique reservee, "
-        "frontieres alignees sur les journees.\n"
-        "Les constantes par defaut sont ajustees sur des mondes simules realistes ;\n"
-        "le bon reglage depend de la vitesse a laquelle bouge le niveau des equipes,\n"
-        "qui n'est pas la meme selon la periode et le circuit couverts par vos donnees.\n"
+    if not args.json:
+        print(
+            f"\nReglage temporel avec {args.holdout:.0%} de fin d'historique reservee, "
+            "frontieres alignees sur les journees.\n"
+            "Les constantes par defaut sont ajustees sur des mondes simules realistes ;\n"
+            "le bon reglage depend de la vitesse a laquelle bouge le niveau des equipes,\n"
+            "qui n'est pas la meme selon la periode et le circuit couverts par vos donnees.\n"
+        )
+    cfg, report = tune(
+        an.matches, holdout_frac=args.holdout, warmup_maps=an.warmup_maps, verbose=not args.json
     )
-    cfg, report = tune(an.matches, holdout_frac=args.holdout, warmup_maps=an.warmup_maps)
+    saved = False
+    out = Path(args.out)
+    if report["gain_reel"] > 0.0005:
+        out.parent.mkdir(parents=True, exist_ok=True)
+        cfg.save(out)
+        saved = True
+    if args.json:
+        print(json.dumps({"config": cfg.to_dict(), "saved": saved, "out": str(out), "report": report},
+                         indent=2, ensure_ascii=False))
+        return 0
     print(f"\n{report['n_matchs_reglage']} matchs de reglage ; "
           f"{report['n_matchs_validation']} matchs de validation "
           f"({report['validation_debut']} -> {report['validation_fin']}).")
@@ -649,15 +680,12 @@ def cmd_tune(args) -> int:
         f"-> {report['logloss_validation_apres']:.4f}   "
         f"(gain reel {report['gain_reel']:+.4f})"
     )
-    if report["gain_reel"] <= 0.0005:
+    if not saved:
         print(
             "\nLe gain ne survit pas a la validation : gardez les constantes par defaut.\n"
             "C'est le resultat le plus frequent quand l'historique est court."
         )
         return 0
-    out = Path(args.out)
-    out.parent.mkdir(parents=True, exist_ok=True)
-    cfg.save(out)
     print(f"\nConstantes enregistrees -> {out}")
     print(f"Pour les utiliser : cs2gp --elo-config {out} backtest")
     return 0
@@ -850,6 +878,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--out", default="models/elo.json")
     s.add_argument("--holdout", type=float, default=0.25,
                    help="part finale de l'historique reservee a la validation")
+    s.add_argument("--json", action="store_true", help="sortie JSON structuree")
     s.set_defaults(func=cmd_tune)
 
     s = sub.add_parser("tipster-backtest", parents=[common],
