@@ -47,6 +47,23 @@ def expected_calibration_error(y: np.ndarray, p: np.ndarray, bins: int = 10) -> 
     return float(total / max(1, len(y)))
 
 
+def max_calibration_error(y: np.ndarray, p: np.ndarray, bins: int = 10) -> float:
+    """Maximum Calibration Error (MCE) : pire ecart absolu sur une tranche non vide."""
+    y, p = probability_pair(y, p)
+    positive_integer("bins", bins)
+    edges = np.linspace(0.0, 1.0, bins + 1)
+    idx = np.clip(np.digitize(p, edges[1:-1]), 0, bins - 1)
+    worst = 0.0
+    for b in range(bins):
+        m = idx == b
+        if not m.any():
+            continue
+        gap = float(abs(p[m].mean() - y[m].mean()))
+        if gap > worst:
+            worst = gap
+    return worst
+
+
 def reliability_table(y: np.ndarray, p: np.ndarray, bins: int = 10) -> list[dict]:
     """Courbe de fiabilite : proba annoncee vs frequence observee."""
     y, p = probability_pair(y, p)
@@ -204,6 +221,7 @@ def summarize(y: np.ndarray, p: np.ndarray) -> dict:
         "brier": brier(y, p),
         "accuracy": accuracy(y, p),
         "ece": expected_calibration_error(y, p),
+        "mce": max_calibration_error(y, p),
     }
 
 
