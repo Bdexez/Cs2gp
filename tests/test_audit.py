@@ -84,6 +84,27 @@ class AuditTests(unittest.TestCase):
         self.assertEqual(report["similar_team_pairs"][0][:2], ["eternal-fire", "eternalfire"])
         self.assertTrue(any("alias" in w for w in report["warnings"]))
 
+    def test_audit_fixtures_flags_unknown_teams_and_missing_match_id_collisions(self):
+        from cs2gp.audit import audit_fixtures
+        from cs2gp.predict import Analyzer
+        from cs2gp.pronostic import Fixture
+
+        day = dt.date(2026, 4, 1)
+        an = Analyzer(warmup_maps=0).load_maps([
+            MapResult("m1", day, "navi", "g2", "mirage", 13, 8, best_of=1),
+        ])
+        fixtures = [
+            Fixture(day + dt.timedelta(days=1), "navi", "g2"),
+            Fixture(day + dt.timedelta(days=1), "g2", "navi"),
+            Fixture(day + dt.timedelta(days=1), "navi", "mystery", odds_a=1.8, odds_b=2.0),
+        ]
+        res = audit_fixtures(fixtures, an)
+        self.assertFalse(res["ok"])
+        self.assertEqual(res["unknown_teams"], ["mystery"])
+        self.assertEqual(res["missing_match_id_collisions"], 1)
+        self.assertEqual(res["with_odds"], 1)
+        self.assertGreaterEqual(len(res["thin_or_stale"]), 2)
+
 
 if __name__ == "__main__":
     unittest.main()
