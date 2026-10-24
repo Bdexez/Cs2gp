@@ -105,6 +105,17 @@ class AuditTests(unittest.TestCase):
         self.assertEqual(res["with_odds"], 1)
         self.assertGreaterEqual(len(res["thin_or_stale"]), 2)
 
+        with tempfile.TemporaryDirectory() as tmp:
+            hpath = Path(tmp) / "history.csv"
+            fpath = Path(tmp) / "fixtures.csv"
+            write_csv(str(hpath), [MapResult("m1", day, "navi", "g2", "mirage", 13, 8, best_of=1)])
+            fpath.write_text("date,team_a,team_b\n2026-04-02,navi,mystery\n", encoding="utf-8")
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(main(["audit", "--data", str(hpath), "--fixtures", str(fpath), "--json"]), 0)
+            payload = json.loads(out.getvalue())
+            self.assertEqual(payload["fixtures"]["unknown_teams"], ["mystery"])
+
 
 if __name__ == "__main__":
     unittest.main()
