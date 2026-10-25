@@ -34,16 +34,18 @@ class CliJsonTests(unittest.TestCase):
             self.assertEqual(len(ratings_csv.read_text(encoding="utf-8").splitlines()), 6)
             teams = [r["team"] for r in ratings_payload["ratings"]]
 
-            # predict --json with odds
+            # predict --json with odds and --markets
             out = io.StringIO()
             with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
                 self.assertEqual(main([
                     "predict", teams[0], teams[1], "--data", str(data), "--no-gbdt",
-                    "--odds-a", "1.85", "--odds-b", "2.00", "--json",
+                    "--odds-a", "1.85", "--odds-b", "2.00", "--markets", "--json",
                 ]), 0)
             pred_payload = json.loads(out.getvalue())
             self.assertAlmostEqual(pred_payload["p_a"] + pred_payload["p_b"], 1.0, places=10)
             self.assertIn("market", pred_payload)
+            self.assertIn("markets", pred_payload)
+            self.assertGreater(len(pred_payload["markets"]), 5)
             self.assertGreater(pred_payload["market"]["overround"], 1.0)
 
             # backtest --json --by-segment
@@ -145,6 +147,22 @@ class CliJsonTests(unittest.TestCase):
                 h2h_payload["series_a_wins"] + h2h_payload["series_b_wins"],
                 h2h_payload["series_total"],
             )
+
+            # audit --json includes feature correlation report
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(main(["audit", "--data", str(data), "--json"]), 0)
+            audit_payload = json.loads(out.getvalue())
+            self.assertIn("features", audit_payload)
+            self.assertIn("constant_features", audit_payload["features"])
+
+    def test_public_package_api_exports(self):
+        import cs2gp
+
+        for symbol in cs2gp.__all__:
+            self.assertTrue(hasattr(cs2gp, symbol))
+        with self.assertRaises(AttributeError):
+            _ = cs2gp.nonexistent_symbol
 
 
 if __name__ == "__main__":

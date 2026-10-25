@@ -13,6 +13,8 @@ from . import __version__
 from .audit import audit_fixtures, audit_history, format_audit
 from .backtest import bet_backtest, read_odds_csv, tune, walk_forward
 from .csvio import atomic_write_csv
+from .features import feature_correlation_report
+from .markets import build_markets, project_veto
 from .metrics import format_summary, summarize
 from .model import MatchPredictor
 from .odds import find_value, overround
@@ -20,7 +22,7 @@ from .predict import MATCH_MODEL_WEIGHT, Analyzer
 from .ratings import EloConfig
 from .pronostic import (
     Fixture, Tipster, fit_decider_temperature, format_card, read_fixtures,
-    simulate_tipster,
+    shape_series, simulate_tipster,
 )
 from . import journal as journal_mod
 from .schema import group_matches, merge_histories, parse_date, read_csv, write_csv
@@ -207,13 +209,28 @@ def cmd_h2h(args) -> int:
 def cmd_audit(args) -> int:
     an = _analyzer(args, train=False)
     report = audit_history(an.maps, an.matches)
+    feat_report = (
+        feature_correlation_report(an.match_ds)
+        if an.match_ds is not None and len(an.match_ds) >= 2 else None
+    )
     fx_report = audit_fixtures(read_fixtures(args.fixtures), an) if args.fixtures else None
     if args.json:
-        payload = {**report, "fixtures": fx_report} if fx_report is not None else report
+        payload = dict(report)
+        if feat_report is not None:
+            payload["features"] = feat_report
+        if fx_report is not None:
+            payload["fixtures"] = fx_report
         print(json.dumps(payload, indent=2, ensure_ascii=False))
         return 0
     print()
     print(format_audit(report))
+    if feat_report is not None and (feat_report["constant_features"] or feat_report["high_pairs"]):
+        print("\nFeatures (dataset match) :")
+        if feat_report["constant_features"]:
+            print(f"  Constantes : {', '.join(feat_report['constant_features'])}")
+        if feat_report["high_pairs"]:
+            pairs = ", ".join(f"{p['a']}/{p['b']} ({p['corr']:+.2f})" for p in feat_report["high_pairs"][:5])
+            print(f"  Fortes correlations : {pairs}")
     if fx_report is not None:
         print(
             f"\nAudit fixtures : {fx_report['n_fixtures']} affiches "
@@ -416,8 +433,23 @@ def cmd_predict(args) -> int:
     an = _analyzer(args)
     on = parse_date(args.date) if args.date else None
     pred = an.predict(args.team_a, args.team_b, best_of=args.bo, lan=args.lan, on=on)
+    market_lines = None
+    if getattr(args, "markets", False):
+        veto = project_veto([(e.map_name, e.p_a) for e in pred.map_edges], pred.best_of)
+        dist = shape_series(veto, pred.best_of, pred.p_a, an.momentum, 1.0)
+        market_lines = build_markets(dist, pred.team_a, pred.team_b)
     if args.json:
         payload = pred.to_dict()
+        if market_lines is not None:
+            payload["markets"] = [
+                {
+                    "market": line.market,
+                    "selection": line.selection,
+                    "probability": line.probability,
+                    "fair_odds": line.fair_odds,
+                }
+                for line in market_lines
+            ]
         if args.odds_a is not None and args.odds_b is not None:
             bet = find_value(
                 pred.p_a, args.odds_a, args.odds_b, pred.team_a, pred.team_b, min_edge=args.min_edge
@@ -435,6 +467,10 @@ def cmd_predict(args) -> int:
         return 0
     print()
     print(pred.report())
+    if market_lines is not None:
+        print("\n  Marches derives (cotes justes) :")
+        for line in market_lines:
+            print(f"    {line.market:<22} {line.selection:<16} {line.probability:>6.1%}   cote {line.fair_odds:.2f}")
 
     if args.odds_a and args.odds_b:
         print()
@@ -839,6 +875,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--odds-a", type=float, help="cote decimale sur team_a")
     s.add_argument("--odds-b", type=float, help="cote decimale sur team_b")
     s.add_argument("--min-edge", type=float, default=0.04)
+    s.add_argument("--markets", action="store_true", help="affiche tous les marches derives et cotes justes")
     s.add_argument("--json", action="store_true", help="sortie JSON structuree")
     s.set_defaults(func=cmd_predict)
 
