@@ -72,6 +72,14 @@ class MapInactivityTests(unittest.TestCase):
         fx.match_context("ghost_a", "ghost_b", self.day)
         self.assertEqual(fx.elo.teams, {})
 
+    def test_leaderboard_active_within_days_filters_inactive_teams(self):
+        later = self.day + dt.timedelta(days=100)
+        self.engine.observe(MapResult("m2", later, "c", "d", "mirage", 13, 8, best_of=1))
+        active = self.engine.leaderboard(on=later, min_maps=1, active_within_days=30)
+        self.assertEqual({t for t, _, _ in active}, {"c", "d"})
+        with self.assertRaises(ValueError):
+            self.engine.leaderboard(on=later, min_maps=1, active_within_days=-1)
+
 
 if __name__ == "__main__":
     unittest.main()

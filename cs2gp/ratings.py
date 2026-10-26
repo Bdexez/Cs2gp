@@ -254,12 +254,24 @@ class EloEngine:
             ra, rb = self.rating(team_a, on), self.rating(team_b, on)
         return expected_score(ra, rb)
 
-    def leaderboard(self, on: dt.date | None = None, min_maps: int = 20) -> list[tuple[str, float, int]]:
-        rows = [
-            (name, self.rating(name, on), tr.maps_played)
-            for name, tr in self.teams.items()
-            if tr.maps_played >= min_maps
-        ]
+    def leaderboard(
+        self,
+        on: dt.date | None = None,
+        min_maps: int = 20,
+        *,
+        active_within_days: int | None = None,
+    ) -> list[tuple[str, float, int]]:
+        if active_within_days is not None:
+            if isinstance(active_within_days, bool) or not isinstance(active_within_days, int) or active_within_days < 0:
+                raise ValueError("active_within_days doit etre un entier positif ou nul")
+        rows = []
+        for name, tr in self.teams.items():
+            if tr.maps_played < min_maps:
+                continue
+            if active_within_days is not None and on is not None:
+                if tr.last_date is None or (on - tr.last_date).days > active_within_days:
+                    continue
+            rows.append((name, self.rating(name, on), tr.maps_played))
         rows.sort(key=lambda r: -r[1])
         return rows
 
