@@ -271,3 +271,40 @@ def paired_block_bootstrap(y, p, reference, dates: list[dt.date], *,
         draws.extend((totals[chosen].sum(axis=1) / counts[chosen].sum(axis=1)).tolist())
     out["low"], out["high"] = map(float, np.quantile(draws, [.025, .975]))
     return out
+
+
+def paired_loss_test(y, p, reference, *, metric: str = "log_loss") -> dict:
+    """Test apparie de difference de perte (Diebold-Mariano / t-test apparie).
+
+    Gain positif = le modele bat la reference sur la metrique demandee.
+    """
+    y, p = probability_pair(y, p)
+    _, reference = probability_pair(y, reference)
+    if metric not in ("log_loss", "brier"):
+        raise ValueError(f"metrique non geree : {metric!r}")
+    if metric == "log_loss":
+        pc = np.clip(p, EPS, 1.0 - EPS)
+        rc = np.clip(reference, EPS, 1.0 - EPS)
+        diff = y * np.log(pc / rc) + (1.0 - y) * np.log((1.0 - pc) / (1.0 - rc))
+    else:
+        diff = (reference - y) ** 2 - (p - y) ** 2
+    n = int(len(diff))
+    gain = float(diff.mean())
+    if n < 2:
+        return {"metric": metric, "n": n, "gain": gain, "se": None, "z_stat": None,
+                "p_value": None, "significant_5pct": False}
+    se = float(diff.std(ddof=1) / math.sqrt(n))
+    if se < 1e-12:
+        return {"metric": metric, "n": n, "gain": gain, "se": 0.0, "z_stat": None,
+                "p_value": None, "significant_5pct": False}
+    z = gain / se
+    p_val = math.erfc(abs(z) / math.sqrt(2.0))
+    return {
+        "metric": metric,
+        "n": n,
+        "gain": gain,
+        "se": se,
+        "z_stat": float(z),
+        "p_value": float(p_val),
+        "significant_5pct": bool(n >= 20 and p_val < 0.05),
+    }

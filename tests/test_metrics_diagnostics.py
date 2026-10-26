@@ -105,6 +105,19 @@ class MetricsDiagnosticsTests(unittest.TestCase):
         self.assertAlmostEqual(mce, 0.5, places=10)
         self.assertAlmostEqual(metrics.summarize(y, p)["mce"], mce, places=10)
 
+    def test_paired_loss_test_detects_significant_gain_on_log_loss_and_brier(self):
+        rng = np.random.default_rng(11)
+        p = np.where(np.arange(200) % 2 == 0, 0.85, 0.15)
+        y = (rng.random(200) < p).astype(float)
+        ref = np.full(200, 0.5)
+        for metric in ("log_loss", "brier"):
+            res = metrics.paired_loss_test(y, p, ref, metric=metric)
+            self.assertGreater(res["gain"], 0.0)
+            self.assertTrue(res["significant_5pct"])
+            self.assertLess(res["p_value"], 0.01)
+        with self.assertRaises(ValueError):
+            metrics.paired_loss_test(y, p, ref, metric="unknown")
+
 
 if __name__ == "__main__":
     unittest.main()
