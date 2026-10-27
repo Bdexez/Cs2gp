@@ -156,6 +156,19 @@ class CliJsonTests(unittest.TestCase):
             self.assertIn("features", audit_payload)
             self.assertIn("constant_features", audit_payload["features"])
 
+            # history --json + --export-csv
+            hist_csv = Path(tmp) / "hist.csv"
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(main([
+                    "history", teams[0], "--data", str(data), "--last", "10",
+                    "--export-csv", str(hist_csv), "--json",
+                ]), 0)
+            hist_payload = json.loads(out.getvalue())
+            self.assertEqual(hist_payload["team"], teams[0])
+            self.assertEqual(len(hist_payload["history"]), 10)
+            self.assertTrue(hist_csv.is_file())
+
     def test_public_package_api_exports(self):
         import cs2gp
 

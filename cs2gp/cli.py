@@ -206,6 +206,46 @@ def cmd_h2h(args) -> int:
     return 0
 
 
+def cmd_history(args) -> int:
+    if args.last is not None:
+        positive_integer("last", args.last)
+    an = _analyzer(args, train=False)
+    timeline = an.team_history(args.team)
+    shown = timeline[-args.last :] if args.last is not None else timeline
+    if args.export_csv:
+        written = atomic_write_csv(
+            args.export_csv,
+            [
+                "date", "match_id", "opponent", "map", "won", "round_diff",
+                "rating_before", "rating_after", "delta", "rd_after", "trajectory_after", "event",
+            ],
+            (
+                [
+                    r["date"], r["match_id"], r["opponent"], r["map"], int(r["won"]),
+                    r["round_diff"], f"{r['rating_before']:.2f}", f"{r['rating_after']:.2f}",
+                    f"{r['delta']:+.2f}", f"{r['rd_after']:.2f}", f"{r['trajectory_after']:+.2f}",
+                    r["event"],
+                ]
+                for r in shown
+            ),
+        )
+        print(f"{written} maps exportees -> {args.export_csv}", file=sys.stderr)
+    if args.json:
+        print(json.dumps({"team": an.resolve_team(args.team), "n_maps": len(shown), "history": shown},
+                         indent=2, ensure_ascii=False))
+        return 0
+    print()
+    print(f"Historique Elo de {an.resolve_team(args.team)} ({len(shown)}/{len(timeline)} maps) :")
+    for r in shown[-20:]:
+        outcome = "W" if r["won"] else "L"
+        print(
+            f"  {r['date']}  {outcome}  vs {r['opponent']:<16} {r['map']:<8} "
+            f"{r['round_diff']:+3d}r  Elo {r['rating_after']:>6.1f} ({r['delta']:+5.1f}) "
+            f"RD {r['rd_after']:>5.1f}"
+        )
+    return 0
+
+
 def cmd_audit(args) -> int:
     an = _analyzer(args, train=False)
     report = audit_history(an.maps, an.matches)
@@ -827,6 +867,13 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--date", help="exclut les matchs a partir de cette date")
     s.add_argument("--json", action="store_true", help="sortie JSON structuree")
     s.set_defaults(func=cmd_h2h)
+
+    s = sub.add_parser("history", parents=[common], help="evolution chronologique de l'Elo d'une equipe")
+    s.add_argument("team")
+    s.add_argument("--last", type=int, default=None, help="limite aux N dernieres maps")
+    s.add_argument("--export-csv", help="exporte la serie temporelle en CSV")
+    s.add_argument("--json", action="store_true", help="sortie JSON structuree")
+    s.set_defaults(func=cmd_history)
 
     s = sub.add_parser("audit", parents=[common], help="controle la qualite des donnees chargees")
     s.add_argument("--fixtures", help="CSV de matchs a venir a verifier avant prediction")
