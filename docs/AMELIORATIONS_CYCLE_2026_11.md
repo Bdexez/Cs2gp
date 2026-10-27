@@ -251,3 +251,14 @@ outillage domaine CS2 et sortie structuree).
   affiche toutes les probabilites et cotes justes des marches derives (texte et `--json`).
 - **API publique stable** (`cs2gp/__init__.py`) : exporte `Analyzer`, `EloConfig`,
   `Fixture`, `Tipster`, `audit_history`, `walk_forward` dans `__all__`.
+
+## Cycle 21 : Calibration `predict --markets`, test apparie de perte et filtre d'activite
+
+- **Calibration alignee sur `predict --markets`** (`cli.py`) : utilise
+  `fit_decider_temperature` (desactivable via `--no-calibration`) sur
+  `an.as_of(pred.date)` pour correspondre exactement a `cs2gp slate`.
+- **Test apparie de perte (`paired_loss_test`)** (`metrics.py`) : test t /
+  Diebold-Mariano apparie sur log-loss ou Brier face a une reference.
+- **Filtre d'activite dans `leaderboard` / `cs2gp ratings`** (`ratings.py`,
+  `cli.py`) : `active_within_days` / `--active-within N` exclut les equipes
+  inactives depuis plus de N jours.
