@@ -262,3 +262,15 @@ outillage domaine CS2 et sortie structuree).
 - **Filtre d'activite dans `leaderboard` / `cs2gp ratings`** (`ratings.py`,
   `cli.py`) : `active_within_days` / `--active-within N` exclut les equipes
   inactives depuis plus de N jours.
+
+## Cycle 22 : Importance par permutation, historique Elo et bootstrap de bankroll
+
+- **Importance par permutation** (`model.py`) : `permutation_importance()`
+  mesure la degradation hors-echantillon (log-loss ou Brier) par colonne,
+  compatible avec la regression logistique seule comme avec l'ensemble GBDT.
+- **Historique Elo d'une equipe (`cs2gp history`)** (`predict.py`, `cli.py`) :
+  `Analyzer.team_history(team)` et `cs2gp history <team> [--last N] [--export-csv] [--json]`
+  reconstruisent la trajectoire chronologique map par map (Elo, delta, RD).
+- **Bootstrap Monte Carlo de bankroll** (`odds.py`) : `bootstrap_bankroll()`
+  estime probabilite de profit, quantiles finaux (p05/mediane/p95) et drawdown
+  p95 sur un horizon de paris donne (mise fixe ou Kelly).
