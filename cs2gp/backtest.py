@@ -518,6 +518,50 @@ def benchmark_regimes(
     return summary
 
 
+def walk_forward_importance(
+    ds: Dataset,
+    *,
+    initial_frac: float = 0.4,
+    refit_every: int = 150,
+    min_train: int = 200,
+    metric: str = "log_loss",
+    repeats: int = 5,
+    seed: int = 0,
+    **model_kwargs,
+) -> list[dict]:
+    """Importance hors-echantillon par permutation agregee sur les folds walk-forward."""
+    from .model import permutation_importance
+
+    splits = forward_splits(ds.dates, initial_frac, min_train, refit_every)
+    names = ds.feature_names or tuple(f"f{i}" for i in range(ds.X.shape[1]))
+    weighted_sum = {name: 0.0 for name in names}
+    fold_deltas = {name: [] for name in names}
+    total_n = 0
+    for fold_idx, (i, j) in enumerate(splits):
+        model = MatchPredictor(**model_kwargs).fit(
+            ds.X[:i], ds.y[:i], ds.dates[:i], ds.feature_names
+        )
+        imp = permutation_importance(
+            model, ds.X[i:j], ds.y[i:j], metric=metric, repeats=repeats, seed=seed + fold_idx * 97
+        )
+        w = j - i
+        total_n += w
+        for row in imp:
+            weighted_sum[row["feature"]] += w * row["mean_delta"]
+            fold_deltas[row["feature"]].append(row["mean_delta"])
+    out = [
+        {
+            "feature": name,
+            "mean_delta": float(weighted_sum[name] / max(1, total_n)),
+            "fold_std": float(np.std(fold_deltas[name])),
+            "folds": len(splits),
+        }
+        for name in names
+    ]
+    out.sort(key=lambda r: -r["mean_delta"])
+    return out
+
+
 # ---------------------------------------------------------------------------
 # Reglage des constantes.
 #
