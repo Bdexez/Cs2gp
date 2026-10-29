@@ -16,6 +16,8 @@ class RecordStatisticsTests(unittest.TestCase):
         self.assertEqual(stat["n"], 100)
         self.assertEqual(stat["n_matchs"], 1)
         self.assertAlmostEqual(stat["erreur_type"], .4)
+        self.assertAlmostEqual(stat["brier"], 0.64, places=10)
+        self.assertGreater(stat["log_loss"], 1.0)
         self.assertFalse(stat["significatif"])
         self.assertIn("n trop faible", record.report())
 

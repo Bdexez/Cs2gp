@@ -690,6 +690,8 @@ class TipsterRecord:
     n_pending: int = 0
 
     def by(self, key) -> dict:
+        from .metrics import brier, log_loss
+
         groups: dict[str, list[SettledPick]] = {}
         for s in self.settled:
             groups.setdefault(key(s.pick), []).append(s)
@@ -699,6 +701,8 @@ class TipsterRecord:
             hits = sum(1 for s in items if s.won)
             promised = sum(s.pick.probability for s in items) / n
             observed = hits / n
+            y_g = [1.0 if s.won else 0.0 for s in items]
+            p_g = [s.pick.probability for s in items]
             # Borne prudente : correlation positive maximale au sein d'un match.
             # Dupliquer ses marches ne reduit donc pas artificiellement la marge.
             clusters = {}
@@ -714,6 +718,8 @@ class TipsterRecord:
                 "observe": observed,
                 "ecart": observed - promised,
                 "erreur_type": se,
+                "log_loss": log_loss(y_g, p_g),
+                "brier": brier(y_g, p_g),
                 "significatif": len(clusters) >= 30 and abs(observed - promised) > 2 * se,
             }
         return out
