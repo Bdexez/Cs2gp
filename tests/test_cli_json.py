@@ -93,15 +93,18 @@ class CliJsonTests(unittest.TestCase):
                 self.assertEqual(main(["merge", str(data), str(data), "--out", str(merged_csv)]), 0)
             self.assertTrue(merged_csv.is_file())
 
-            # tipster-backtest --json
+            # tipster-backtest --json + --export-csv
+            tb_csv = Path(tmp) / "tipster_oos.csv"
             out = io.StringIO()
             with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
                 self.assertEqual(main([
-                    "tipster-backtest", "--data", str(data), "--no-gbdt", "--json",
+                    "tipster-backtest", "--data", str(data), "--no-gbdt",
+                    "--export-csv", str(tb_csv), "--json",
                 ]), 0)
             tb_payload = json.loads(out.getvalue())
             self.assertIn("by_tier", tb_payload)
             self.assertIn("by_market", tb_payload)
+            self.assertTrue(tb_csv.is_file())
 
             # team --json
             out = io.StringIO()
