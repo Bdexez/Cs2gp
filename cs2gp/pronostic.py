@@ -24,7 +24,7 @@ import datetime as dt
 import math
 from dataclasses import dataclass, field
 
-from .csvio import read_rows
+from .csvio import atomic_write_csv, read_rows
 from .markets import (
     MarketLine, build_markets, enforce_margins, fit_decider_calibration,
     project_veto, series_distribution,
@@ -810,6 +810,24 @@ class TipsterRecord:
             "by_market": self.by(lambda p: p.market),
             "dispersions": list(self.dispersions),
         }
+
+    def export_csv(self, path) -> int:
+        """Exporte atomiquement les pronostics regles en CSV."""
+        return atomic_write_csv(
+            path,
+            [
+                "date", "match_id", "team_a", "team_b", "best_of", "event",
+                "market", "selection", "probability", "tier", "won",
+            ],
+            (
+                [
+                    s.pick.date.isoformat(), s.pick.match_id, s.pick.team_a, s.pick.team_b,
+                    s.pick.best_of, s.pick.event, s.pick.market, s.pick.selection,
+                    f"{s.pick.probability:.6f}", s.pick.tier, int(s.won),
+                ]
+                for s in self.settled
+            ),
+        )
 
 
 def _settle(pick: Pick, meta: dict, y_a: float) -> bool:
