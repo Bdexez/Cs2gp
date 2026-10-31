@@ -183,11 +183,15 @@ def format_audit(report: dict) -> str:
 
 def audit_fixtures(fixtures: Sequence, analyzer) -> dict:
     """Controle pre-vol d'une carte de matchs a venir avant prediction ou archivage."""
+    from .odds import overround
+
     if analyzer.fx is None:
         raise RuntimeError("charger des donnees dans l'analyseur avant de verifier les fixtures")
     fixtures = list(fixtures)
     unknown: list[str] = []
     thin_or_stale: list[str] = []
+    incomplete_odds: list[str] = []
+    arbitrage: list[str] = []
     with_odds = 0
     pair_days: Counter = Counter()
     for fx in fixtures:
@@ -195,6 +199,12 @@ def audit_fixtures(fixtures: Sequence, analyzer) -> dict:
             "odds_a", "odds_b", "odds_over", "odds_under", "odds_a_sweep", "odds_b_sweep"
         )):
             with_odds += 1
+        if (fx.odds_a is None) != (fx.odds_b is None) or (fx.odds_over is None) != (fx.odds_under is None):
+            incomplete_odds.append(fx.label)
+        if fx.odds_a is not None and fx.odds_b is not None and overround(fx.odds_a, fx.odds_b) < 1.0:
+            arbitrage.append(fx.label)
+        elif fx.odds_over is not None and fx.odds_under is not None and overround(fx.odds_over, fx.odds_under) < 1.0:
+            arbitrage.append(fx.label)
         if not fx.match_id:
             pair_days[(fx.date, tuple(sorted((fx.team_a, fx.team_b))))] += 1
         resolved = []
@@ -214,6 +224,14 @@ def audit_fixtures(fixtures: Sequence, analyzer) -> dict:
         warnings.append(f"equipe(s) inconnue(s) dans l'historique : {', '.join(sorted(unknown))}.")
     if thin_or_stale:
         warnings.append(f"{len(thin_or_stale)} affiche(s) a historique mince ou ancien (confiance faible).")
+    if incomplete_odds:
+        warnings.append(
+            f"{len(incomplete_odds)} affiche(s) avec paire de cotes incomplete (retrait de marge impossible)."
+        )
+    if arbitrage:
+        warnings.append(
+            f"{len(arbitrage)} affiche(s) avec overround < 1 (arbitrage ou erreur de saisie de cote)."
+        )
     if collisions:
         warnings.append(
             f"{collisions} collision(s) (date, paire) sans match_id : le reglement du journal sera ambigu."
@@ -223,7 +241,9 @@ def audit_fixtures(fixtures: Sequence, analyzer) -> dict:
         "with_odds": with_odds,
         "unknown_teams": sorted(unknown),
         "thin_or_stale": thin_or_stale,
+        "incomplete_odds_pairs": incomplete_odds,
+        "arbitrage_fixtures": arbitrage,
         "missing_match_id_collisions": collisions,
         "warnings": warnings,
-        "ok": not unknown and collisions == 0,
+        "ok": not unknown and not incomplete_odds and collisions == 0,
     }

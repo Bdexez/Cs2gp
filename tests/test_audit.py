@@ -116,6 +116,24 @@ class AuditTests(unittest.TestCase):
             payload = json.loads(out.getvalue())
             self.assertEqual(payload["fixtures"]["unknown_teams"], ["mystery"])
 
+    def test_audit_fixtures_detects_incomplete_odds_and_arbitrage(self):
+        from cs2gp.audit import audit_fixtures
+        from cs2gp.predict import Analyzer
+        from cs2gp.pronostic import Fixture
+
+        day = dt.date(2026, 4, 1)
+        an = Analyzer(warmup_maps=0).load_maps([
+            MapResult("m1", day, "navi", "g2", "mirage", 13, 8, best_of=1),
+        ])
+        fixtures = [
+            Fixture(day + dt.timedelta(days=1), "navi", "g2", match_id="f1", odds_a=1.80),
+            Fixture(day + dt.timedelta(days=1), "navi", "g2", match_id="f2", odds_a=2.10, odds_b=2.10),
+        ]
+        res = audit_fixtures(fixtures, an)
+        self.assertFalse(res["ok"])
+        self.assertEqual(len(res["incomplete_odds_pairs"]), 1)
+        self.assertEqual(len(res["arbitrage_fixtures"]), 1)
+
 
 if __name__ == "__main__":
     unittest.main()
