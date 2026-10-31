@@ -132,6 +132,8 @@ class BacktestSegmentTests(unittest.TestCase):
             payload = json.loads(out.getvalue())
             self.assertIn("by_fold", payload)
             self.assertIn("bet_backtest", payload)
+            self.assertIn("favorite_reliability", payload)
+            self.assertEqual(len(payload["temperatures"]), payload["folds"])
             self.assertGreater(payload["bet_backtest"]["matches_with_odds"], 0)
             self.assertGreater(payload["bet_backtest"]["avg_overround"], 1.0)
             self.assertTrue(export_path.is_file())
