@@ -292,3 +292,11 @@ outillage domaine CS2 et sortie structuree).
   directement en CLI (texte et `--json`).
 - **Export CSV du `tipster-backtest`** (`pronostic.py`, `cli.py`) :
   `TipsterRecord.export_csv()` et `--export-csv` sur `cs2gp tipster-backtest`.
+
+## Cycle 25 : Temperatures par fold, fiabilite favori et audit des cotes
+
+- **Temperatures par fold et fiabilite favori** (`backtest.py`) : `walk_forward`
+  enregistre la temperature de calibration apprise a chaque fold (`temperatures`)
+  et `BacktestResult.to_dict()` expose `favorite_reliability`.
+- **Audit des cotes dans `audit_fixtures`** (`audit.py`) : signale les paires
+  de cotes incompletes (retrait de marge impossible) et les surebets (`overround < 1`).
