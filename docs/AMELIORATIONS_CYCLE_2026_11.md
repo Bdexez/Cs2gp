@@ -300,3 +300,10 @@ outillage domaine CS2 et sortie structuree).
   et `BacktestResult.to_dict()` expose `favorite_reliability`.
 - **Audit des cotes dans `audit_fixtures`** (`audit.py`) : signale les paires
   de cotes incompletes (retrait de marge impossible) et les surebets (`overround < 1`).
+
+## Cycle 26 : Analyse d'erreurs (`worst_misses`) et garde JSON EloConfig
+
+- **Analyse d'erreurs (`worst_misses` / `--errors N`)** (`backtest.py`, `cli.py`) :
+  identifie les N matchs les plus couteux en log-loss dans un backtest (texte et `--json`).
+- **Validation stricte de `EloConfig.from_dict` / `load`** (`ratings.py`) :
+  rejette explicitement tout fichier JSON qui n'est pas un objet.
