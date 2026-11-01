@@ -415,6 +415,8 @@ def cmd_backtest(args) -> int:
             payload["bet_backtest"] = odds_summary
         if importance is not None:
             payload["importance"] = importance
+        if getattr(args, "errors", 0):
+            payload["worst_misses"] = res.worst_misses(args.errors)
         print(json.dumps(payload, indent=2, ensure_ascii=False))
         return 0
     print()
@@ -481,6 +483,13 @@ def cmd_backtest(args) -> int:
         print("\nImportance hors-echantillon par permutation (delta log-loss) :")
         for row in importance[:10]:
             print(f"  {row['feature']:<22} {row['mean_delta']:+.5f}  (std folds {row['fold_std']:.5f})")
+    if getattr(args, "errors", 0):
+        print(f"\nPires ecarts en log-loss (top {args.errors}) :")
+        for row in res.worst_misses(args.errors):
+            print(
+                f"  {row['date']}  {row['team_a']} vs {row['team_b']}  "
+                f"p={row['p_model']:.1%}  y={row['y']}  logloss={row['log_loss']:.3f}  [{row['match_id']}]"
+            )
     return 0
 
 
@@ -923,6 +932,8 @@ def build_parser() -> argparse.ArgumentParser:
                    help="affiche l'evolution du log-loss et de la calibration par fold")
     s.add_argument("--importance", action="store_true",
                    help="calcule l'importance hors-echantillon par permutation")
+    s.add_argument("--errors", type=int, default=0,
+                   help="affiche les N matchs les plus couteux en log-loss (0 desactive)")
     s.add_argument("--export-csv", help="exporte les predictions hors-echantillon en CSV")
     s.add_argument("--odds-csv", help="CSV de cotes historiques (match_id,odds_a,odds_b)")
     s.add_argument("--min-edge", type=float, default=0.04,

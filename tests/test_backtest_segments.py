@@ -173,6 +173,16 @@ class BacktestSegmentTests(unittest.TestCase):
         self.assertGreater(imp[0]["mean_delta"], 0.0)
         self.assertGreaterEqual(imp[0]["folds"], 1)
 
+    def test_worst_misses_orders_by_descending_log_loss(self):
+        res = self._sample_result()
+        res.predictions[5] = 0.99  # y[5] == 0 -> huge log-loss miss
+        misses = res.worst_misses(top=3)
+        self.assertEqual(len(misses), 3)
+        self.assertEqual(misses[0]["match_id"], "m5")
+        self.assertGreater(misses[0]["log_loss"], misses[1]["log_loss"])
+        with self.assertRaises(ValueError):
+            res.worst_misses(top=0)
+
 
 if __name__ == "__main__":
     unittest.main()

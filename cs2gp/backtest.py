@@ -203,6 +203,36 @@ class BacktestResult:
             })
         return rows
 
+    def worst_misses(self, top: int = 10) -> list[dict]:
+        """Retourne les matchs les plus couteux en log-loss pour l'analyse d'erreurs."""
+        positive_integer("top", top)
+        if not len(self.y):
+            return []
+        eps = 1e-12
+        pm = np.clip(self.predictions, eps, 1.0 - eps)
+        pe = np.clip(self.elo_only, eps, 1.0 - eps)
+        losses = -(self.y * np.log(pm) + (1.0 - self.y) * np.log(1.0 - pm))
+        elo_losses = -(self.y * np.log(pe) + (1.0 - self.y) * np.log(1.0 - pe))
+        order = np.argsort(-losses)[:top]
+        rows = []
+        for idx in order:
+            i = int(idx)
+            m = self.meta[i]
+            rows.append({
+                "match_id": m.get("match_id", ""),
+                "date": self.dates[i].isoformat(),
+                "team_a": m.get("team_a", ""),
+                "team_b": m.get("team_b", ""),
+                "best_of": m.get("best_of"),
+                "score": m.get("score", ""),
+                "y": int(self.y[i]),
+                "p_model": float(self.predictions[i]),
+                "p_elo": float(self.elo_only[i]),
+                "log_loss": float(losses[i]),
+                "elo_log_loss": float(elo_losses[i]),
+            })
+        return rows
+
     def export_csv(self, path: str | Path) -> int:
         """Exporte atomiquement les predictions hors-echantillon en CSV."""
         cols = [
