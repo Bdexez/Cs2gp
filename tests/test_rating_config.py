@@ -18,6 +18,18 @@ class RatingConfigTests(unittest.TestCase):
                         use_uncertainty=False, lan_bonus=-1)
         self.assertEqual(EloConfig.from_dict(cfg.to_dict()), cfg)
 
+    def test_non_object_json_config_is_rejected_cleanly(self):
+        from pathlib import Path
+        import tempfile
+
+        with self.assertRaisesRegex(ValueError, "objet JSON"):
+            EloConfig.from_dict(["not", "a", "dict"])
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp) / "bad.json"
+            p.write_text("[1, 2, 3]", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "objet JSON"):
+                EloConfig.load(p)
+
 
 if __name__ == "__main__":
     unittest.main()
