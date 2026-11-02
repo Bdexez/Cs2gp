@@ -120,6 +120,16 @@ class PredictionParityTests(unittest.TestCase):
         self.assertIn("IC 95% modele match", pred.report())
         self.assertEqual(pred.to_dict()["p_a_interval"], [lo, hi])
 
+    def test_compare_teams_returns_symmetric_scouting_summary(self):
+        a, b = self.an.known_teams()[:2]
+        cmp_ab = self.an.compare_teams(a, b)
+        cmp_ba = self.an.compare_teams(b, a)
+        self.assertAlmostEqual(cmp_ab["elo_diff"], -cmp_ba["elo_diff"], places=10)
+        self.assertAlmostEqual(cmp_ab["elo_win_prob_a"] + cmp_ba["elo_win_prob_a"], 1.0, places=10)
+        self.assertEqual(len(cmp_ab["map_edges"]), 7)
+        with self.assertRaises(ValueError):
+            self.an.compare_teams(a, a)
+
 
 if __name__ == "__main__":
     unittest.main()
