@@ -246,6 +246,37 @@ def cmd_history(args) -> int:
     return 0
 
 
+def cmd_compare(args) -> int:
+    an = _analyzer(args, train=False)
+    on = parse_date(args.date) if args.date else None
+    cmp = an.compare_teams(args.team_a, args.team_b, on=on)
+    if args.json:
+        print(json.dumps(cmp, indent=2, ensure_ascii=False))
+        return 0
+    a, b = cmp["team_a"], cmp["team_b"]
+    print()
+    print(f"Comparaison : {a['team']} vs {b['team']}   [au {cmp['as_of']}]")
+    print(
+        f"  Elo     : {a['rating']:.0f} (+/-{a['deviation']:.0f}) vs "
+        f"{b['rating']:.0f} (+/-{b['deviation']:.0f})   "
+        f"(ecart {cmp['elo_diff']:+.0f}, proba Elo {cmp['elo_win_prob_a']:.1%})"
+    )
+    print(
+        f"  Forme   : {a['recent_win_rate']:.0%} ({a['recent_round_diff']:+.1f}r) vs "
+        f"{b['recent_win_rate']:.0%} ({b['recent_round_diff']:+.1f}r) | "
+        f"charge 21j {a['workload_21d']} vs {b['workload_21d']} maps"
+    )
+    h2h = cmp["h2h"]
+    print(
+        f"  H2H     : {h2h['series_a_wins']}-{h2h['series_b_wins']} series, "
+        f"{h2h['maps_a_wins']}-{h2h['maps_b_wins']} maps (score {h2h['weighted_h2h_score']:+.3f})"
+    )
+    print("\n  Ecart Elo par map (vu de " + a["team"] + ") :")
+    for row in cmp["map_edges"]:
+        print(f"    {row['map']:<10} {row['elo_edge']:+7.1f}")
+    return 0
+
+
 def cmd_audit(args) -> int:
     an = _analyzer(args, train=False)
     report = audit_history(an.maps, an.matches)
@@ -917,6 +948,13 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--export-csv", help="exporte la serie temporelle en CSV")
     s.add_argument("--json", action="store_true", help="sortie JSON structuree")
     s.set_defaults(func=cmd_history)
+
+    s = sub.add_parser("compare", parents=[common], help="scouting comparatif rapide entre deux equipes")
+    s.add_argument("team_a")
+    s.add_argument("team_b")
+    s.add_argument("--date", help="date de reference (defaut : dernier match connu)")
+    s.add_argument("--json", action="store_true", help="sortie JSON structuree")
+    s.set_defaults(func=cmd_compare)
 
     s = sub.add_parser("audit", parents=[common], help="controle la qualite des donnees chargees")
     s.add_argument("--fixtures", help="CSV de matchs a venir a verifier avant prediction")
