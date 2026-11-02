@@ -368,6 +368,8 @@ def cmd_train(args) -> int:
 
 
 def cmd_backtest(args) -> int:
+    if getattr(args, "errors", 0) < 0:
+        raise ValueError("errors doit etre positif ou nul")
     an = _analyzer(args, train=False)
     res = walk_forward(
         an.match_ds,
@@ -705,11 +707,18 @@ def cmd_journal(args) -> int:
     until = getattr(args, "until", None)
     record = journal_mod.scorecard(args.journal, since=since, until=until)
     money = journal_mod.financial_summary(args.journal, since=since, until=until)
+    risk = (
+        journal_mod.bankroll_risk(args.journal, since=since, until=until)
+        if getattr(args, "risk", False) else None
+    )
     if getattr(args, "json", False):
-        print(json.dumps({
+        payload = {
             "scorecard": None if record is None else record.to_dict(),
             "financial": money,
-        }, indent=2, ensure_ascii=False))
+        }
+        if getattr(args, "risk", False):
+            payload["risk"] = risk
+        print(json.dumps(payload, indent=2, ensure_ascii=False))
         return 0
     if record is None:
         print("Aucun pronostic pointe pour le moment.")
@@ -728,6 +737,13 @@ def cmd_journal(args) -> int:
               f"pire serie {money['pire_serie_defaites']} defaites")
         print(f"  Kelly     : {money['profit_kelly']:+.3f} pour "
               f"{money['mise_kelly_totale']:.2f} misees, ROI {money['roi_kelly']:+.1%}")
+        if risk is not None:
+            print(
+                f"  Risque MC ({risk['horizon']} paris, {risk['samples']} tirages) : "
+                f"P(profit) {risk['prob_profit']:.1%} | "
+                f"bankroll p05={risk['p05_final']:.2f} / med={risk['median_final']:.2f} | "
+                f"drawdown p95={risk['p95_max_drawdown_pct']:.1%}"
+            )
         print("  Sur moins de ~200 paris, ce ROI est domine par le hasard : "
               "ne pas en tirer de conclusion.")
     return 0
@@ -1004,6 +1020,8 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--journal", default="data/journal.csv")
     s.add_argument("--since", type=parse_date, help="inclut uniquement les matchs a partir de cette date")
     s.add_argument("--until", type=parse_date, help="inclut uniquement les matchs jusqu'a cette date")
+    s.add_argument("--risk", action="store_true",
+                   help="ajoute un bootstrap Monte Carlo de bankroll et drawdown p95")
     s.add_argument("--json", action="store_true", help="sortie JSON structuree")
     s.set_defaults(func=cmd_journal)
 

@@ -382,3 +382,29 @@ def financial_summary(
         "mise_kelly_totale": kelly_staked,
         "roi_kelly": kelly_profit / kelly_staked if kelly_staked > 1e-9 else 0.0,
     }
+
+
+def bankroll_risk(
+    journal_path: str | Path,
+    *,
+    since: dt.date | None = None,
+    until: dt.date | None = None,
+    mode: str = "kelly",
+    horizon: int | None = None,
+    samples: int = 500,
+    seed: int = 0,
+) -> dict | None:
+    """Estimation Monte Carlo du drawdown et du risque sur les paris cotes du journal."""
+    from .odds import bootstrap_bankroll
+
+    rows = [
+        r for r in _filter_by_date(load(journal_path), since=since, until=until)
+        if r.get("resultat") and r.get("cote")
+    ]
+    if not rows:
+        return None
+    plays = [
+        (float(r["probabilite"]), float(r["cote"]), int(r["resultat"] == "gagne"))
+        for r in rows
+    ]
+    return bootstrap_bankroll(plays, mode=mode, horizon=horizon, samples=samples, seed=seed)

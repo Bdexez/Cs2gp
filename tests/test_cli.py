@@ -53,6 +53,8 @@ class CommonOptionsTests(unittest.TestCase):
             main(["fixtures", "--teams", "1"])
         with self.assertRaisesRegex(SystemExit, "count"):
             main(["fixtures", "--count", "0"])
+        with self.assertRaisesRegex(SystemExit, "errors"):
+            main(["backtest", "--errors", "-1"])
 
     def test_settle_and_tipster_backtest_accept_window_and_refit_options(self):
         parser = build_parser()
