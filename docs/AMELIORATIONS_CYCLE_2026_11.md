@@ -317,3 +317,13 @@ outillage domaine CS2 et sortie structuree).
   deux equipes (profils, avantage map par map, probabilite Elo, H2H) sans
   necessiter d'entrainement.
 - **Validation `--errors < 0`** (`cli.py`) : echoue immediatement avant le backtest.
+
+## Cycle 28 : Commande `compare`, Hosmer-Lemeshow et variations Elo (`movers`)
+
+- **Scouting CLI (`cs2gp compare`)** (`cli.py`) : expose `Analyzer.compare_teams()`
+  en texte et `--json` sans entrainement.
+- **Test de Hosmer-Lemeshow** (`metrics.py`) : `hosmer_lemeshow(y, p, bins=10)`
+  calcule la statistique chi2 par quantiles pour reperer les defauts de
+  calibration non lineaires.
+- **Variations Elo (`Analyzer.movers`)** (`predict.py`) : identifie les plus
+  fortes hausses et baisses Elo sur une fenetre glissante de N jours.
