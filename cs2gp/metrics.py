@@ -234,6 +234,28 @@ def spiegelhalter_z(y: np.ndarray, p: np.ndarray) -> dict:
     }
 
 
+def hosmer_lemeshow(y: np.ndarray, p: np.ndarray, bins: int = 10) -> dict:
+    """Statistique chi2 de Hosmer-Lemeshow par quantiles (detecte les defauts non lineaires)."""
+    y, p = probability_pair(y, p)
+    positive_integer("bins", bins)
+    order = np.argsort(p)
+    chunks = [c for c in np.array_split(order, min(bins, len(y))) if len(c) > 0]
+    chi2 = 0.0
+    for idx in chunks:
+        nk = float(len(idx))
+        ok = float(y[idx].sum())
+        ek = float(p[idx].sum())
+        pk = ek / nk
+        denom = max(nk * pk * (1.0 - pk), 1e-9)
+        chi2 += ((ok - ek) ** 2) / denom
+    g = len(chunks)
+    return {
+        "statistic": float(chi2),
+        "df": max(1, g - 2),
+        "groups": g,
+    }
+
+
 def summarize(y: np.ndarray, p: np.ndarray) -> dict:
     y = np.asarray(y, dtype=float)
     ll = log_loss(y, p)
