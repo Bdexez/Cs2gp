@@ -485,6 +485,45 @@ class Analyzer:
             "h2h": self.head_to_head(a, b, on=on),
         }
 
+    def movers(self, window_days: int = 30, min_maps: int = 20, top: int = 5) -> dict:
+        """Equipes en plus forte hausse et baisse Elo sur les `window_days` derniers jours."""
+        from .ratings import EloEngine
+        from .validation import positive_integer
+
+        positive_integer("window_days", window_days)
+        positive_integer("top", top)
+        if min_maps < 0:
+            raise ValueError("min_maps doit etre positif ou nul")
+        if self.fx is None or not self.maps:
+            raise RuntimeError("charger des donnees avant de calculer les variations Elo")
+        as_of = max(m.date for m in self.maps)
+        cutoff = as_of - dt.timedelta(days=window_days)
+        past_engine = EloEngine(self.elo_config)
+        for mp in sorted(self.maps, key=lambda m: (m.date, m.match_id, m.map_index)):
+            if mp.date <= cutoff:
+                past_engine.observe(mp)
+        rows = []
+        for team, tr in self.fx.elo.teams.items():
+            if tr.maps_played < min_maps:
+                continue
+            now_elo = float(self.fx.elo.rating(team, as_of))
+            prev_elo = float(past_engine.rating(team, cutoff))
+            rows.append({
+                "team": team,
+                "rating_before": prev_elo,
+                "rating_after": now_elo,
+                "delta": float(now_elo - prev_elo),
+                "maps_played": int(tr.maps_played),
+            })
+        rows.sort(key=lambda r: -r["delta"])
+        return {
+            "as_of": as_of.isoformat(),
+            "since": cutoff.isoformat(),
+            "window_days": window_days,
+            "risers": rows[:top],
+            "fallers": list(reversed(rows[-top:])) if rows else [],
+        }
+
     def calibration_history(self):
         """Historique hors entrainement partage par les calibrations et mis en cache."""
         from .calibration import prequential_maps
