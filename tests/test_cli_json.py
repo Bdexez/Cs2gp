@@ -180,6 +180,14 @@ class CliJsonTests(unittest.TestCase):
             self.assertEqual(cmp_payload["team_a"]["team"], teams[0])
             self.assertEqual(len(cmp_payload["map_edges"]), 7)
 
+            # movers --json
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(main(["movers", "--data", str(data), "--days", "30", "--min-maps", "1", "--top", "3", "--json"]), 0)
+            mv_payload = json.loads(out.getvalue())
+            self.assertEqual(len(mv_payload["risers"]), 3)
+            self.assertEqual(len(mv_payload["fallers"]), 3)
+
     def test_public_package_api_exports(self):
         import cs2gp
 
