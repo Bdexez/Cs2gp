@@ -327,3 +327,13 @@ outillage domaine CS2 et sortie structuree).
   calibration non lineaires.
 - **Variations Elo (`Analyzer.movers`)** (`predict.py`) : identifie les plus
   fortes hausses et baisses Elo sur une fenetre glissante de N jours.
+
+## Cycle 29 : Commande `movers`, Hosmer-Lemeshow en JSON et modularisation CLI
+
+- **Commande CLI `cs2gp movers`** (`cli.py`, `cli_exports.py`) : expose les
+  plus fortes hausses et baisses Elo recentes (texte et `--json`).
+- **Hosmer-Lemeshow dans le backtest JSON** (`backtest.py`) :
+  `BacktestResult.to_dict()` inclut `hosmer_lemeshow`.
+- **Modularisation CLI** (`cli_exports.py`, `cli.py`) : extraction des exports
+  CSV (`ratings`, `history`, `slate`) et du formatage `movers` dans un module
+  dedie pour alleger `cli.py`.
