@@ -887,12 +887,9 @@ def simulate_tipster(
     les seules series anterieures, comme elle le serait en production. La figer
     a une valeur ajustee sur toute la periode donnerait un bilan flatteur et faux.
     """
-    import numpy as np
-
     from .backtest import _pool_to_series
     from .model import MatchPredictor, map_predictor
     from .predict import combine_probability, confidence_label
-    from .schema import ACTIVE_DUTY
     from .calibration import prequential_maps
 
     n = len(match_ds)
