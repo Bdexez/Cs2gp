@@ -337,3 +337,13 @@ outillage domaine CS2 et sortie structuree).
 - **Modularisation CLI** (`cli_exports.py`, `cli.py`) : extraction des exports
   CSV (`ratings`, `history`, `slate`) et du formatage `movers` dans un module
   dedie pour alleger `cli.py`.
+
+## Cycle 30 : Statistiques par map (`cs2gp maps`), hygiene AST et reference CLI
+
+- **Statistiques globales par map** (`predict.py`, `cli.py`) :
+  `Analyzer.map_stats()` et `cs2gp maps [--json]` calculent volume, taux de
+  prolongation (OT), ecart moyen de rounds, total de rounds et taux de
+  victoire du favori Elo par map.
+- **Verification d'hygiene AST et reference CLI** (`docs/REFERENCE.md`) :
+  audit des imports inutilises sur tout `cs2gp/` et mise a jour complete de la
+  reference CLI.
