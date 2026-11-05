@@ -6,13 +6,11 @@ import datetime as dt
 from dataclasses import dataclass, field
 from pathlib import Path
 
-import numpy as np
-
 from .features import FeatureExtractor, build_datasets
 from .markets import project_veto, series_distribution
 from .model import MatchPredictor, map_predictor
 from .ratings import EloConfig
-from .schema import ACTIVE_DUTY, Match, MapResult, group_matches, normalize_team, read_csv
+from .schema import Match, MapResult, group_matches, normalize_team, read_csv
 
 # Plafond de confiance. Aucun modele base sur des resultats passes ne peut
 # honnetement depasser ce seuil sur un match unique.
@@ -523,6 +521,49 @@ class Analyzer:
             "risers": rows[:top],
             "fallers": list(reversed(rows[-top:])) if rows else [],
         }
+
+    def map_stats(self) -> list[dict]:
+        """Statistiques globales par map (volume, OT, ecart de rounds, reussite favori Elo)."""
+        from .ratings import EloEngine
+
+        if self.fx is None or not self.maps:
+            raise RuntimeError("charger des donnees avant de calculer les statistiques par map")
+        engine = EloEngine(self.elo_config)
+        buckets: dict[str, dict] = {}
+        for mp in sorted(self.maps, key=lambda m: (m.date, m.match_id, m.map_index)):
+            ra_elo = engine.map_rating(mp.team_a, mp.map_name, mp.date)
+            rb_elo = engine.map_rating(mp.team_b, mp.map_name, mp.date)
+            slot = buckets.setdefault(mp.map_name, {
+                "played": 0, "ot": 0, "abs_diff": 0, "rounds": 0,
+                "fav_total": 0, "fav_wins": 0,
+            })
+            slot["played"] += 1
+            hi, lo = max(mp.rounds_a, mp.rounds_b), min(mp.rounds_a, mp.rounds_b)
+            if hi >= 16 and lo >= 12:
+                slot["ot"] += 1
+            slot["abs_diff"] += abs(mp.round_diff)
+            slot["rounds"] += mp.rounds_a + mp.rounds_b
+            if abs(ra_elo - rb_elo) > 1e-6:
+                slot["fav_total"] += 1
+                fav_a = ra_elo > rb_elo
+                if (fav_a and mp.a_won) or (not fav_a and not mp.a_won):
+                    slot["fav_wins"] += 1
+            engine.observe(mp)
+        rows = []
+        for name, b in buckets.items():
+            n = b["played"]
+            rows.append({
+                "map": name,
+                "played": n,
+                "ot_rate": float(b["ot"] / n),
+                "avg_round_diff": float(b["abs_diff"] / n),
+                "avg_total_rounds": float(b["rounds"] / n),
+                "elo_favorite_win_rate": (
+                    float(b["fav_wins"] / b["fav_total"]) if b["fav_total"] else None
+                ),
+            })
+        rows.sort(key=lambda r: (-r["played"], r["map"]))
+        return rows
 
     def calibration_history(self):
         """Historique hors entrainement partage par les calibrations et mis en cache."""
