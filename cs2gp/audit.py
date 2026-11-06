@@ -61,6 +61,9 @@ def audit_history(
 
     pair_days = Counter((m.date, tuple(sorted((m.team_a, m.team_b)))) for m in matches)
     same_day_collisions = sum(1 for c in pair_days.values() if c > 1)
+    team_a_win_rate = (
+        float(sum(m.a_won for m in complete) / len(complete)) if complete else None
+    )
 
     matches_by_year = {str(y): c for y, c in sorted(Counter(m.date.year for m in matches).items())}
     active_counts = [maps_by_name.get(m, 0) for m in ACTIVE_DUTY]
@@ -120,12 +123,18 @@ def audit_history(
             f"{len(similar_teams)} paire(s) de noms d'equipes tres proches ({sample}) : "
             "verifier les alias manquants ou fautes de frappe."
         )
+    if len(complete) >= 30 and team_a_win_rate is not None and abs(team_a_win_rate - 0.5) > 0.15:
+        warnings.append(
+            f"orientation biaisee : team_a gagne {team_a_win_rate:.1%} des series "
+            "(verifier si la source place systematiquement le vainqueur en team_a)."
+        )
 
     return {
         "n_maps": len(maps),
         "n_matches": len(matches),
         "n_complete_matches": len(complete),
         "n_incomplete_matches": incomplete,
+        "team_a_win_rate": team_a_win_rate,
         "n_teams": len(teams),
         "teams_under_warmup": teams_under_warmup,
         "similar_team_pairs": similar_teams,
