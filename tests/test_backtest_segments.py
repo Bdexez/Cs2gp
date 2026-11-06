@@ -184,6 +184,16 @@ class BacktestSegmentTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             res.worst_misses(top=0)
 
+    def test_abstention_curve_decreases_coverage_monotonically(self):
+        res = self._sample_result()
+        curve = res.abstention_curve((0.50, 0.70, 0.90))
+        self.assertEqual(len(curve), 3)
+        self.assertEqual(curve[0]["coverage"], 1.0)
+        self.assertEqual(curve[1]["coverage"], 1.0)  # all sample probs are 0.75 / 0.25
+        self.assertEqual(curve[2]["coverage"], 0.0)
+        with self.assertRaises(ValueError):
+            res.abstention_curve((0.40,))
+
 
 if __name__ == "__main__":
     unittest.main()

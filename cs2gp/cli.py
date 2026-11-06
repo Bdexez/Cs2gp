@@ -447,6 +447,8 @@ def cmd_backtest(args) -> int:
             payload["importance"] = importance
         if getattr(args, "errors", 0):
             payload["worst_misses"] = res.worst_misses(args.errors)
+        if getattr(args, "abstention_curve", False):
+            payload["abstention_curve"] = res.abstention_curve()
         print(json.dumps(payload, indent=2, ensure_ascii=False))
         return 0
     print()
@@ -519,6 +521,18 @@ def cmd_backtest(args) -> int:
             print(
                 f"  {row['date']}  {row['team_a']} vs {row['team_b']}  "
                 f"p={row['p_model']:.1%}  y={row['y']}  logloss={row['log_loss']:.3f}  [{row['match_id']}]"
+            )
+    if getattr(args, "abstention_curve", False):
+        print("\nCourbe de selectivite (seuil d'abstention) :")
+        print(f"  {'seuil':<8}{'n':>6}{'couv.':>8}{'annonce':>10}{'acc':>9}{'logloss':>10}{'brier':>9}")
+        for row in res.abstention_curve():
+            if row["n"] == 0:
+                print(f"  {row['threshold']:<8.2f}{0:>6}{0.0:>7.1%}")
+                continue
+            print(
+                f"  {row['threshold']:<8.2f}{row['n']:>6}{row['coverage']:>7.1%}"
+                f"{row['mean_confidence']:>9.1%}{row['accuracy']:>9.1%}"
+                f"{row['log_loss']:>10.4f}{row['brier']:>9.4f}"
             )
     return 0
 
@@ -966,6 +980,8 @@ def build_parser() -> argparse.ArgumentParser:
                    help="calcule l'importance hors-echantillon par permutation")
     s.add_argument("--errors", type=int, default=0,
                    help="affiche les N matchs les plus couteux en log-loss (0 desactive)")
+    s.add_argument("--abstention-curve", action="store_true",
+                   help="affiche le compromis couverture / precision selon le seuil d'abstention")
     s.add_argument("--export-csv", help="exporte les predictions hors-echantillon en CSV")
     s.add_argument("--odds-csv", help="CSV de cotes historiques (match_id,odds_a,odds_b)")
     s.add_argument("--min-edge", type=float, default=0.04,
