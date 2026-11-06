@@ -140,6 +140,17 @@ class PredictionParityTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.an.movers(window_days=0)
 
+    def test_event_stats_summarizes_tournaments_and_upset_rates(self):
+        stats = self.an.event_stats(min_matches=1)
+        self.assertGreater(len(stats), 0)
+        self.assertEqual(sum(s["n_matches"] for s in stats), len(self.an.matches))
+        for row in stats:
+            if row["elo_upset_rate"] is not None:
+                self.assertGreaterEqual(row["elo_upset_rate"], 0.0)
+                self.assertLessEqual(row["elo_upset_rate"], 1.0)
+        with self.assertRaises(ValueError):
+            self.an.event_stats(min_matches=0)
+
 
 if __name__ == "__main__":
     unittest.main()
