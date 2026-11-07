@@ -289,6 +289,26 @@ def cmd_maps(args) -> int:
     return 0
 
 
+def cmd_events(args) -> int:
+    positive_integer("top", args.top)
+    positive_integer("min_matches", args.min_matches)
+    an = _analyzer(args, train=False)
+    rows = an.event_stats(min_matches=args.min_matches)[: args.top]
+    if args.json:
+        print(json.dumps({"events": rows}, indent=2, ensure_ascii=False))
+        return 0
+    print()
+    print(f"{'tournoi':<26}{'tier':>5}{'ctx':>8}{'matchs':>8}{'upsets Elo':>12}   periode")
+    for r in rows:
+        ctx = "LAN" if r["lan"] else "online"
+        up = "n/a" if r["elo_upset_rate"] is None else f"{r['elo_upset_rate']:.1%}"
+        print(
+            f"{r['event'][:25]:<26}{r['tier'].upper():>5}{ctx:>8}{r['n_matches']:>8}"
+            f"{up:>12}   {r['date_start']} -> {r['date_end']}"
+        )
+    return 0
+
+
 def cmd_audit(args) -> int:
     an = _analyzer(args, train=False)
     report = audit_history(an.maps, an.matches)
@@ -947,6 +967,12 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("maps", parents=[common], help="statistiques globales par map (OT, rounds, favori Elo)")
     s.add_argument("--json", action="store_true", help="sortie JSON structuree")
     s.set_defaults(func=cmd_maps)
+
+    s = sub.add_parser("events", parents=[common], help="bilan par tournoi (volume, tier, LAN, upsets Elo)")
+    s.add_argument("--min-matches", type=int, default=1, help="matchs minimum par tournoi (defaut 1)")
+    s.add_argument("--top", type=int, default=20, help="nombre maximum de tournois affiches (defaut 20)")
+    s.add_argument("--json", action="store_true", help="sortie JSON structuree")
+    s.set_defaults(func=cmd_events)
 
     s = sub.add_parser("audit", parents=[common], help="controle la qualite des donnees chargees")
     s.add_argument("--fixtures", help="CSV de matchs a venir a verifier avant prediction")

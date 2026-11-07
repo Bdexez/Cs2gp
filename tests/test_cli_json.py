@@ -196,6 +196,14 @@ class CliJsonTests(unittest.TestCase):
             self.assertEqual(len(maps_payload["maps"]), 7)
             self.assertGreater(maps_payload["maps"][0]["played"], 0)
 
+            # events --json
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(main(["events", "--data", str(data), "--top", "5", "--json"]), 0)
+            ev_payload = json.loads(out.getvalue())
+            self.assertGreater(len(ev_payload["events"]), 0)
+            self.assertLessEqual(len(ev_payload["events"]), 5)
+
     def test_public_package_api_exports(self):
         import cs2gp
 
