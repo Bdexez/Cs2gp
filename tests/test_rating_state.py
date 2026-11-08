@@ -80,6 +80,17 @@ class MapInactivityTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.engine.leaderboard(on=later, min_maps=1, active_within_days=-1)
 
+    def test_rating_summary_computes_distribution_and_handles_empty(self):
+        summary = self.engine.rating_summary(on=self.day, min_maps=1)
+        self.assertEqual(summary["n_teams"], 2)
+        self.assertEqual(summary["top_team"], "a")
+        self.assertEqual(summary["bottom_team"], "b")
+        self.assertGreater(summary["max"], summary["min"])
+        self.assertGreater(summary["mean_rd"], 0.0)
+        empty = self.engine.rating_summary(on=self.day, min_maps=50)
+        self.assertEqual(empty["n_teams"], 0)
+        self.assertIsNone(empty["mean"])
+
 
 if __name__ == "__main__":
     unittest.main()
