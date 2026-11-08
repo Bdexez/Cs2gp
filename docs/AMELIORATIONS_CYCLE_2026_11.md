@@ -363,3 +363,12 @@ outillage domaine CS2 et sortie structuree).
   dans la colonne `team_a`.
 - **Commande CLI `cs2gp events`** (`cli.py`) : expose `Analyzer.event_stats()`
   en texte et `--json`.
+
+## Cycle 33 : Bilan mensuel du journal (`--by-month`) et distribution Elo (`rating_summary`)
+
+- **Bilan mensuel du journal** (`journal.py`, `cli.py`) : `monthly_summary()` et
+  `cs2gp journal --by-month [--json]` ventilent volume, probabilite annoncee,
+  taux de reussite, Brier et P&L/ROI mise fixe par mois (`YYYY-MM`).
+- **Resume statistique Elo (`EloEngine.rating_summary`)** (`ratings.py`, `cli.py`) :
+  calcule moyenne, ecart-type, quantiles (min/p25/mediane/p75/max) et RD moyen
+  de l'ecosysteme, expose dans `cs2gp ratings` (texte et `--json`).
