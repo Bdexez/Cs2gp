@@ -94,3 +94,39 @@ def format_movers(mv: dict) -> str:
                 f"({r['delta']:+6.1f})   [{r['maps_played']} maps]"
             )
     return "\n".join(lines)
+
+
+def export_maps_csv(path, rows: list[dict]) -> int:
+    return atomic_write_csv(
+        path,
+        [
+            "map", "played", "ot_rate",
+            "avg_round_diff", "avg_total_rounds", "elo_favorite_win_rate",
+        ],
+        (
+            [
+                r["map"], r["played"], f"{r['ot_rate']:.6f}",
+                f"{r['avg_round_diff']:.4f}", f"{r['avg_total_rounds']:.4f}",
+                "" if r["elo_favorite_win_rate"] is None else f"{r['elo_favorite_win_rate']:.6f}",
+            ]
+            for r in rows
+        ),
+    )
+
+
+def export_events_csv(path, rows: list[dict]) -> int:
+    return atomic_write_csv(
+        path,
+        [
+            "event", "n_matches", "n_complete", "tier", "lan",
+            "date_start", "date_end", "elo_upset_rate",
+        ],
+        (
+            [
+                r["event"], r["n_matches"], r["n_complete"], r["tier"], int(r["lan"]),
+                r["date_start"], r["date_end"],
+                "" if r["elo_upset_rate"] is None else f"{r['elo_upset_rate']:.6f}",
+            ]
+            for r in rows
+        ),
+    )

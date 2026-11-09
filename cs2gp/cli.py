@@ -12,7 +12,10 @@ from pathlib import Path
 from . import __version__
 from .audit import audit_fixtures, audit_history, format_audit
 from .backtest import bet_backtest, read_odds_csv, tune, walk_forward, walk_forward_importance
-from .cli_exports import export_history_csv, export_ratings_csv, export_slate_csv, format_movers
+from .cli_exports import (
+    export_events_csv, export_history_csv, export_maps_csv,
+    export_ratings_csv, export_slate_csv, format_movers,
+)
 from .features import feature_correlation_report
 from .markets import build_markets, project_veto
 from .metrics import format_summary, summarize
@@ -275,6 +278,9 @@ def cmd_movers(args) -> int:
 def cmd_maps(args) -> int:
     an = _analyzer(args, train=False)
     rows = an.map_stats()
+    if getattr(args, "export_csv", None):
+        written = export_maps_csv(args.export_csv, rows)
+        print(f"{written} maps exportees -> {args.export_csv}", file=sys.stderr)
     if args.json:
         print(json.dumps({"maps": rows}, indent=2, ensure_ascii=False))
         return 0
@@ -294,6 +300,9 @@ def cmd_events(args) -> int:
     positive_integer("min_matches", args.min_matches)
     an = _analyzer(args, train=False)
     rows = an.event_stats(min_matches=args.min_matches)[: args.top]
+    if getattr(args, "export_csv", None):
+        written = export_events_csv(args.export_csv, rows)
+        print(f"{written} tournois exportes -> {args.export_csv}", file=sys.stderr)
     if args.json:
         print(json.dumps({"events": rows}, indent=2, ensure_ascii=False))
         return 0
@@ -992,12 +1001,14 @@ def build_parser() -> argparse.ArgumentParser:
     s.set_defaults(func=cmd_movers)
 
     s = sub.add_parser("maps", parents=[common], help="statistiques globales par map (OT, rounds, favori Elo)")
+    s.add_argument("--export-csv", help="exporte les statistiques par map en CSV")
     s.add_argument("--json", action="store_true", help="sortie JSON structuree")
     s.set_defaults(func=cmd_maps)
 
     s = sub.add_parser("events", parents=[common], help="bilan par tournoi (volume, tier, LAN, upsets Elo)")
     s.add_argument("--min-matches", type=int, default=1, help="matchs minimum par tournoi (defaut 1)")
     s.add_argument("--top", type=int, default=20, help="nombre maximum de tournois affiches (defaut 20)")
+    s.add_argument("--export-csv", help="exporte le bilan par tournoi en CSV")
     s.add_argument("--json", action="store_true", help="sortie JSON structuree")
     s.set_defaults(func=cmd_events)
 

@@ -564,8 +564,8 @@ cs2gp history navi [--last 20] [--export-csv ...] # chronological Elo & RD timel
 cs2gp compare navi g2 [--date YYYY-MM-DD] [--json]# fast pre-training scouting comparison
 cs2gp h2h navi g2 [--date YYYY-MM-DD] [--json]    # head-to-head history
 cs2gp movers [--days 30] [--top 5] [--json]       # biggest recent Elo risers & fallers
-cs2gp maps [--json]                               # global map stats (OT, rounds, Elo fav)
-cs2gp events [--min-matches 5] [--top 20] [--json]# tournament volume & Elo upset rates
+cs2gp maps [--export-csv m.csv] [--json]          # global map stats (OT, rounds, Elo fav)
+cs2gp events [--min-matches 5] [--top 20] [--export-csv e.csv] [--json] # tournament volume & upsets
 cs2gp inspect models/analyzer.cs2gp [--json]      # verify and inspect a bundle safely
 cs2gp diff old.cs2gp new.cs2gp [--json]           # compare two bundles safely
 cs2gp merge part1.csv part2.csv --out all.csv     # deduplicate & merge CSV histories

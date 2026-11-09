@@ -190,21 +190,27 @@ class CliJsonTests(unittest.TestCase):
             self.assertEqual(len(mv_payload["risers"]), 3)
             self.assertEqual(len(mv_payload["fallers"]), 3)
 
-            # maps --json
+            # maps --json + --export-csv
+            maps_csv = Path(tmp) / "maps.csv"
             out = io.StringIO()
             with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
-                self.assertEqual(main(["maps", "--data", str(data), "--json"]), 0)
+                self.assertEqual(main(["maps", "--data", str(data), "--export-csv", str(maps_csv), "--json"]), 0)
             maps_payload = json.loads(out.getvalue())
             self.assertEqual(len(maps_payload["maps"]), 7)
             self.assertGreater(maps_payload["maps"][0]["played"], 0)
+            self.assertTrue(maps_csv.is_file())
 
-            # events --json
+            # events --json + --export-csv
+            events_csv = Path(tmp) / "events.csv"
             out = io.StringIO()
             with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
-                self.assertEqual(main(["events", "--data", str(data), "--top", "5", "--json"]), 0)
+                self.assertEqual(main([
+                    "events", "--data", str(data), "--top", "5", "--export-csv", str(events_csv), "--json",
+                ]), 0)
             ev_payload = json.loads(out.getvalue())
             self.assertGreater(len(ev_payload["events"]), 0)
             self.assertLessEqual(len(ev_payload["events"]), 5)
+            self.assertTrue(events_csv.is_file())
 
     def test_public_package_api_exports(self):
         import cs2gp
