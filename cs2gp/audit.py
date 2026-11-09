@@ -201,9 +201,13 @@ def audit_fixtures(fixtures: Sequence, analyzer) -> dict:
     thin_or_stale: list[str] = []
     incomplete_odds: list[str] = []
     arbitrage: list[str] = []
+    past_fixtures: list[str] = []
+    latest_history = max((m.date for m in analyzer.matches), default=None)
     with_odds = 0
     pair_days: Counter = Counter()
     for fx in fixtures:
+        if latest_history is not None and fx.date < latest_history:
+            past_fixtures.append(fx.label)
         if any(getattr(fx, k) is not None for k in (
             "odds_a", "odds_b", "odds_over", "odds_under", "odds_a_sweep", "odds_b_sweep"
         )):
@@ -245,6 +249,11 @@ def audit_fixtures(fixtures: Sequence, analyzer) -> dict:
         warnings.append(
             f"{collisions} collision(s) (date, paire) sans match_id : le reglement du journal sera ambigu."
         )
+    if past_fixtures:
+        warnings.append(
+            f"{len(past_fixtures)} affiche(s) datee(s) avant le dernier match connu ({latest_history}) : "
+            "verifier qu'il ne s'agit pas de matchs deja joues."
+        )
     return {
         "n_fixtures": len(fixtures),
         "with_odds": with_odds,
@@ -252,6 +261,7 @@ def audit_fixtures(fixtures: Sequence, analyzer) -> dict:
         "thin_or_stale": thin_or_stale,
         "incomplete_odds_pairs": incomplete_odds,
         "arbitrage_fixtures": arbitrage,
+        "past_fixtures": past_fixtures,
         "missing_match_id_collisions": collisions,
         "warnings": warnings,
         "ok": not unknown and not incomplete_odds and collisions == 0,
