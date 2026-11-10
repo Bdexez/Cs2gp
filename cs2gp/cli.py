@@ -17,7 +17,7 @@ from .cli_exports import (
     export_ratings_csv, export_slate_csv, format_movers,
 )
 from .features import feature_correlation_report
-from .markets import build_markets, project_veto
+from .markets import build_markets, project_veto, veto_sensitivity
 from .metrics import format_summary, summarize
 from .odds import find_value, overround
 from .predict import MATCH_MODEL_WEIGHT, Analyzer
@@ -489,6 +489,8 @@ def cmd_backtest(args) -> int:
             payload["worst_misses"] = res.worst_misses(args.errors)
         if getattr(args, "abstention_curve", False):
             payload["abstention_curve"] = res.abstention_curve()
+        if getattr(args, "by_team", False):
+            payload["by_team"] = res.by_team()
         print(json.dumps(payload, indent=2, ensure_ascii=False))
         return 0
     print()
@@ -574,6 +576,16 @@ def cmd_backtest(args) -> int:
                 f"{row['mean_confidence']:>9.1%}{row['accuracy']:>9.1%}"
                 f"{row['log_loss']:>10.4f}{row['brier']:>9.4f}"
             )
+    if getattr(args, "by_team", False):
+        teams_perf = res.by_team()
+        if teams_perf:
+            print("\nPar equipe (les plus difficiles a prevoir) :")
+            print(f"  {'equipe':<18}{'n':>5}{'win%':>8}{'annonce':>9}{'logloss':>10}{'gain_elo':>10}")
+            for row in teams_perf[:10]:
+                print(
+                    f"  {row['team']:<18}{row['n']:>5}{row['win_rate']:>7.1%}"
+                    f"{row['mean_prob']:>8.1%}{row['log_loss']:>10.4f}{row['gain_vs_elo']:>+10.4f}"
+                )
     return 0
 
 
@@ -584,12 +596,16 @@ def cmd_predict(args) -> int:
     on = parse_date(args.date) if args.date else None
     pred = an.predict(args.team_a, args.team_b, best_of=args.bo, lan=args.lan, on=on)
     market_lines = None
+    veto_sens = None
     if getattr(args, "markets", False):
         past = an.as_of(pred.date)
         temp = 1.0 if getattr(args, "no_calibration", False) else fit_decider_temperature(past, momentum=past.momentum)
-        veto = project_veto([(e.map_name, e.p_a) for e in pred.map_edges], pred.best_of)
+        map_probs = [(e.map_name, e.p_a) for e in pred.map_edges]
+        veto = project_veto(map_probs, pred.best_of)
         dist = shape_series(veto, pred.best_of, pred.p_a, past.momentum, temp)
         market_lines = build_markets(dist, pred.team_a, pred.team_b)
+        if pred.best_of >= 3 and len(map_probs) == 7:
+            veto_sens = veto_sensitivity(map_probs, pred.best_of, momentum=past.momentum, samples=200, seed=0)
     if args.json:
         payload = pred.to_dict()
         if market_lines is not None:
@@ -602,6 +618,8 @@ def cmd_predict(args) -> int:
                 }
                 for line in market_lines
             ]
+            if veto_sens is not None:
+                payload["veto_sensitivity"] = veto_sens
         if args.odds_a is not None and args.odds_b is not None:
             bet = find_value(
                 pred.p_a, args.odds_a, args.odds_b, pred.team_a, pred.team_b, min_edge=args.min_edge
@@ -623,6 +641,11 @@ def cmd_predict(args) -> int:
         print("\n  Marches derives (cotes justes) :")
         for line in market_lines:
             print(f"    {line.market:<22} {line.selection:<16} {line.probability:>6.1%}   cote {line.fair_odds:.2f}")
+        if veto_sens is not None:
+            print(
+                f"  Sensibilite au veto : variation totale {veto_sens['total_variation']:.1%} "
+                f"(ecart max score {veto_sens['max_score_shift']:.1%})"
+            )
 
     if args.odds_a and args.odds_b:
         print()
@@ -1051,6 +1074,8 @@ def build_parser() -> argparse.ArgumentParser:
                    help="affiche les N matchs les plus couteux en log-loss (0 desactive)")
     s.add_argument("--abstention-curve", action="store_true",
                    help="affiche le compromis couverture / precision selon le seuil d'abstention")
+    s.add_argument("--by-team", action="store_true",
+                   help="affiche la performance hors-echantillon par equipe")
     s.add_argument("--export-csv", help="exporte les predictions hors-echantillon en CSV")
     s.add_argument("--odds-csv", help="CSV de cotes historiques (match_id,odds_a,odds_b)")
     s.add_argument("--min-edge", type=float, default=0.04,

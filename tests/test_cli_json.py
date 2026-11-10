@@ -46,6 +46,7 @@ class CliJsonTests(unittest.TestCase):
             self.assertAlmostEqual(pred_payload["p_a"] + pred_payload["p_b"], 1.0, places=10)
             self.assertIn("market", pred_payload)
             self.assertIn("markets", pred_payload)
+            self.assertIn("veto_sensitivity", pred_payload)
             self.assertGreater(len(pred_payload["markets"]), 5)
             self.assertGreater(pred_payload["market"]["overround"], 1.0)
 
@@ -54,13 +55,14 @@ class CliJsonTests(unittest.TestCase):
             with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
                 self.assertEqual(main([
                     "backtest", "--data", str(data), "--no-gbdt", "--bootstrap-samples", "0",
-                    "--by-segment", "--json",
+                    "--by-segment", "--by-team", "--json",
                 ]), 0)
             bt_payload = json.loads(out.getvalue())
             self.assertIn("metrics", bt_payload)
             self.assertIn("calibration", bt_payload)
             self.assertIn("brier_decomposition", bt_payload)
             self.assertIn("by_segment", bt_payload)
+            self.assertIn("by_team", bt_payload)
 
             # journal --json
             jpath = Path(tmp) / "journal.csv"
