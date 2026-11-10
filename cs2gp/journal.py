@@ -458,3 +458,24 @@ def monthly_summary(
             "flat_roi": flat_roi,
         })
     return out
+
+
+def export_filtered_csv(
+    journal_path: str | Path,
+    out_path: str | Path,
+    *,
+    since: dt.date | None = None,
+    until: dt.date | None = None,
+    settled_only: bool = False,
+) -> int:
+    """Exporte de maniere atomique une tranche filtree du journal en CSV."""
+    from .csvio import atomic_write_csv
+
+    rows = _filter_by_date(load(journal_path), since=since, until=until)
+    if settled_only:
+        rows = [r for r in rows if r.get("resultat")]
+    return atomic_write_csv(
+        out_path,
+        COLUMNS,
+        ([r.get(col, "") for col in COLUMNS] for r in rows),
+    )

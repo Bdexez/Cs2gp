@@ -223,6 +223,21 @@ class JournalTests(unittest.TestCase):
         self.assertIsNone(months[1]["flat_profit"])
         self.assertEqual(months[1]["priced_bets"], 0)
 
+    def test_export_filtered_csv_respects_dates_and_settled_only(self):
+        d1 = dt.date(2026, 1, 10)
+        d2 = dt.date(2026, 2, 15)
+        p1 = replace(self.pick, date=d1, match_id="m1")
+        p2 = replace(self.pick, date=d2, match_id="m2")
+        journal.record([p1, p2], self.path)
+        journal.settle(self.path, group_matches([MapResult("m1", d1, "a", "b", "mirage", 13, 5, 1)]))
+        out_csv = self.path.with_name("export.csv")
+        n_settled = journal.export_filtered_csv(self.path, out_csv, settled_only=True)
+        self.assertEqual(n_settled, 1)
+        self.assertEqual(len(journal.load(out_csv)), 1)
+        n_feb = journal.export_filtered_csv(self.path, out_csv, since=dt.date(2026, 2, 1))
+        self.assertEqual(n_feb, 1)
+        self.assertEqual(journal.load(out_csv)[0]["match_id"], "m2")
+
 
 if __name__ == "__main__":
     unittest.main()
