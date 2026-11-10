@@ -194,6 +194,19 @@ class BacktestSegmentTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             res.abstention_curve((0.40,))
 
+    def test_by_team_aggregates_both_sides_and_orders_by_log_loss(self):
+        res = self._sample_result()
+        res.meta[0]["team_a"] = "volatile"
+        for i in range(6):
+            res.meta[i]["team_a"] = "volatile"
+            res.predictions[i] = 0.90 if res.y[i] == 0 else 0.10
+        rows = res.by_team(min_matches=5)
+        self.assertEqual(rows[0]["team"], "volatile")
+        self.assertEqual(rows[0]["n"], 6)
+        self.assertGreater(rows[0]["log_loss"], rows[-1]["log_loss"])
+        with self.assertRaises(ValueError):
+            res.by_team(min_matches=0)
+
 
 if __name__ == "__main__":
     unittest.main()
