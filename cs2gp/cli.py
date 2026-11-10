@@ -767,6 +767,11 @@ def cmd_journal(args) -> int:
         journal_mod.monthly_summary(args.journal, since=since, until=until)
         if getattr(args, "by_month", False) else None
     )
+    if getattr(args, "export_csv", None):
+        written = journal_mod.export_filtered_csv(
+            args.journal, args.export_csv, since=since, until=until
+        )
+        print(f"{written} ligne(s) du journal exportee(s) -> {args.export_csv}", file=sys.stderr)
     if getattr(args, "json", False):
         payload = {
             "scorecard": None if record is None else record.to_dict(),
@@ -1120,6 +1125,7 @@ def build_parser() -> argparse.ArgumentParser:
                    help="ajoute un bootstrap Monte Carlo de bankroll et drawdown p95")
     s.add_argument("--by-month", action="store_true",
                    help="ventile calibration et P&L mise fixe par mois (YYYY-MM)")
+    s.add_argument("--export-csv", help="exporte la tranche filtree du journal en CSV")
     s.add_argument("--json", action="store_true", help="sortie JSON structuree")
     s.set_defaults(func=cmd_journal)
 
