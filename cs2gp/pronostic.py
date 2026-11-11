@@ -808,6 +808,8 @@ class TipsterRecord:
             "scoring": self.scoring(),
             "by_tier": self.by(lambda p: p.tier),
             "by_market": self.by(lambda p: p.market),
+            "by_format": self.by(lambda p: f"bo{p.best_of}"),
+            "by_year": self.by(lambda p: str(p.date.year)),
             "dispersions": list(self.dispersions),
         }
 
