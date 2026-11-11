@@ -571,7 +571,7 @@ cs2gp diff old.cs2gp new.cs2gp [--json]           # compare two bundles safely
 cs2gp merge part1.csv part2.csv --out all.csv     # deduplicate & merge CSV histories
 cs2gp ratings --active-within 60 --export-csv r.csv
 cs2gp predict navi g2 --markets [--json]
-cs2gp backtest --by-segment --by-fold --importance --errors 10 --export-csv out.csv --odds-csv odds.csv [--json]
+cs2gp backtest --by-segment --by-fold --by-team --importance --errors 10 --export-csv out.csv --odds-csv odds.csv [--json]
 cs2gp journal --since 2026-01-01 --by-month --risk --export-csv j.csv [--json]
 cs2gp sample --regime realiste --with-rosters     # synthetic data with roster reshuffles
 ```

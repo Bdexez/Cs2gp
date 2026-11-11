@@ -391,3 +391,12 @@ outillage domaine CS2 et sortie structuree).
 - **Export CSV filtre du journal** (`journal.py`, `cli.py`) :
   `export_filtered_csv()` et `cs2gp journal --export-csv` exportent de maniere
   atomique une tranche datee (ou reglee) du journal.
+
+## Cycle 36 : Performance par equipe en backtest (`--by-team`) et sensibilite veto dans `predict`
+
+- **Diagnostic par equipe (`BacktestResult.by_team` / `--by-team`)** (`backtest.py`,
+  `cli.py`) : identifie les equipes les plus difficiles et les plus previsibles
+  hors-echantillon (log-loss, gain vs Elo, Brier, precision).
+- **Sensibilite au veto dans `cs2gp predict --markets`** (`cli.py`) : expose
+  `veto_sensitivity()` (variation totale et ecart max sur le score exact) en
+  texte et `--json` pour les series BO3/BO5.
