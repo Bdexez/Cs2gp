@@ -70,6 +70,9 @@ class ModelIntegrityTests(unittest.TestCase):
         self.assertTrue(diag[0]["significant"])
         self.assertGreater(abs(diag[0]["z_score"]), 4.0)
         self.assertIsNotNone(diag[0]["se"])
+        cond = mdl.logistic.condition_number()
+        self.assertIsNotNone(cond)
+        self.assertGreaterEqual(cond, 1.0)
 
     def test_permutation_importance_ranks_informative_feature_first(self):
         from cs2gp.model import permutation_importance
