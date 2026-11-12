@@ -91,6 +91,15 @@ class MapInactivityTests(unittest.TestCase):
         self.assertEqual(empty["n_teams"], 0)
         self.assertIsNone(empty["mean"])
 
+    def test_copy_produces_isolated_engine_for_what_if_simulations(self):
+        clone = self.engine.copy()
+        before_a = self.engine.rating("a", self.day)
+        clone.observe(MapResult("hyp", self.day + dt.timedelta(days=1), "a", "b", "nuke", 5, 13, best_of=1))
+        self.assertEqual(self.engine.rating("a", self.day), before_a)
+        self.assertLess(clone.rating("a", self.day + dt.timedelta(days=1)), before_a)
+        self.assertEqual(self.engine.maps_played("a"), 1)
+        self.assertEqual(clone.maps_played("a"), 2)
+
 
 if __name__ == "__main__":
     unittest.main()

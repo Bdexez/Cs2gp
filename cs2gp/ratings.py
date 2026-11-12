@@ -162,6 +162,27 @@ class EloEngine:
         self._xy = 0.0
         self._xx = 0.0
 
+    def copy(self) -> "EloEngine":
+        """Retourne une copie independante de l'etat Elo pour simulations hypothetiques."""
+        clone = EloEngine(EloConfig(**self.cfg.to_dict()))
+        clone._xy = self._xy
+        clone._xx = self._xx
+        clone.teams = {
+            name: TeamRating(
+                rating=tr.rating,
+                fast_rating=tr.fast_rating,
+                rd=tr.rd,
+                maps_played=tr.maps_played,
+                last_date=tr.last_date,
+                roster=tr.roster,
+                map_ratings=dict(tr.map_ratings),
+                map_counts=dict(tr.map_counts),
+                map_last_dates=dict(tr.map_last_dates),
+            )
+            for name, tr in self.teams.items()
+        }
+        return clone
+
     # ------------------------------------------------------------------ lecture
 
     def _team(self, name: str) -> TeamRating:
