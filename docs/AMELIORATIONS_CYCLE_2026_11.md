@@ -400,3 +400,13 @@ outillage domaine CS2 et sortie structuree).
 - **Sensibilite au veto dans `cs2gp predict --markets`** (`cli.py`) : expose
   `veto_sensitivity()` (variation totale et ecart max sur le score exact) en
   texte et `--json` pour les series BO3/BO5.
+
+## Cycle 37 : Conditionnement Fisher, `cs2gp train --json` et ventilation format/annee du tipster
+
+- **Conditionnement numerique (`LogisticModel.condition_number`)** (`model.py`) :
+  calcule le conditionnement de la matrice de covariance de Fisher pour reperer
+  une colinearite excessive apres standardisation.
+- **Sortie JSON sur `cs2gp train`** (`cli.py`) : `cs2gp train --json` emet
+  metriques, poids + z-scores de Wald, temperature, `l2` et conditionnement Fisher.
+- **Ventilation `by_format` et `by_year`** (`pronostic.py`) : `TipsterRecord.to_dict()`
+  expose le suivi du pronostiqueur par format (`bo1`/`bo3`/`bo5`) et par annee.

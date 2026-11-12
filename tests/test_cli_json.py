@@ -123,14 +123,24 @@ class CliJsonTests(unittest.TestCase):
             self.assertEqual(team_payload["team"], teams[0])
             self.assertEqual(len(team_payload["map_pool"]), 7)
 
-            # train --bundle + inspect --json
+            # train --bundle + inspect --json + train --json
             bundle = Path(tmp) / "analyzer.cs2gp"
+            model_json_path = Path(tmp) / "match.json"
             train_out = io.StringIO()
             with contextlib.redirect_stdout(train_out), contextlib.redirect_stderr(io.StringIO()):
                 self.assertEqual(main([
                     "train", "--data", str(data), "--no-gbdt", "--bundle", str(bundle),
                 ]), 0)
             self.assertIn("z=", train_out.getvalue())
+            train_json_out = io.StringIO()
+            with contextlib.redirect_stdout(train_json_out), contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(main([
+                    "train", "--data", str(data), "--no-gbdt", "--out", str(model_json_path), "--json",
+                ]), 0)
+            train_payload = json.loads(train_json_out.getvalue())
+            self.assertEqual(train_payload["kind"], "match_model")
+            self.assertIn("condition_number", train_payload)
+            self.assertGreater(len(train_payload["features"]), 0)
             out = io.StringIO()
             with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
                 self.assertEqual(main(["inspect", str(bundle), "--json"]), 0)

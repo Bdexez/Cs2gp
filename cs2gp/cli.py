@@ -412,24 +412,45 @@ def cmd_train(args) -> int:
     an = _analyzer(args)
     ds = an.match_ds
     p_in = an.match_model.predict_proba(ds.X)
+    in_metrics = summarize(ds.y, p_in)
+    feat_diag = an.match_model.logistic.feature_diagnostics()
+    cond = an.match_model.logistic.condition_number()
+    out = Path(args.bundle or args.out or "models/match.json")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    if args.bundle:
+        an.save(out)
+    else:
+        an.match_model.save(out)
+    if getattr(args, "json", False):
+        print(json.dumps({
+            "trained_on": an.match_model.trained_on,
+            "last_date": an.match_model.last_date,
+            "l2": an.match_model.l2,
+            "temperature": an.match_model.temperature,
+            "has_gbdt": an.match_model.gbdt is not None,
+            "condition_number": cond,
+            "in_sample_metrics": in_metrics,
+            "features": feat_diag,
+            "kind": "bundle" if args.bundle else "match_model",
+            "output": str(out),
+        }, indent=2, ensure_ascii=False))
+        return 0
     print("\nAjustement en echantillon (optimiste par construction, sert de controle) :")
-    print(format_summary("modele", summarize(ds.y, p_in)))
+    print(format_summary("modele", in_metrics))
     print("\nPoids appris (features standardisees, vus de l'equipe A ; * = |z| > 1.96) :")
-    for row in an.match_model.logistic.feature_diagnostics():
+    for row in feat_diag:
         w = row["weight"]
         bar = "#" * min(24, int(abs(w) * 10))
         z_str = "   n/a" if row["z_score"] is None else f"{row['z_score']:+6.2f}"
         star = "*" if row["significant"] else " "
         print(f"  {row['feature']:<22} {w:+.4f}  z={z_str} {star}  {bar}")
     print(f"\nTemperature de calibration : {an.match_model.temperature:.3f}")
+    if cond is not None:
+        print(f"Conditionnement Fisher     : {cond:.1f}")
     print(f"GBDT actif : {an.match_model.gbdt is not None}")
-    out = Path(args.bundle or args.out or "models/match.json")
-    out.parent.mkdir(parents=True, exist_ok=True)
     if args.bundle:
-        an.save(out)
         print(f"\nAnalyseur autonome enregistre -> {out}")
     else:
-        an.match_model.save(out)
         print(f"\nModele match enregistre -> {out}")
     print("Pour une mesure honnete de la performance : cs2gp backtest")
     return 0
@@ -1058,6 +1079,7 @@ def build_parser() -> argparse.ArgumentParser:
     target = s.add_mutually_exclusive_group()
     target.add_argument("--out", help="modele match JSON seul (defaut models/match.json)")
     target.add_argument("--bundle", help="instantane autonome de l'analyseur, reutilisable avec --model")
+    s.add_argument("--json", action="store_true", help="sortie JSON structuree")
     s.set_defaults(func=cmd_train)
 
     s = sub.add_parser("backtest", parents=[common], help="validation walk-forward (la seule qui compte)")
