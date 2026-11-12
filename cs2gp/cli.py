@@ -90,6 +90,9 @@ def cmd_merge(args) -> int:
     sources = [read_csv(src) for src in args.inputs]
     merged, stats = merge_histories(sources)
     write_csv(args.out, merged)
+    if getattr(args, "json", False):
+        print(json.dumps({"output": str(args.out), **stats}, indent=2, ensure_ascii=False))
+        return 0
     print(
         f"{stats['unique_out']} maps fusionnees -> {args.out} "
         f"({stats['total_in']} lues, {stats['duplicates_skipped']} doublon(s) ignores)"
@@ -99,7 +102,19 @@ def cmd_merge(args) -> int:
 
 def cmd_teams(args) -> int:
     an = _analyzer(args, train=False)
-    for t in an.known_teams():
+    teams = an.known_teams()
+    if getattr(args, "json", False):
+        rows = [
+            {
+                "team": t,
+                "maps_played": an.fx.elo.maps_played(t),
+                "last_date": tr.last_date.isoformat() if (tr := an.fx.elo._read_team(t)).last_date else None,
+            }
+            for t in teams
+        ]
+        print(json.dumps({"n_teams": len(rows), "teams": rows}, indent=2, ensure_ascii=False))
+        return 0
+    for t in teams:
         print(f"{t:<20} {an.fx.elo.maps_played(t):>5} maps")
     return 0
 
@@ -999,9 +1014,11 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("merge", help="fusionne plusieurs CSV d'historique sans doublons ni conflits")
     s.add_argument("inputs", nargs="+", help="fichiers CSV source")
     s.add_argument("--out", required=True, help="CSV fusionne de sortie")
+    s.add_argument("--json", action="store_true", help="sortie JSON structuree")
     s.set_defaults(func=cmd_merge)
 
     s = sub.add_parser("teams", parents=[common], help="liste les equipes connues")
+    s.add_argument("--json", action="store_true", help="sortie JSON structuree")
     s.set_defaults(func=cmd_teams)
 
     s = sub.add_parser("team", parents=[common], help="profil detaille d'une equipe")

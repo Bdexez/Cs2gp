@@ -96,11 +96,20 @@ class CliJsonTests(unittest.TestCase):
             self.assertIn("fixture", slate_payload["analyses"][0])
             self.assertTrue(slate_csv.is_file())
 
-            # merge CLI
+            # merge --json & teams --json
             merged_csv = Path(tmp) / "merged.csv"
-            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
-                self.assertEqual(main(["merge", str(data), str(data), "--out", str(merged_csv)]), 0)
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(main(["merge", str(data), str(data), "--out", str(merged_csv), "--json"]), 0)
             self.assertTrue(merged_csv.is_file())
+            merge_payload = json.loads(out.getvalue())
+            self.assertGreater(merge_payload["duplicates_skipped"], 0)
+
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(main(["teams", "--data", str(data), "--json"]), 0)
+            teams_payload = json.loads(out.getvalue())
+            self.assertEqual(teams_payload["n_teams"], 8)
 
             # tipster-backtest --json + --export-csv
             tb_csv = Path(tmp) / "tipster_oos.csv"

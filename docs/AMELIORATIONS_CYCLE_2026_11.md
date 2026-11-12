@@ -410,3 +410,11 @@ outillage domaine CS2 et sortie structuree).
   metriques, poids + z-scores de Wald, temperature, `l2` et conditionnement Fisher.
 - **Ventilation `by_format` et `by_year`** (`pronostic.py`) : `TipsterRecord.to_dict()`
   expose le suivi du pronostiqueur par format (`bo1`/`bo3`/`bo5`) et par annee.
+
+## Cycle 38 : Copie isolee `EloEngine.copy()` et `--json` sur `teams` / `merge`
+
+- **Copie isolee (`EloEngine.copy`)** (`ratings.py`) : clone explicitement
+  l'etat Elo (notes, RD, maps, regression en ligne) pour des simulations
+  hypothetiques sans muter l'instance source.
+- **Sortie JSON sur `cs2gp teams` et `cs2gp merge`** (`cli.py`) : complete
+  l'uniformite `--json` de l'interface CLI pour l'automatisation.
