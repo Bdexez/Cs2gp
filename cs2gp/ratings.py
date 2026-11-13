@@ -183,6 +183,58 @@ class EloEngine:
         }
         return clone
 
+    def simulate_outcome(
+        self,
+        team_a: str,
+        team_b: str,
+        map_name: str,
+        on: dt.date,
+        *,
+        rounds_a: int = 13,
+        rounds_b: int = 8,
+        tier: str = "b",
+    ) -> dict:
+        """Simule l'impact Elo d'une victoire de A ou de B sans muter le moteur."""
+        if rounds_a <= rounds_b or rounds_b < 0:
+            raise ValueError("rounds_a doit etre strictement superieur a rounds_b >= 0")
+        ra0 = self.rating(team_a, on)
+        rb0 = self.rating(team_b, on)
+        mra0 = self.map_rating(team_a, map_name, on)
+        mrb0 = self.map_rating(team_b, map_name, on)
+
+        def _branch(score_a: int, score_b: int) -> dict:
+            sim = self.copy()
+            sim.observe(MapResult(
+                match_id="__whatif__", date=on, team_a=team_a, team_b=team_b,
+                map_name=map_name, rounds_a=score_a, rounds_b=score_b, best_of=1, tier=tier,
+            ))
+            ra1 = sim.rating(team_a, on)
+            rb1 = sim.rating(team_b, on)
+            return {
+                "rating_a": ra1,
+                "delta_a": ra1 - ra0,
+                "rating_b": rb1,
+                "delta_b": rb1 - rb0,
+                "map_rating_a": sim.map_rating(team_a, map_name, on),
+                "map_rating_b": sim.map_rating(team_b, map_name, on),
+            }
+
+        return {
+            "team_a": team_a,
+            "team_b": team_b,
+            "map": map_name,
+            "date": on.isoformat(),
+            "tier": tier,
+            "before": {
+                "rating_a": ra0,
+                "rating_b": rb0,
+                "map_rating_a": mra0,
+                "map_rating_b": mrb0,
+            },
+            "if_a_wins": _branch(rounds_a, rounds_b),
+            "if_b_wins": _branch(rounds_b, rounds_a),
+        }
+
     # ------------------------------------------------------------------ lecture
 
     def _team(self, name: str) -> TeamRating:
