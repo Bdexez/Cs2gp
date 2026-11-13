@@ -146,6 +146,17 @@ class MetricsDiagnosticsTests(unittest.TestCase):
         self.assertAlmostEqual(summary["roc_auc"], 1.0, places=10)
         self.assertIn("auc=1.000", metrics.format_summary("test", summary))
 
+    def test_sharpness_measures_confidence_entropy_and_decisiveness(self):
+        flat = metrics.sharpness([0.5, 0.5, 0.5, 0.5])
+        sharp = metrics.sharpness([0.9, 0.1, 0.8, 0.2])
+        self.assertAlmostEqual(flat["mean_confidence"], 0.5, places=10)
+        self.assertEqual(flat["pct_decisive_70"], 0.0)
+        self.assertAlmostEqual(sharp["mean_confidence"], 0.85, places=10)
+        self.assertEqual(sharp["pct_decisive_70"], 1.0)
+        self.assertLess(sharp["mean_entropy"], flat["mean_entropy"])
+        with self.assertRaises(ValueError):
+            metrics.sharpness([])
+
 
 if __name__ == "__main__":
     unittest.main()
