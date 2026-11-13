@@ -16,6 +16,7 @@ from .cli_exports import (
     export_events_csv, export_history_csv, export_maps_csv,
     export_ratings_csv, export_slate_csv, format_movers,
 )
+from .csvio import atomic_write_csv
 from .features import feature_correlation_report
 from .markets import build_markets, project_veto, veto_sensitivity
 from .metrics import format_summary, summarize
@@ -752,7 +753,6 @@ def _tipster(an: Analyzer, args) -> Tipster:
 
 def cmd_fixtures(args) -> int:
     """Genere une liste de matchs a venir a partir des equipes les mieux notees."""
-    import csv
     import itertools
 
     if args.teams < 2:
@@ -763,17 +763,28 @@ def cmd_fixtures(args) -> int:
     board = [t for t, _r, _n in an.fx.elo.leaderboard(on=on, min_maps=40)][: args.teams]
     pairs = list(itertools.combinations(board, 2))[: args.count]
     out = Path(args.out)
-    out.parent.mkdir(parents=True, exist_ok=True)
-    with out.open("w", newline="", encoding="utf-8") as fh:
-        w = csv.writer(fh, lineterminator="\n")
-        w.writerow(["date", "team_a", "team_b", "best_of", "lan", "event",
-                    "odds_a", "odds_b", "odds_over", "odds_under",
-                    "odds_a_sweep", "odds_b_sweep"])
-        for i, (a, b) in enumerate(pairs):
-            w.writerow([
+    atomic_write_csv(
+        out,
+        [
+            "date", "team_a", "team_b", "best_of", "lan", "event",
+            "odds_a", "odds_b", "odds_over", "odds_under",
+            "odds_a_sweep", "odds_b_sweep",
+        ],
+        (
+            [
                 (on + dt.timedelta(days=1 + i // 3)).isoformat(), a, b, 3, 1,
                 "Exemple", "", "", "", "", "", "",
-            ])
+            ]
+            for i, (a, b) in enumerate(pairs)
+        ),
+    )
+    if getattr(args, "json", False):
+        print(json.dumps({
+            "output": str(out),
+            "n_fixtures": len(pairs),
+            "as_of": on.isoformat(),
+        }, indent=2, ensure_ascii=False))
+        return 0
     print(f"{len(pairs)} matchs a venir -> {out}")
     print("Colonnes de cotes laissees vides : le pronostiqueur repondra "
           "'qui gagne'.\nLes remplir bascule en mode marche ('ou le marche se trompe').")
@@ -1152,6 +1163,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--teams", type=int, default=8)
     s.add_argument("--count", type=int, default=10)
     s.add_argument("--date", type=parse_date, help="date initiale du calendrier (defaut aujourd'hui)")
+    s.add_argument("--json", action="store_true", help="sortie JSON structuree")
     s.set_defaults(func=cmd_fixtures)
 
     s = sub.add_parser("slate", parents=[common],
