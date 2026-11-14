@@ -469,6 +469,8 @@ class Analyzer:
         prof_a = self.team_profile(a, on=as_of)
         prof_b = self.team_profile(b, on=as_of)
         edges = self.fx.map_pool_edges(a, b, as_of)
+        pool = self.fx.pool_on(as_of)
+        stakes = self.fx.elo.simulate_outcome(a, b, pool[0], as_of)
         return {
             "as_of": as_of.isoformat(),
             "team_a": prof_a,
@@ -476,6 +478,12 @@ class Analyzer:
             "elo_diff": float(prof_a["rating"] - prof_b["rating"]),
             "elo_win_prob_a": float(self.fx.elo.win_probability(a, b, as_of)),
             "certainty": float(self.fx.elo.certainty(a, b, as_of)),
+            "elo_stakes": {
+                "a_win_delta_a": stakes["if_a_wins"]["delta_a"],
+                "a_loss_delta_a": stakes["if_b_wins"]["delta_a"],
+                "b_win_delta_b": stakes["if_b_wins"]["delta_b"],
+                "b_loss_delta_b": stakes["if_a_wins"]["delta_b"],
+            },
             "map_edges": [
                 {"map": m, "elo_edge": float(val)}
                 for m, val in sorted(edges.items(), key=lambda kv: -kv[1])
