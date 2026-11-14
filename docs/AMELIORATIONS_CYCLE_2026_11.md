@@ -436,3 +436,12 @@ outillage domaine CS2 et sortie structuree).
 - **Invariants mathematiques etendus** (`tests/test_invariants.py`) : couvre
   l'antisymetrie de `roc_auc`, l'invariance par retournement de `sharpness`, la
   monotonicite de `devig_shin` et la purete/symetrie de `simulate_outcome`.
+
+## Cycle 41 : Enjeux Elo dans `compare` et diagnostic d'environnement `cs2gp doctor`
+
+- **Enjeux Elo dans `Analyzer.compare_teams` / `cs2gp compare`** (`predict.py`,
+  `cli.py`) : expose `elo_stakes` (gain/perte Elo pour chaque equipe) en texte
+  et `--json`.
+- **Commande `cs2gp doctor`** (`cli.py`) : verifie en un coup d'oeil versions
+  Python/NumPy/scikit-learn, disponibilite GBDT et lisibilite du fichier de
+  donnees (texte et `--json`).

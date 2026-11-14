@@ -558,6 +558,7 @@ tests/          unittest suite covering core, reliability, diagnostics and CLI
 ### Additional CLI commands and options
 
 ```bash
+cs2gp doctor [--json]                             # check environment & dataset readiness
 cs2gp audit [--fixtures f.csv] [--json]           # dataset & fixtures quality check
 cs2gp team navi [--date YYYY-MM-DD] [--json]      # full team profile and map pool
 cs2gp history navi [--last 20] [--export-csv ...] # chronological Elo & RD timeline

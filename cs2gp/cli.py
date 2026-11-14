@@ -270,6 +270,12 @@ def cmd_compare(args) -> int:
         f"charge 21j {a['workload_21d']} vs {b['workload_21d']} maps"
     )
     h2h = cmp["h2h"]
+    stakes = cmp.get("elo_stakes")
+    if stakes:
+        print(
+            f"  Enjeu   : {a['team']} ({stakes['a_win_delta_a']:+.1f} / {stakes['a_loss_delta_a']:+.1f}) | "
+            f"{b['team']} ({stakes['b_win_delta_b']:+.1f} / {stakes['b_loss_delta_b']:+.1f})"
+        )
     print(
         f"  H2H     : {h2h['series_a_wins']}-{h2h['series_b_wins']} series, "
         f"{h2h['maps_a_wins']}-{h2h['maps_b_wins']} maps (score {h2h['weighted_h2h_score']:+.3f})"
@@ -331,6 +337,61 @@ def cmd_events(args) -> int:
             f"{r['event'][:25]:<26}{r['tier'].upper():>5}{ctx:>8}{r['n_matches']:>8}"
             f"{up:>12}   {r['date_start']} -> {r['date_end']}"
         )
+    return 0
+
+
+def cmd_doctor(args) -> int:
+    """Bilan rapide de l'environnement Python/NumPy/scikit-learn et du jeu de donnees."""
+    import platform
+    import numpy as np
+
+    try:
+        import sklearn
+        sk_ver = getattr(sklearn, "__version__", "installed")
+    except ImportError:
+        sk_ver = None
+
+    data_path = Path(args.data or DEFAULT_DATA)
+    data_info: dict = {"path": str(data_path), "exists": data_path.is_file()}
+    if data_path.is_file():
+        try:
+            maps = read_csv(str(data_path))
+            rep = audit_history(maps)
+            data_info.update({
+                "readable": True,
+                "n_maps": rep["n_maps"],
+                "n_matches": rep["n_matches"],
+                "n_teams": rep["n_teams"],
+                "date_min": rep["date_min"],
+                "date_max": rep["date_max"],
+                "n_warnings": len(rep["warnings"]),
+            })
+        except (ValueError, OSError) as exc:
+            data_info.update({"readable": False, "error": str(exc)})
+
+    payload = {
+        "package_version": __version__,
+        "python_version": platform.python_version(),
+        "numpy_version": np.__version__,
+        "scikit_learn_version": sk_ver,
+        "gbdt_available": sk_ver is not None,
+        "data": data_info,
+    }
+    if getattr(args, "json", False):
+        print(json.dumps(payload, indent=2, ensure_ascii=False))
+        return 0
+    print(f"cs2gp {payload['package_version']}  (Python {payload['python_version']}, NumPy {payload['numpy_version']})")
+    print(f"  scikit-learn (GBDT) : {sk_ver or 'absent (mode logistique pur)'}")
+    if not data_info["exists"]:
+        print(f"  Donnees             : absentes ({data_path})")
+    elif data_info.get("readable"):
+        print(
+            f"  Donnees             : {data_path} ({data_info['n_maps']} maps, "
+            f"{data_info['n_matches']} matchs, {data_info['date_min']} -> {data_info['date_max']}, "
+            f"{data_info['n_warnings']} alerte(s))"
+        )
+    else:
+        print(f"  Donnees             : illisibles ({data_info.get('error')})")
     return 0
 
 
@@ -1088,6 +1149,10 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--export-csv", help="exporte le bilan par tournoi en CSV")
     s.add_argument("--json", action="store_true", help="sortie JSON structuree")
     s.set_defaults(func=cmd_events)
+
+    s = sub.add_parser("doctor", parents=[common], help="verifie l'environnement et la lisibilite des donnees")
+    s.add_argument("--json", action="store_true", help="sortie JSON structuree")
+    s.set_defaults(func=cmd_doctor)
 
     s = sub.add_parser("audit", parents=[common], help="controle la qualite des donnees chargees")
     s.add_argument("--fixtures", help="CSV de matchs a venir a verifier avant prediction")
