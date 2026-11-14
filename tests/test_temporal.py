@@ -38,9 +38,11 @@ class TemporalTests(unittest.TestCase):
 
     def test_invalid_refit_cannot_loop_forever(self):
         dates = [dt.date(2025, 1, 1) + dt.timedelta(days=i) for i in range(500)]
-        for refit in (0, -1, 1.5):
+        for refit in (0, -1, 1.5, True, False):
             with self.subTest(refit=refit), self.assertRaisesRegex(ValueError, "refit_every"):
                 forward_splits(dates, .4, 200, refit)
+        with self.assertRaisesRegex(ValueError, "min_train"):
+            forward_splits(dates, .4, True, 150)
 
     def test_calibration_does_not_share_training_day(self):
         dates = [dt.date(2025, 1, 1) + dt.timedelta(days=i//7) for i in range(250)]
