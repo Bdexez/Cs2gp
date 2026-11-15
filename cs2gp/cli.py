@@ -14,7 +14,7 @@ from .audit import audit_fixtures, audit_history, format_audit
 from .backtest import bet_backtest, read_odds_csv, tune, walk_forward, walk_forward_importance
 from .cli_exports import (
     export_events_csv, export_history_csv, export_maps_csv,
-    export_ratings_csv, export_slate_csv, format_movers,
+    export_ratings_csv, export_slate_csv, format_compare, format_movers, format_team_profile,
 )
 from .csvio import atomic_write_csv
 from .features import feature_correlation_report
@@ -82,6 +82,16 @@ def cmd_sample(args) -> int:
     out.parent.mkdir(parents=True, exist_ok=True)
     write_csv(str(out), rows)
     matches = group_matches(rows)
+    if getattr(args, "json", False):
+        print(json.dumps({
+            "output": str(out),
+            "n_maps": len(rows),
+            "n_matches": len(matches),
+            "regime": args.regime,
+            "seed": args.seed,
+            "with_rosters": bool(args.with_rosters),
+        }, indent=2, ensure_ascii=False))
+        return 0
     print(f"{len(rows)} maps / {len(matches)} matchs simules -> {out}")
     print("Donnees synthetiques : utiles pour tester la chaine, pas pour parier.")
     return 0
@@ -128,24 +138,7 @@ def cmd_team(args) -> int:
         print(json.dumps(prof, indent=2, ensure_ascii=False))
         return 0
     print()
-    print(f"{prof['team']}   [au {prof['as_of']}]")
-    print(
-        f"  Elo {prof['rating']:.0f} (+/-{prof['deviation']:.0f} RD) | "
-        f"trajectoire {prof['trajectory']:+.1f} | {prof['maps_played']} maps"
-    )
-    print(
-        f"  Forme recente : {prof['recent_win_rate']:.1%} "
-        f"({prof['recent_round_diff']:+.1f} rounds, residu {prof['perf_residual']:+.1f}) | "
-        f"SOS {prof['sos']:.0f} | charge 21j {prof['workload_21d']} maps | serie {prof['streak']:+d}"
-    )
-    if prof["roster"]:
-        print(f"  Roster ({prof['maps_with_roster']} maps) : {', '.join(prof['roster'])}")
-    print("\n  Pool de maps :")
-    for row in prof["map_pool"]:
-        print(
-            f"    {row['map']:<10} Elo {row['rating']:>6.0f}   "
-            f"{row['maps_played']:>3} maps   forme {row['recent_win_rate']:.0%}"
-        )
+    print(format_team_profile(prof))
     return 0
 
 
@@ -256,33 +249,8 @@ def cmd_compare(args) -> int:
     if args.json:
         print(json.dumps(cmp, indent=2, ensure_ascii=False))
         return 0
-    a, b = cmp["team_a"], cmp["team_b"]
     print()
-    print(f"Comparaison : {a['team']} vs {b['team']}   [au {cmp['as_of']}]")
-    print(
-        f"  Elo     : {a['rating']:.0f} (+/-{a['deviation']:.0f}) vs "
-        f"{b['rating']:.0f} (+/-{b['deviation']:.0f})   "
-        f"(ecart {cmp['elo_diff']:+.0f}, proba Elo {cmp['elo_win_prob_a']:.1%})"
-    )
-    print(
-        f"  Forme   : {a['recent_win_rate']:.0%} ({a['recent_round_diff']:+.1f}r) vs "
-        f"{b['recent_win_rate']:.0%} ({b['recent_round_diff']:+.1f}r) | "
-        f"charge 21j {a['workload_21d']} vs {b['workload_21d']} maps"
-    )
-    h2h = cmp["h2h"]
-    stakes = cmp.get("elo_stakes")
-    if stakes:
-        print(
-            f"  Enjeu   : {a['team']} ({stakes['a_win_delta_a']:+.1f} / {stakes['a_loss_delta_a']:+.1f}) | "
-            f"{b['team']} ({stakes['b_win_delta_b']:+.1f} / {stakes['b_loss_delta_b']:+.1f})"
-        )
-    print(
-        f"  H2H     : {h2h['series_a_wins']}-{h2h['series_b_wins']} series, "
-        f"{h2h['maps_a_wins']}-{h2h['maps_b_wins']} maps (score {h2h['weighted_h2h_score']:+.3f})"
-    )
-    print("\n  Ecart Elo par map (vu de " + a["team"] + ") :")
-    for row in cmp["map_edges"]:
-        print(f"    {row['map']:<10} {row['elo_edge']:+7.1f}")
+    print(format_compare(cmp))
     return 0
 
 
@@ -1081,6 +1049,7 @@ def build_parser() -> argparse.ArgumentParser:
                    help="regime du generateur (defaut realiste)")
     s.add_argument("--with-rosters", action="store_true",
                    help="genere des effectifs de 5 joueurs renouveles lors des remaniements")
+    s.add_argument("--json", action="store_true", help="sortie JSON structuree")
     s.set_defaults(func=cmd_sample)
 
     s = sub.add_parser("merge", help="fusionne plusieurs CSV d'historique sans doublons ni conflits")

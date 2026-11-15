@@ -130,3 +130,51 @@ def export_events_csv(path, rows: list[dict]) -> int:
             for r in rows
         ),
     )
+
+
+def format_team_profile(prof: dict) -> str:
+    lines = [
+        f"{prof['team']}   [au {prof['as_of']}]",
+        f"  Elo {prof['rating']:.0f} (+/-{prof['deviation']:.0f} RD) | "
+        f"trajectoire {prof['trajectory']:+.1f} | {prof['maps_played']} maps",
+        f"  Forme recente : {prof['recent_win_rate']:.1%} "
+        f"({prof['recent_round_diff']:+.1f} rounds, residu {prof['perf_residual']:+.1f}) | "
+        f"SOS {prof['sos']:.0f} | charge 21j {prof['workload_21d']} maps | serie {prof['streak']:+d}",
+    ]
+    if prof["roster"]:
+        lines.append(f"  Roster ({prof['maps_with_roster']} maps) : {', '.join(prof['roster'])}")
+    lines.append("\n  Pool de maps :")
+    for row in prof["map_pool"]:
+        lines.append(
+            f"    {row['map']:<10} Elo {row['rating']:>6.0f}   "
+            f"{row['maps_played']:>3} maps   forme {row['recent_win_rate']:.0%}"
+        )
+    return "\n".join(lines)
+
+
+def format_compare(cmp: dict) -> str:
+    a, b = cmp["team_a"], cmp["team_b"]
+    h2h = cmp["h2h"]
+    lines = [
+        f"Comparaison : {a['team']} vs {b['team']}   [au {cmp['as_of']}]",
+        f"  Elo     : {a['rating']:.0f} (+/-{a['deviation']:.0f}) vs "
+        f"{b['rating']:.0f} (+/-{b['deviation']:.0f})   "
+        f"(ecart {cmp['elo_diff']:+.0f}, proba Elo {cmp['elo_win_prob_a']:.1%})",
+        f"  Forme   : {a['recent_win_rate']:.0%} ({a['recent_round_diff']:+.1f}r) vs "
+        f"{b['recent_win_rate']:.0%} ({b['recent_round_diff']:+.1f}r) | "
+        f"charge 21j {a['workload_21d']} vs {b['workload_21d']} maps",
+    ]
+    stakes = cmp.get("elo_stakes")
+    if stakes:
+        lines.append(
+            f"  Enjeu   : {a['team']} ({stakes['a_win_delta_a']:+.1f} / {stakes['a_loss_delta_a']:+.1f}) | "
+            f"{b['team']} ({stakes['b_win_delta_b']:+.1f} / {stakes['b_loss_delta_b']:+.1f})"
+        )
+    lines.append(
+        f"  H2H     : {h2h['series_a_wins']}-{h2h['series_b_wins']} series, "
+        f"{h2h['maps_a_wins']}-{h2h['maps_b_wins']} maps (score {h2h['weighted_h2h_score']:+.3f})"
+    )
+    lines.append("\n  Ecart Elo par map (vu de " + a["team"] + ") :")
+    for row in cmp["map_edges"]:
+        lines.append(f"    {row['map']:<10} {row['elo_edge']:+7.1f}")
+    return "\n".join(lines)
