@@ -95,7 +95,8 @@ class BacktestSegmentTests(unittest.TestCase):
             lookup = read_odds_csv(odds_path)
             self.assertEqual(lookup["m0"], (1.90, 1.90, 1.60, 2.30))
             from cs2gp.backtest import bet_backtest
-            bb = bet_backtest(res, lookup, min_edge=0.04)
+            bb = bet_backtest(res, lookup, min_edge=0.04, devig_method="shin")
+            self.assertEqual(bb["devig_method"], "shin")
             self.assertGreater(bb["clv_bets"], 0)
             self.assertIsNotNone(bb["avg_clv_prob"])
 
