@@ -462,3 +462,11 @@ outillage domaine CS2 et sortie structuree).
   et `closing_line_value()`.
 - **Option `--devig` sur `cs2gp predict`** (`cli.py`) : permet de confronter
   directement une prediction au marche en mode `power`, `shin` ou `proportional`.
+
+## Cycle 44 : `--devig` en backtest de paris et `cs2gp settle --json`
+
+- **Retrait de marge configurable dans `bet_backtest()`** (`backtest.py`,
+  `cli.py`) : `devig_method` / `--devig {power,shin,proportional}` propage la
+  methode choisie a la detection de valeur et au calcul de CLV.
+- **Sortie `--json` sur `cs2gp settle`** (`cli.py`) : rend l'ensemble complet
+  des sous-commandes CLI 100 % exploitable en JSON pour l'automatisation.

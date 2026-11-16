@@ -519,7 +519,10 @@ def cmd_backtest(args) -> int:
         written = res.export_csv(args.export_csv)
         print(f"{written} predictions hors-echantillon exportees -> {args.export_csv}", file=sys.stderr)
     odds_summary = (
-        bet_backtest(res, read_odds_csv(args.odds_csv), min_edge=args.min_edge)
+        bet_backtest(
+            res, read_odds_csv(args.odds_csv), min_edge=args.min_edge,
+            devig_method=getattr(args, "devig", "power"),
+        )
         if args.odds_csv else None
     )
     importance = (
@@ -851,6 +854,15 @@ def cmd_slate(args) -> int:
 def cmd_settle(args) -> int:
     an = _analyzer(args, train=False)
     stats = journal_mod.settle(args.journal, an.matches, window_days=args.window_days)
+    if getattr(args, "json", False):
+        record = journal_mod.scorecard(args.journal)
+        money = journal_mod.financial_summary(args.journal)
+        print(json.dumps({
+            "settlement": stats,
+            "scorecard": None if record is None else record.to_dict(),
+            "financial": money,
+        }, indent=2, ensure_ascii=False))
+        return 0
     print(f"Pointage : {stats['pointes']} nouveau(x) resultat(s), "
           f"{stats['en_attente']} en attente, "
           f"{stats['introuvables']} introuvable(s), {stats['ambigus']} ambigu(s).")
@@ -1168,6 +1180,8 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--odds-csv", help="CSV de cotes historiques (match_id,odds_a,odds_b)")
     s.add_argument("--min-edge", type=float, default=0.04,
                    help="ecart minimal avec le marche pour --odds-csv (defaut 0.04)")
+    s.add_argument("--devig", choices=("power", "shin", "proportional"), default="power",
+                   help="methode de retrait de marge pour --odds-csv (defaut power)")
     s.add_argument("--blend", type=float, default=MATCH_MODEL_WEIGHT,
                    help="poids du modele match dans le melange (1 = lui seul)")
     s.add_argument("--no-maps", action="store_true",
@@ -1230,6 +1244,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--journal", default="data/journal.csv")
     s.add_argument("--window-days", type=int, default=3,
                    help="tolerance de date en jours pour les lignes sans match_id (defaut 3)")
+    s.add_argument("--json", action="store_true", help="sortie JSON structuree")
     s.set_defaults(func=cmd_settle)
 
     s = sub.add_parser("journal", parents=[common],

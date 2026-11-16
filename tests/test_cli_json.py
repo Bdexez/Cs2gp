@@ -83,6 +83,16 @@ class CliJsonTests(unittest.TestCase):
             self.assertIn("by_month", j_payload)
             self.assertTrue(j_csv.is_file())
 
+            # settle --json
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(main([
+                    "settle", "--data", str(data), "--journal", str(jpath), "--json",
+                ]), 0)
+            st_payload = json.loads(out.getvalue())
+            self.assertIn("settlement", st_payload)
+            self.assertIn("scorecard", st_payload)
+
             # slate --json + --export-csv
             fpath = Path(tmp) / "fixtures.csv"
             slate_csv = Path(tmp) / "slate.csv"
