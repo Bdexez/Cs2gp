@@ -40,11 +40,12 @@ class CliJsonTests(unittest.TestCase):
             with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
                 self.assertEqual(main([
                     "predict", teams[0], teams[1], "--data", str(data), "--no-gbdt",
-                    "--odds-a", "1.85", "--odds-b", "2.00", "--markets", "--json",
+                    "--odds-a", "1.85", "--odds-b", "2.00", "--devig", "shin", "--markets", "--json",
                 ]), 0)
             pred_payload = json.loads(out.getvalue())
             self.assertAlmostEqual(pred_payload["p_a"] + pred_payload["p_b"], 1.0, places=10)
             self.assertIn("market", pred_payload)
+            self.assertEqual(pred_payload["market"]["devig"], "shin")
             self.assertIn("markets", pred_payload)
             self.assertIn("veto_sensitivity", pred_payload)
             self.assertGreater(len(pred_payload["markets"]), 5)
