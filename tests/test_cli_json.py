@@ -101,7 +101,8 @@ class CliJsonTests(unittest.TestCase):
             with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
                 self.assertEqual(main([
                     "slate", "--data", str(data), "--no-gbdt", "--fixtures", str(fpath),
-                    "--momentum", "0", "--no-calibration", "--export-csv", str(slate_csv), "--json",
+                    "--momentum", "0", "--no-calibration", "--devig", "shin",
+                    "--export-csv", str(slate_csv), "--json",
                 ]), 0)
             slate_payload = json.loads(out.getvalue())
             self.assertEqual(len(slate_payload["analyses"]), 1)
@@ -290,6 +291,17 @@ class CliJsonTests(unittest.TestCase):
             self.assertTrue(hasattr(cs2gp, symbol))
         with self.assertRaises(AttributeError):
             _ = cs2gp.nonexistent_symbol
+
+    def test_all_cli_subcommands_support_json(self):
+        from cs2gp.cli import build_parser
+
+        parser = build_parser()
+        subparsers = next(a for a in parser._actions if a.dest == "cmd").choices
+        missing = [
+            name for name, sp in subparsers.items()
+            if "--json" not in sp._option_string_actions
+        ]
+        self.assertEqual(missing, [])
 
 
 if __name__ == "__main__":

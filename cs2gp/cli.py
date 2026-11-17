@@ -783,6 +783,8 @@ def _tipster(an: Analyzer, args) -> Tipster:
         kw["edge_min"] = args.edge_min
     if getattr(args, "abstention", None) is not None:
         kw["abstention"] = args.abstention
+    if getattr(args, "devig", None) is not None:
+        kw["devig_method"] = args.devig
     return Tipster(an, momentum=an.momentum, decider_temperature=temp,
                   calibrate_decider=not getattr(args, "no_calibration", False), **kw)
 
@@ -1235,6 +1237,8 @@ def build_parser() -> argparse.ArgumentParser:
                    help="probabilite minimale pour se prononcer sans cotes (defaut 0.60)")
     s.add_argument("--edge-min", type=float, default=None,
                    help="ecart minimal avec le marche pour un pari avec cotes (defaut 0.04)")
+    s.add_argument("--devig", choices=("power", "shin", "proportional"), default="power",
+                   help="methode de retrait de marge bookmaker (defaut power)")
     s.add_argument("--export-csv", help="exporte la carte de pronostics et abstentions en CSV")
     s.add_argument("--json", action="store_true", help="sortie JSON structuree")
     s.set_defaults(func=cmd_slate)
