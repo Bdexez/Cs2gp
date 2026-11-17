@@ -29,7 +29,7 @@ from .markets import (
     MarketLine, build_markets, enforce_margins, fit_decider_calibration,
     project_veto, series_distribution,
 )
-from .odds import devig_power, expected_value, kelly_fraction
+from .odds import devig, expected_value, kelly_fraction
 from .predict import Analyzer, Prediction
 from .temporal import forward_splits
 from .schema import _to_bool, normalize_team, parse_date, parse_integer
@@ -338,8 +338,11 @@ class Tipster:
         abstention: float = SEUIL_ABSTENTION,
         decider_temperature: float = 1.0,
         calibrate_decider: bool = False,
+        devig_method: str = "power",
     ) -> None:
         _validate_options(momentum, edge_min, abstention, decider_temperature)
+        if devig_method not in ("power", "shin", "proportional"):
+            raise ValueError(f"methode de devig inconnue : {devig_method!r}")
         self.an = analyzer
         self.momentum = momentum
         # Calibration du marche "la serie va-t-elle a la derniere map".
@@ -348,6 +351,7 @@ class Tipster:
         self.calibrate_decider = calibrate_decider
         self.edge_min = edge_min
         self.abstention = abstention
+        self.devig_method = devig_method
 
     # ------------------------------------------------------------- raisonnement
 
@@ -517,7 +521,7 @@ class Tipster:
         picks: list[Pick] = []
         outright: list[tuple] = []
         if fx.odds_a and fx.odds_b:
-            ma, mb = devig_power(fx.odds_a, fx.odds_b)
+            ma, mb = devig(fx.odds_a, fx.odds_b, method=self.devig_method)
             outright = [
                 (pred.team_a, pred.p_a, ma, fx.odds_a),
                 (pred.team_b, 1 - pred.p_a, mb, fx.odds_b),
@@ -560,7 +564,7 @@ class Tipster:
         if fx.best_of >= 3 and fx.odds_over and fx.odds_under:
             line = fx.best_of - 0.5
             p_over = dist.p_maps_played(fx.best_of)
-            mo, mu = devig_power(fx.odds_over, fx.odds_under)
+            mo, mu = devig(fx.odds_over, fx.odds_under, method=self.devig_method)
             for label, p_model, p_market, odds in (
                 (f"total maps +{line}", p_over, mo, fx.odds_over),
                 (f"total maps -{line}", 1 - p_over, mu, fx.odds_under),
