@@ -520,8 +520,9 @@ class Tipster:
     def _value_picks(self, fx, pred, dist, rationale) -> list[Pick]:
         picks: list[Pick] = []
         outright: list[tuple] = []
+        devig_method = getattr(self, "devig_method", "power")
         if fx.odds_a and fx.odds_b:
-            ma, mb = devig(fx.odds_a, fx.odds_b, method=self.devig_method)
+            ma, mb = devig(fx.odds_a, fx.odds_b, method=devig_method)
             outright = [
                 (pred.team_a, pred.p_a, ma, fx.odds_a),
                 (pred.team_b, 1 - pred.p_a, mb, fx.odds_b),
@@ -564,7 +565,7 @@ class Tipster:
         if fx.best_of >= 3 and fx.odds_over and fx.odds_under:
             line = fx.best_of - 0.5
             p_over = dist.p_maps_played(fx.best_of)
-            mo, mu = devig(fx.odds_over, fx.odds_under, method=self.devig_method)
+            mo, mu = devig(fx.odds_over, fx.odds_under, method=devig_method)
             for label, p_model, p_market, odds in (
                 (f"total maps +{line}", p_over, mo, fx.odds_over),
                 (f"total maps -{line}", 1 - p_over, mu, fx.odds_under),
