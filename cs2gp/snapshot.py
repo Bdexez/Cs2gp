@@ -90,28 +90,35 @@ def save_analyzer(an, path: str | Path) -> None:
             temporary.unlink(missing_ok=True)
 
 
+def _read_verified_archive(path: str | Path) -> tuple[dict, dict[str, bytes]]:
+    """Ouvre un instantane .cs2gp, verifie schema, version et sommes SHA-256."""
+    with ZipFile(path) as archive:
+        names = archive.namelist()
+        files = set(names) - {"manifest.json"}
+        if (len(names) != len(set(names)) or "manifest.json" not in names
+                or not _REQUIRED <= files or not files <= _ALLOWED):
+            raise ValueError("contenu d'instantane incomplet ou inconnu")
+        manifest = json.loads(archive.read("manifest.json"))
+        if (manifest.get("format") != "cs2gp.analyzer" or manifest.get("version") not in (1, 2)
+                or manifest.get("feature_pipeline") != 1 or manifest.get("schemas") != _schemas()):
+            raise ValueError("version ou schema d'instantane incompatible")
+        if (manifest["version"] == 2) != ("calibration.json" in files):
+            raise ValueError("historique de calibration incompatible avec la version d'instantane")
+        if set(manifest.get("sha256", {})) != files:
+            raise ValueError("inventaire d'instantane incoherent")
+        blobs = {name: archive.read(name) for name in files}
+    for name, blob in blobs.items():
+        if hashlib.sha256(blob).hexdigest() != manifest["sha256"][name]:
+            raise ValueError(f"somme de controle invalide : {name}")
+    return manifest, blobs
+
+
 def load_analyzer(path: str | Path):
     from .predict import Analyzer
 
     try:
-        with ZipFile(path) as archive:
-            names = archive.namelist()
-            files = set(names) - {"manifest.json"}
-            if (len(names) != len(set(names)) or "manifest.json" not in names
-                    or not _REQUIRED <= files or not files <= _ALLOWED):
-                raise ValueError("contenu d'instantane incomplet ou inconnu")
-            manifest = json.loads(archive.read("manifest.json"))
-            if (manifest.get("format") != "cs2gp.analyzer" or manifest.get("version") not in (1, 2)
-                    or manifest.get("feature_pipeline") != 1 or manifest.get("schemas") != _schemas()):
-                raise ValueError("version ou schema d'instantane incompatible")
-            if (manifest["version"] == 2) != ("calibration.json" in files):
-                raise ValueError("historique de calibration incompatible avec la version d'instantane")
-            if set(manifest.get("sha256", {})) != files:
-                raise ValueError("inventaire d'instantane incoherent")
-            blobs = {name: archive.read(name) for name in files}
-        for name, blob in blobs.items():
-            if hashlib.sha256(blob).hexdigest() != manifest["sha256"][name]:
-                raise ValueError(f"somme de controle invalide : {name}")
+        manifest, blobs = _read_verified_archive(path)
+        files = set(blobs)
         if any(name.endswith(".pkl") for name in blobs):
             installed = _sklearn_version()
             if installed is None or installed != manifest.get("sklearn_version"):
@@ -168,24 +175,7 @@ def load_analyzer(path: str | Path):
 def inspect_analyzer(path: str | Path) -> dict:
     """Verifie l'integrite d'un instantane et retourne ses metadonnees sans unpickler le GBDT."""
     try:
-        with ZipFile(path) as archive:
-            names = archive.namelist()
-            files = set(names) - {"manifest.json"}
-            if (len(names) != len(set(names)) or "manifest.json" not in names
-                    or not _REQUIRED <= files or not files <= _ALLOWED):
-                raise ValueError("contenu d'instantane incomplet ou inconnu")
-            manifest = json.loads(archive.read("manifest.json"))
-            if (manifest.get("format") != "cs2gp.analyzer" or manifest.get("version") not in (1, 2)
-                    or manifest.get("feature_pipeline") != 1 or manifest.get("schemas") != _schemas()):
-                raise ValueError("version ou schema d'instantane incompatible")
-            if (manifest["version"] == 2) != ("calibration.json" in files):
-                raise ValueError("historique de calibration incompatible avec la version d'instantane")
-            if set(manifest.get("sha256", {})) != files:
-                raise ValueError("inventaire d'instantane incoherent")
-            blobs = {name: archive.read(name) for name in files}
-        for name, blob in blobs.items():
-            if hashlib.sha256(blob).hexdigest() != manifest["sha256"][name]:
-                raise ValueError(f"somme de controle invalide : {name}")
+        manifest, blobs = _read_verified_archive(path)
         history = json.loads(blobs["history.json"])
         match_meta = json.loads(blobs["match.json"])
         map_meta = json.loads(blobs["map.json"])
