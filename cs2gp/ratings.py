@@ -105,9 +105,9 @@ class EloConfig:
 
     def save(self, path) -> None:
         import json
-        from pathlib import Path
+        from .csvio import atomic_write_bytes
 
-        Path(path).write_text(json.dumps(self.to_dict(), indent=2), encoding="utf-8")
+        atomic_write_bytes(path, json.dumps(self.to_dict(), indent=2).encode("utf-8"))
 
 
 def expected_score(rating_a: float, rating_b: float) -> float:
