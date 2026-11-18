@@ -238,6 +238,18 @@ class JournalTests(unittest.TestCase):
         self.assertEqual(n_feb, 1)
         self.assertEqual(journal.load(out_csv)[0]["match_id"], "m2")
 
+    def test_pending_picks_lists_unsettled_actionable_rows(self):
+        d1 = dt.date(2026, 1, 10)
+        d2 = dt.date(2026, 1, 12)
+        p1 = replace(self.pick, date=d1, match_id="m1")
+        p2 = replace(self.pick, date=d2, match_id="m2", odds=1.95)
+        journal.record([p1, p2], self.path)
+        journal.settle(self.path, group_matches([MapResult("m1", d1, "a", "b", "mirage", 13, 5, 1)]))
+        pending = journal.pending_picks(self.path)
+        self.assertEqual(len(pending), 1)
+        self.assertEqual(pending[0]["match_id"], "m2")
+        self.assertAlmostEqual(pending[0]["odds"], 1.95)
+
 
 if __name__ == "__main__":
     unittest.main()

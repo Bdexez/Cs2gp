@@ -479,3 +479,35 @@ def export_filtered_csv(
         COLUMNS,
         ([r.get(col, "") for col in COLUMNS] for r in rows),
     )
+
+
+def pending_picks(
+    journal_path: str | Path,
+    *,
+    since: dt.date | None = None,
+    until: dt.date | None = None,
+) -> list[dict]:
+    """Liste les pronostics actionnables encore en attente de pointage."""
+    rows = [
+        r for r in _filter_by_date(load(journal_path), since=since, until=until)
+        if not r.get("resultat") and r["verdict"] in ("PRONOSTIC", "VALEUR")
+    ]
+    rows.sort(key=lambda r: (r["date"], r["team_a"], r["marche"]))
+    return [
+        {
+            "pick_id": r["pick_id"],
+            "date": r["date"],
+            "team_a": r["team_a"],
+            "team_b": r["team_b"],
+            "best_of": int(r["best_of"] or 3),
+            "event": r.get("event", ""),
+            "market": r["marche"],
+            "selection": r["selection"],
+            "probability": float(r["probabilite"]),
+            "tier": r["palier"],
+            "verdict": r["verdict"],
+            "odds": float(r["cote"]) if r.get("cote") else None,
+            "match_id": r.get("match_id", ""),
+        }
+        for r in rows
+    ]
