@@ -493,3 +493,16 @@ outillage domaine CS2 et sortie structuree).
   `_read_verified_archive()` partage par `load_analyzer()` et `inspect_analyzer()`.
 - **Pronostics en attente (`pending_picks` / `--pending`)** (`journal.py`,
   `cli.py`) : liste les pronostics actionnables non encore pointes (texte et `--json`).
+
+## Cycle 48 : API publique enrichie (`cs2gp/__init__.py`) et matrice de confusion (`confusion_summary`)
+
+- **API publique paresseuse etendue** (`cs2gp/__init__.py`) : table `_EXPORTS`
+  declarant `audit_fixtures`, `devig`, `inspect_analyzer`, `diff_analyzers`,
+  `roc_auc` et `sharpness` dans `__all__`.
+- **Matrice de confusion parametree (`confusion_summary`)** (`metrics.py`) :
+  calcule `tp`, `fp`, `tn`, `fn`, precision, rappel, specificite, F1 et
+  exactitude equilibree pour un seuil donne.
+  Exposee dans l'API publique et sous `confusion` dans le JSON du backtest
+  (seuil 0,5). Le F1 vaut zero en presence d'erreurs sans vrai positif ;
+  seuls les ratios sans denominateur valent `null`. Tests des classes
+  uniques, des seuils limites et des entrees invalides.

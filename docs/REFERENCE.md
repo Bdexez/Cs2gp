@@ -551,7 +551,8 @@ cs2gp/
   snapshot.py   complete analyzer archive, schema/integrity checks and safe inspection
   pronostic.py  selectivity, tiers, reasoning, proper scoring, tipster backtest
   journal.py    archiving of calls, settling, track record and drawdown metrics
-  cli.py        command-line interface (text and --json)
+  cli_exports.py shared CLI CSV exporters and terminal formatters
+  cli.py        command-line interface (text and --json on all 24 subcommands)
 tests/          unittest suite covering core, reliability, diagnostics and CLI
 ```
 
@@ -571,11 +572,17 @@ cs2gp inspect models/analyzer.cs2gp [--json]      # verify and inspect a bundle 
 cs2gp diff old.cs2gp new.cs2gp [--json]           # compare two bundles safely
 cs2gp merge part1.csv part2.csv --out all.csv     # deduplicate & merge CSV histories
 cs2gp ratings --active-within 60 --export-csv r.csv
-cs2gp predict navi g2 --markets [--json]
-cs2gp backtest --by-segment --by-fold --by-team --importance --errors 10 --export-csv out.csv --odds-csv odds.csv [--json]
-cs2gp journal --since 2026-01-01 --by-month --risk --export-csv j.csv [--json]
+cs2gp predict navi g2 --devig shin --markets [--json]
+cs2gp backtest --by-segment --by-fold --by-team --importance --errors 10 --export-csv out.csv --odds-csv odds.csv --devig shin [--json]
+cs2gp journal --since 2026-01-01 --by-month --pending --risk --export-csv j.csv [--json]
 cs2gp sample --regime realiste --with-rosters     # synthetic data with roster reshuffles
 ```
+
+`backtest --json` includes a `confusion` object at threshold 0.5 (`p >= 0.5`
+predicts team A): counts `tp`, `fp`, `tn`, `fn`, precision, recall, specificity,
+F1 and balanced accuracy. Ratios with a zero denominator are `null`; F1 is
+zero when errors occur without a true positive. Python callers can use
+`from cs2gp import confusion_summary` with a custom `threshold` in [0, 1].
 
 All analytical commands accept `--json`. Pass `--versioned-pool` to align Active
 Duty map pools with historical CS2 rotations.

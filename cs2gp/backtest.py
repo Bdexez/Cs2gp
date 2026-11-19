@@ -19,7 +19,7 @@ import numpy as np
 from .csvio import atomic_write_csv, read_rows
 from .features import Dataset
 from .metrics import (
-    brier, brier_decomposition, calibration_slope_intercept, favorite_reliability_table,
+    brier, brier_decomposition, calibration_slope_intercept, confusion_summary, favorite_reliability_table,
     format_summary, hosmer_lemeshow, log_loss, paired_block_bootstrap, quantile_reliability_table,
     reliability_table, sharpness, spiegelhalter_z, summarize,
 )
@@ -161,6 +161,7 @@ class BacktestResult:
             "hosmer_lemeshow": hosmer_lemeshow(self.y, self.predictions) if len(self.y) else None,
             "brier_decomposition": brier_decomposition(self.y, self.predictions) if len(self.y) else None,
             "sharpness": sharpness(self.predictions) if len(self.y) else None,
+            "confusion": confusion_summary(self.y, self.predictions) if len(self.y) else None,
             "reliability": reliability_table(self.y, self.predictions) if len(self.y) else [],
             "quantile_reliability": quantile_reliability_table(self.y, self.predictions) if len(self.y) else [],
             "favorite_reliability": favorite_reliability_table(self.y, self.predictions) if len(self.y) else [],

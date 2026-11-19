@@ -63,6 +63,14 @@ class CliJsonTests(unittest.TestCase):
             self.assertIn("calibration", bt_payload)
             self.assertIn("brier_decomposition", bt_payload)
             self.assertIn("sharpness", bt_payload)
+            confusion = bt_payload["confusion"]
+            self.assertEqual(confusion["threshold"], 0.5)
+            self.assertEqual(sum(confusion[k] for k in ("tp", "fp", "tn", "fn")),
+                             bt_payload["n_matches"])
+            self.assertAlmostEqual(
+                (confusion["tp"] + confusion["tn"]) / bt_payload["n_matches"],
+                bt_payload["metrics"]["accuracy"],
+            )
             self.assertIn("by_segment", bt_payload)
             self.assertIn("by_team", bt_payload)
 
