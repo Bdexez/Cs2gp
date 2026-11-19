@@ -506,3 +506,21 @@ outillage domaine CS2 et sortie structuree).
   (seuil 0,5). Le F1 vaut zero en presence d'erreurs sans vrai positif ;
   seuls les ratios sans denominateur valent `null`. Tests des classes
   uniques, des seuils limites et des entrees invalides.
+
+## Cycle 49 : Memoire des simulations Monte Carlo et drawdown relatif
+
+- **Simulation par lots (`bootstrap_bankroll`)** (`odds.py`) : conserve
+  seulement les capitaux finaux et drawdowns maximaux entre les lots ;
+  au plus 64 trajectoires par lot, avec une taille adaptee a l'horizon.
+  Les tirages suivent le meme ordre pour une graine donnee. Sur 500
+  simulations Kelly de 4 000 paris (graine 42 ; 13 gains et 7 pertes,
+  probabilite 0,65 et cote 2), le pic mesure avec `tracemalloc` passe de
+  92,39 Mio a 10,59 Mio, avec les memes quantiles et probabilite de profit.
+  La memoire depend encore de la longueur d'une trajectoire et du nombre
+  de resultats finaux conserves pour les quantiles.
+- **Drawdown independant de l'unite de capital** (`odds.py`) : suppression
+  du plancher absolu de 1e-12 sur les pics de bankroll. Le capital initial
+  strictement positif est inclus dans chaque pic ; une perte de 5 % donne
+  maintenant 5 % meme pour un capital initial de 1e-15 (auparavant 0,005 %).
+  Tests de comparaison aux trajectoires individuelles en mise fixe et Kelly,
+  de reproductibilite sur plusieurs lots et d'invariance au capital initial.

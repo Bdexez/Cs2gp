@@ -403,7 +403,11 @@ def bootstrap_bankroll(
     scale: float = 0.25,
     seed: int = 0,
 ) -> dict:
-    """Reechantillonnage Monte Carlo de la bankroll : distribution finale et drawdown p95."""
+    """Reechantillonnage Monte Carlo de la bankroll, par lots de trajectoires.
+
+    Seuls les capitaux finaux et drawdowns sont conserves pour les quantiles.
+    La taille des lots limite la memoire sans changer l'ordre des tirages.
+    """
     from .validation import positive_integer
 
     if mode not in ("flat", "kelly"):
@@ -424,41 +428,46 @@ def bootstrap_bankroll(
     if mode == "flat":
         finite_number("stake", stake, strict=True)
         rets = np.array([(odds - 1.0) * stake if won else -stake for _p, odds, won in results], dtype=float)
-        idx = rng.integers(0, n, size=(samples, h))
-        paths = np.concatenate([np.zeros((samples, 1)), np.cumsum(rets[idx], axis=1)], axis=1)
-        finals = paths[:, -1]
-        peaks = np.maximum.accumulate(paths, axis=1)
-        max_dds = np.max(peaks - paths, axis=1)
-        return {
-            "mode": "flat", "horizon": h, "samples": samples,
-            "prob_profit": float(np.mean(finals > 0.0)),
-            "median_final": float(np.median(finals)),
-            "p05_final": float(np.quantile(finals, 0.05)),
-            "p95_final": float(np.quantile(finals, 0.95)),
-            "median_max_drawdown": float(np.median(max_dds)),
-            "p95_max_drawdown": float(np.quantile(max_dds, 0.95)),
-        }
+        start_value = 0.0
+        drawdown_suffix = ""
+    else:
+        finite_number("initial_bankroll", initial_bankroll, strict=True)
+        finite_number("cap", cap, maximum=1.0)
+        finite_number("scale", scale, maximum=1.0)
+        mults = np.array([
+            1.0 + kelly_fraction(p, odds, cap=cap, scale=scale) * ((odds - 1.0) if won else -1.0)
+            for p, odds, won in results
+        ], dtype=float)
+        start_value = float(initial_bankroll)
+        drawdown_suffix = "_pct"
 
-    finite_number("initial_bankroll", initial_bankroll, strict=True)
-    finite_number("cap", cap, maximum=1.0)
-    finite_number("scale", scale, maximum=1.0)
-    mults = np.array([
-        1.0 + kelly_fraction(p, odds, cap=cap, scale=scale) * ((odds - 1.0) if won else -1.0)
-        for p, odds, won in results
-    ], dtype=float)
-    idx = rng.integers(0, n, size=(samples, h))
-    paths = float(initial_bankroll) * np.concatenate(
-        [np.ones((samples, 1)), np.cumprod(mults[idx], axis=1)], axis=1
-    )
-    finals = paths[:, -1]
-    peaks = np.maximum.accumulate(paths, axis=1)
-    max_dds = np.max((peaks - paths) / np.maximum(peaks, 1e-12), axis=1)
+    finals = np.empty(samples)
+    max_dds = np.empty(samples)
+    # Au plus 64 trajectoires et environ 1 million de cellules par lot.
+    batch_size = max(1, min(64, 1_000_000 // (h + 1)))
+    for start in range(0, samples, batch_size):
+        stop = min(samples, start + batch_size)
+        idx = rng.integers(0, n, size=(stop - start, h))
+        paths = np.empty((stop - start, h + 1))
+        paths[:, 0] = start_value
+        if mode == "flat":
+            np.cumsum(rets[idx], axis=1, out=paths[:, 1:])
+        else:
+            np.cumprod(mults[idx], axis=1, out=paths[:, 1:])
+            paths[:, 1:] *= start_value
+        finals[start:stop] = paths[:, -1]
+        peaks = np.maximum.accumulate(paths, axis=1)
+        drawdowns = peaks - paths
+        if mode == "kelly":
+            # Le pic inclut le capital initial strictement positif.
+            drawdowns /= peaks
+        max_dds[start:stop] = np.max(drawdowns, axis=1)
     return {
-        "mode": "kelly", "horizon": h, "samples": samples,
-        "prob_profit": float(np.mean(finals > float(initial_bankroll))),
+        "mode": mode, "horizon": h, "samples": samples,
+        "prob_profit": float(np.mean(finals > start_value)),
         "median_final": float(np.median(finals)),
         "p05_final": float(np.quantile(finals, 0.05)),
         "p95_final": float(np.quantile(finals, 0.95)),
-        "median_max_drawdown_pct": float(np.median(max_dds)),
-        "p95_max_drawdown_pct": float(np.quantile(max_dds, 0.95)),
+        "median_max_drawdown" + drawdown_suffix: float(np.median(max_dds)),
+        "p95_max_drawdown" + drawdown_suffix: float(np.quantile(max_dds, 0.95)),
     }

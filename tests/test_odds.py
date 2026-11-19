@@ -1,6 +1,8 @@
 import math
 import unittest
 
+import numpy as np
+
 from cs2gp.odds import (
     closing_line_value, devig, devig_power, devig_shin, equity_curve, expected_value, find_value,
     kelly_fraction, market_diagnostics, roi_significance, simulate_flat, simulate_kelly,
@@ -146,6 +148,45 @@ class OddsValidationTests(unittest.TestCase):
         self.assertGreaterEqual(flat["p95_max_drawdown"], flat["median_max_drawdown"])
         with self.assertRaises(ValueError):
             bootstrap_bankroll([], mode="kelly")
+
+    def test_bootstrap_matches_individual_seeded_trajectories_across_batches(self):
+        from cs2gp.odds import bootstrap_bankroll
+
+        seq = [(0.65, 2.0, 1), (0.7, 1.8, 0), (0.8, 1.5, 1)]
+        samples, horizon, seed = 137, 17, 9
+        draws = np.random.default_rng(seed).integers(0, len(seq), size=(samples, horizon))
+        for mode in ("flat", "kelly"):
+            with self.subTest(mode=mode):
+                paths = np.array([
+                    equity_curve([seq[i] for i in draw], mode=mode, stake=2.0,
+                                 initial_bankroll=100.0)
+                    for draw in draws
+                ])
+                peaks = np.maximum.accumulate(paths, axis=1)
+                drawdowns = peaks - paths
+                if mode == "kelly":
+                    drawdowns /= peaks
+                max_dds = drawdowns.max(axis=1)
+                result = bootstrap_bankroll(seq, mode=mode, stake=2.0, initial_bankroll=100.0,
+                                            samples=samples, horizon=horizon, seed=seed)
+                self.assertEqual(result["prob_profit"], np.mean(paths[:, -1] > paths[:, 0]))
+                for key, q in (("p05_final", .05), ("median_final", .5), ("p95_final", .95)):
+                    self.assertAlmostEqual(result[key], np.quantile(paths[:, -1], q), places=10)
+                suffix = "_pct" if mode == "kelly" else ""
+                self.assertAlmostEqual(result["median_max_drawdown" + suffix],
+                                       np.median(max_dds), places=10)
+                self.assertAlmostEqual(result["p95_max_drawdown" + suffix],
+                                       np.quantile(max_dds, .95), places=10)
+
+    def test_bootstrap_relative_drawdown_is_invariant_to_initial_capital(self):
+        from cs2gp.odds import bootstrap_bankroll
+
+        seq = [(0.6, 2.0, 0)]
+        for capital in (1e-100, 1e-15, 1.0, 1e100):
+            with self.subTest(capital=capital):
+                result = bootstrap_bankroll(seq, samples=1, horizon=1, initial_bankroll=capital)
+                self.assertAlmostEqual(result["median_max_drawdown_pct"], .05, places=12)
+                self.assertAlmostEqual(result["p95_max_drawdown_pct"], .05, places=12)
 
 
 if __name__ == "__main__":
