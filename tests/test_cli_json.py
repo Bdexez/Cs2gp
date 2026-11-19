@@ -74,13 +74,14 @@ class CliJsonTests(unittest.TestCase):
             out = io.StringIO()
             with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
                 self.assertEqual(main([
-                    "journal", "--journal", str(jpath), "--by-month",
+                    "journal", "--journal", str(jpath), "--by-month", "--pending",
                     "--export-csv", str(j_csv), "--json",
                 ]), 0)
             j_payload = json.loads(out.getvalue())
             self.assertIn("scorecard", j_payload)
             self.assertIn("financial", j_payload)
             self.assertIn("by_month", j_payload)
+            self.assertEqual(len(j_payload["pending"]), 1)
             self.assertTrue(j_csv.is_file())
 
             # settle --json

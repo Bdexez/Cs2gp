@@ -486,3 +486,10 @@ outillage domaine CS2 et sortie structuree).
   `fsync`/`os.replace`), rendant 100 % des ecritures disque du paquet atomiques.
 - **Extension des smoke checks CI** (`.github/workflows/tests.yml`) : ajout de
   `cs2gp doctor --json`, `cs2gp maps --json` et `cs2gp events --json`.
+
+## Cycle 47 : Deduplication `snapshot.py` et suivi des pronostics en attente (`--pending`)
+
+- **Deduplication de la verification d'archives** (`snapshot.py`) : extraction de
+  `_read_verified_archive()` partage par `load_analyzer()` et `inspect_analyzer()`.
+- **Pronostics en attente (`pending_picks` / `--pending`)** (`journal.py`,
+  `cli.py`) : liste les pronostics actionnables non encore pointes (texte et `--json`).
