@@ -55,6 +55,37 @@ class MetricsDiagnosticsTests(unittest.TestCase):
         res_const = metrics.calibration_slope_intercept([1, 0, 1, 0], [0.5, 0.5, 0.5, 0.5])
         self.assertFalse(res_const["converged"])
 
+    def test_calibration_slope_converges_from_extreme_probabilities_to_known_solution(self):
+        # Deux groupes : taux observes 25 % et 75 %, p annoncees 0 et 1.
+        # Avec le clipping de Cox, la solution non penalisee est analytique.
+        y = np.array([0] * 75 + [1] * 25 + [0] * 25 + [1] * 75, dtype=float)
+        p = np.repeat([0.0, 1.0], 100)
+        result = metrics.calibration_slope_intercept(y, p)
+        self.assertTrue(result["converged"])
+        self.assertAlmostEqual(result["intercept"], 0.0, places=8)
+        expected_slope = np.log(3.0) / np.log((1.0 - 1e-6) / 1e-6)
+        self.assertAlmostEqual(result["slope"], expected_slope, places=8)
+
+    def test_calibration_slope_reaches_stationary_point_on_contradictory_extreme_inputs(self):
+        for seed in (0, 1, 11, 42):
+            rng = np.random.default_rng(seed)
+            p = rng.choice([0.0, .00001, .01, .05, .1, .9, .95, .99, .99999, 1.0], 30)
+            y = rng.integers(0, 2, 30)
+            result = metrics.calibration_slope_intercept(y, p)
+            with self.subTest(seed=seed):
+                self.assertTrue(result["converged"])
+                pc = np.clip(p, 1e-6, 1.0 - 1e-6)
+                X = np.column_stack([np.ones(len(y)), np.log(pc / (1.0 - pc))])
+                beta = np.array([result["intercept"], result["slope"]])
+                q = 1.0 / (1.0 + np.exp(-(X @ beta)))
+                gradient = X.T @ (y - q) - 1e-6 * (beta - [0.0, 1.0])
+                np.testing.assert_allclose(gradient, 0.0, atol=1e-6)
+                self.assertLess(metrics.log_loss(y, q), metrics.log_loss(y, p))
+                reversed_result = metrics.calibration_slope_intercept(1 - y, 1 - p)
+                self.assertTrue(reversed_result["converged"])
+                self.assertAlmostEqual(result["slope"], reversed_result["slope"], places=8)
+                self.assertAlmostEqual(result["intercept"], -reversed_result["intercept"], places=8)
+
     def test_paired_block_bootstrap_supports_brier_metric(self):
         dates = [dt.date(2026, 1, 1) + dt.timedelta(days=i) for i in range(40)]
         y = np.array([1, 0] * 20, dtype=float)

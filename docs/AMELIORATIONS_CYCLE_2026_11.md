@@ -524,3 +524,17 @@ outillage domaine CS2 et sortie structuree).
   maintenant 5 % meme pour un capital initial de 1e-15 (auparavant 0,005 %).
   Tests de comparaison aux trajectoires individuelles en mise fixe et Kelly,
   de reproductibilite sur plusieurs lots et d'invariance au capital initial.
+
+## Cycle 50 : Convergence du diagnostic de calibration de Cox
+
+- **Newton amorti (`calibration_slope_intercept`)** (`metrics.py`) : controle
+  de decroissance du cout logistique penalise avec `logaddexp`, sans saturer
+  artificiellement les logits de l'optimisation. Le pas est reduit lorsqu'un
+  pas complet augmente le cout ; une tolerance d'arrondi evite un blocage a
+  proximite de l'optimum. Un cas reproduit avec des probabilites extremes et
+  des resultats contradictoires passait auparavant a une pente de 8,5 millions,
+  sans convergence. Il converge maintenant vers une pente de -0,0421.
+- **Verification numerique** : solution analytique de deux groupes aux taux
+  observes 25 % et 75 %, gradient penalise proche de zero et symetrie lors
+  de l'inversion des equipes. Controle exploratoire de 200 graines aux
+  probabilites extremes : aucune non-convergence observee apres correction.
