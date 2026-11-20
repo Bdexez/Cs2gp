@@ -438,30 +438,66 @@ class MatchPredictor:
     def load(cls, path: str | Path) -> "MatchPredictor":
         path = Path(path)
         payload = json.loads(path.read_text(encoding="utf-8"))
-        if payload.get("version") != 1:
+        if not isinstance(payload, dict):
+            raise ValueError("le fichier de modele doit contenir un objet JSON")
+        if type(payload.get("version")) is not int or payload["version"] != 1:
             raise ValueError("version de modele non prise en charge")
-        weights = np.asarray(payload["weights"], dtype=float)
-        scales = np.asarray(payload["scales"], dtype=float)
-        resid = np.asarray(payload.get("resid") or [], dtype=float)
+        required = {"weights", "scales", "feature_names", "temperature", "l2", "gbdt_weight"}
+        if not required <= payload.keys():
+            raise ValueError(f"parametres de modele manquants : {sorted(required - payload.keys())}")
+        try:
+            weights = np.asarray(payload["weights"], dtype=float)
+            scales = np.asarray(payload["scales"], dtype=float)
+            resid = np.asarray(payload.get("resid") or [], dtype=float)
+        except (TypeError, OverflowError) as exc:
+            raise ValueError("parametres de modele non numeriques") from exc
+        names = payload["feature_names"]
+        if (not isinstance(names, list) or any(not isinstance(name, str) or not name for name in names)
+                or len(set(names)) != len(names)):
+            raise ValueError("feature_names doit contenir des noms uniques non vides")
+        finite_number("temperature", payload["temperature"], strict=True)
         if (weights.ndim != 1 or len(weights) == 0 or scales.shape != weights.shape
                 or not np.all(np.isfinite(weights)) or not np.all(np.isfinite(scales))
                 or np.any(scales <= 0) or resid.shape not in ((0,), (len(weights)-1,))
                 or not np.all(np.isfinite(resid))
-                or len(payload["feature_names"]) not in (0, len(weights))
-                or not math.isfinite(payload["temperature"]) or payload["temperature"] <= 0):
+                or len(names) not in (0, len(weights))):
             raise ValueError("parametres de modele invalides")
-        has_gbdt = bool(payload.get("has_gbdt"))
+        has_gbdt = payload.get("has_gbdt", False)
+        if not isinstance(has_gbdt, bool):
+            raise ValueError("has_gbdt doit etre un booleen")
+        trained_on = payload.get("trained_on", 0)
+        if type(trained_on) is not int or trained_on < 0:
+            raise ValueError("trained_on doit etre un entier positif ou nul")
+        last_date = payload.get("last_date", "")
+        if not isinstance(last_date, str):
+            raise ValueError("last_date doit etre une date ISO ou une chaine vide")
+        if last_date:
+            dt.date.fromisoformat(last_date)
         m = cls(l2=payload["l2"], use_gbdt=has_gbdt, gbdt_weight=payload["gbdt_weight"])
         m.temperature = payload["temperature"]
-        m.feature_names = tuple(payload["feature_names"])
-        m.trained_on = payload.get("trained_on", 0)
-        m.last_date = payload.get("last_date", "")
+        m.feature_names = tuple(names)
+        m.trained_on = trained_on
+        m.last_date = last_date
         m.logistic = LogisticModel(l2=payload["l2"], feature_names=m.feature_names)
         m.logistic.weights, m.logistic.scales, m.logistic.resid = weights, scales, resid
         if payload.get("cov") is not None:
-            cov = np.asarray(payload["cov"], dtype=float)
+            try:
+                cov = np.asarray(payload["cov"], dtype=float)
+            except (TypeError, OverflowError) as exc:
+                raise ValueError("matrice de covariance non numerique") from exc
             if cov.shape != (len(weights), len(weights)) or not np.all(np.isfinite(cov)):
                 raise ValueError("matrice de covariance invalide")
+            # Verifier a l'echelle de la matrice pour tolerer les arrondis de
+            # l'inversion de Fisher, sans accepter une variance negative.
+            scaled_cov = cov / max(float(np.max(np.abs(cov))), np.finfo(float).tiny)
+            if not np.allclose(scaled_cov, scaled_cov.T, rtol=0.0, atol=1e-10):
+                raise ValueError("matrice de covariance non symetrique")
+            try:
+                eigenvalues = np.linalg.eigvalsh(0.5 * (scaled_cov + scaled_cov.T))
+            except np.linalg.LinAlgError as exc:
+                raise ValueError("matrice de covariance indecomposable") from exc
+            if float(eigenvalues.min()) < -1e-10:
+                raise ValueError("matrice de covariance non positive")
             m.logistic.cov = cov
         blob = path.with_suffix(".gbdt.pkl")
         if has_gbdt:
