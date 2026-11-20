@@ -556,3 +556,19 @@ outillage domaine CS2 et sortie structuree).
   Python 3.14.10, NumPy 2.5.5 et scikit-learn 1.9.1. Les 257 tests passent
   sans test ignore, dont les sauvegardes/rechargements de l'ensemble GBDT
   et des instantanes complets.
+
+## Cycle 52 : Augmentation miroir logistique sans duplication des donnees
+
+- **Gradient et Hessienne equivalents** (`model.py`) : l'identite
+  `sigmoid(-z) = 1 - sigmoid(z)` permet de remplacer la copie miroir par un
+  facteur 2 dans le gradient et la Hessienne. La penalite L2 conserve ainsi
+  sa force historique. La covariance reste calculee sur les observations
+  originales, sans compter artificiellement les lignes miroir.
+- **Mesure de memoire** : fit de 40 000 observations et 24 features gaussiennes,
+  graine 52, labels tires selon `sigmoid(X[:, 0])`, threads BLAS fixes a 1.
+  Pic `tracemalloc` de 46,77 Mio avant contre 23,58 Mio apres (environ -50 %).
+  Ecart maximal observe de 1,2e-16 sur les coefficients et les probabilites
+  du lot compare ; projection et echelles identiques.
+- **Tests de non-regression** : optimum analytique unidimensionnel pondere
+  pour controler la force L2 et equivalence avec une augmentation explicite
+  dont la penalite est ajustee ; antisymetrie des probabilites preservee.
