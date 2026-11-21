@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 
 from cs2gp import metrics
-from cs2gp.model import LogisticModel, MatchPredictor, recency_weights
+from cs2gp.model import LogisticModel, MatchPredictor, recency_weights, series_win_probability
 
 
 class NumericContractsTests(unittest.TestCase):
@@ -54,6 +54,37 @@ class NumericContractsTests(unittest.TestCase):
                 LogisticModel(**options).fit(X, y)
         with self.assertRaises(ValueError):
             recency_weights([], halflife=0)
+
+    def test_zero_weight_rows_do_not_affect_residualization_or_scaling(self):
+        rng = np.random.default_rng(11)
+        X = rng.normal(size=(40, 3))
+        y = (X[:, 0] > 0).astype(float)
+        clean = LogisticModel().fit(X, y)
+        X_aug = np.vstack([X, [[100.0, -500.0, 900.0]]])
+        y_aug = np.append(y, 0.0)
+        w_aug = np.append(np.ones(len(y)), 0.0)
+        weighted = LogisticModel().fit(X_aug, y_aug, sample_weight=w_aug)
+        np.testing.assert_allclose(weighted.resid, clean.resid, atol=1e-12)
+        np.testing.assert_allclose(weighted.scales, clean.scales, atol=1e-12)
+        np.testing.assert_allclose(weighted.weights, clean.weights, atol=1e-10)
+
+    def test_explain_and_series_win_probability_validate_inputs(self):
+        untrained = MatchPredictor(use_gbdt=False)
+        with self.assertRaises(RuntimeError):
+            untrained.explain(np.array([1.0, 2.0]))
+        rng = np.random.default_rng(3)
+        X = rng.normal(size=(60, 2))
+        model = MatchPredictor(use_gbdt=False).fit(X, (X[:, 0] > 0).astype(float))
+        with self.assertRaises(ValueError):
+            model.explain(np.array([np.nan, 1.0]))
+        with self.assertRaises(ValueError):
+            model.explain(np.array([1.0, 2.0]), top=0)
+        for bad_p in (float("nan"), -0.1, 1.1):
+            with self.assertRaises(ValueError):
+                series_win_probability(bad_p, 3)
+        for bad_bo in (0, 2, 4, -1, True):
+            with self.assertRaises(ValueError):
+                series_win_probability(0.6, bad_bo)
 
 
 if __name__ == "__main__":

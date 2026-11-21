@@ -17,7 +17,9 @@ import datetime as dt
 import json
 import hashlib
 import math
+import os
 import pickle
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -63,7 +65,7 @@ class LogisticModel:
     resid: np.ndarray | None = None
     feature_names: tuple[str, ...] = ()
 
-    def _fit_residualizer(self, X: np.ndarray) -> None:
+    def _fit_residualizer(self, X: np.ndarray, w: np.ndarray) -> None:
         """Projette chaque colonne hors de la colonne 0 (l'ecart de niveau).
 
         Toutes les features sont fortement correlees a `elo_diff` : forme, pool,
@@ -79,11 +81,12 @@ class LogisticModel:
             self.resid = np.zeros(max(0, X.shape[1] - 1))
             return
         base = X[:, 0]
-        denom = float(base @ base)
+        w_base = w * base
+        denom = float(base @ w_base)
         if denom < 1e-12:
             self.resid = np.zeros(X.shape[1] - 1)
             return
-        self.resid = np.array([float(base @ X[:, j]) / denom for j in range(1, X.shape[1])])
+        self.resid = np.array([float(w_base @ X[:, j]) / denom for j in range(1, X.shape[1])])
 
     def _apply_residual(self, X: np.ndarray) -> np.ndarray:
         if self.resid is None or len(self.resid) == 0:
@@ -101,10 +104,10 @@ class LogisticModel:
         positive_integer("max_iter", self.max_iter)
         if self.feature_names and len(self.feature_names) != X.shape[1]:
             raise ValueError("feature_names doit nommer chaque colonne de X")
-        self._fit_residualizer(X)
+        self._fit_residualizer(X, w)
         X = self._apply_residual(X)
         # Mise a l'echelle sans centrage : centrer casserait l'antisymetrie.
-        self.scales = np.maximum(np.sqrt(np.mean(X**2, axis=0)), 1e-6)
+        self.scales = np.maximum(np.sqrt(np.average(X**2, axis=0, weights=w)), 1e-6)
         Xs = X / self.scales
 
         # Augmentation miroir : impose la symetrie et double l'echantillon.
@@ -271,7 +274,10 @@ class MatchPredictor:
 
     def explain(self, x: np.ndarray, top: int = 6) -> list[tuple[str, float]]:
         """Contribution de chaque feature au logit, en points de logit."""
-        x = np.asarray(x, dtype=float).reshape(1, -1)
+        if self.logistic.weights is None or self.logistic.scales is None:
+            raise RuntimeError("modele non entraine")
+        positive_integer("top", top)
+        x = feature_matrix(np.asarray(x, dtype=float).reshape(1, -1), columns=len(self.logistic.weights))
         x = self.logistic._apply_residual(x).ravel()
         contrib = (x / self.logistic.scales) * self.logistic.weights
         contrib = contrib * (1 - self.gbdt_weight if self.gbdt is not None else 1.0)
@@ -282,7 +288,25 @@ class MatchPredictor:
 
     # -------------------------------------------------------------------- I/O
 
+    @staticmethod
+    def _atomic_write_bytes(path: Path, data: bytes) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = None
+        try:
+            with tempfile.NamedTemporaryFile(dir=path.parent, prefix=f".{path.name}.",
+                                             suffix=".tmp", delete=False) as fh:
+                temporary = Path(fh.name)
+                fh.write(data)
+                fh.flush()
+                os.fsync(fh.fileno())
+            os.replace(temporary, path)
+        finally:
+            if temporary is not None:
+                temporary.unlink(missing_ok=True)
+
     def save(self, path: str | Path) -> None:
+        if self.logistic.weights is None or self.logistic.scales is None:
+            raise RuntimeError("modele non entraine")
         path = Path(path)
         payload = {
             "version": 1,
@@ -299,9 +323,9 @@ class MatchPredictor:
         }
         if self.gbdt is not None:
             blob = pickle.dumps(self.gbdt)
-            path.with_suffix(".gbdt.pkl").write_bytes(blob)
+            self._atomic_write_bytes(path.with_suffix(".gbdt.pkl"), blob)
             payload["gbdt_sha256"] = hashlib.sha256(blob).hexdigest()
-        path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        self._atomic_write_bytes(path, json.dumps(payload, indent=2).encode("utf-8"))
 
     @classmethod
     def load(cls, path: str | Path) -> "MatchPredictor":
@@ -319,7 +343,8 @@ class MatchPredictor:
                 or len(payload["feature_names"]) not in (0, len(weights))
                 or not math.isfinite(payload["temperature"]) or payload["temperature"] <= 0):
             raise ValueError("parametres de modele invalides")
-        m = cls(l2=payload["l2"], gbdt_weight=payload["gbdt_weight"])
+        has_gbdt = bool(payload.get("has_gbdt"))
+        m = cls(l2=payload["l2"], use_gbdt=has_gbdt, gbdt_weight=payload["gbdt_weight"])
         m.temperature = payload["temperature"]
         m.feature_names = tuple(payload["feature_names"])
         m.trained_on = payload.get("trained_on", 0)
@@ -327,7 +352,7 @@ class MatchPredictor:
         m.logistic = LogisticModel(l2=payload["l2"], feature_names=m.feature_names)
         m.logistic.weights, m.logistic.scales, m.logistic.resid = weights, scales, resid
         blob = path.with_suffix(".gbdt.pkl")
-        if payload.get("has_gbdt"):
+        if has_gbdt:
             if not blob.is_file():
                 raise ValueError(f"composant GBDT manquant : {blob}")
             data = blob.read_bytes()
@@ -352,6 +377,10 @@ def series_win_probability(p_map: float, best_of: int) -> float:
     (momentum, lecture d'adversaire), mais l'erreur reste petite devant
     l'incertitude sur p_map lui-meme.
     """
+    finite_number("p_map", p_map, maximum=1.0)
+    positive_integer("best_of", best_of)
+    if best_of not in (1, 3, 5):
+        raise ValueError(f"format non gere : bo{best_of}")
     p = min(max(float(p_map), 1e-6), 1 - 1e-6)
     wins_needed = best_of // 2 + 1
     total = 0.0
