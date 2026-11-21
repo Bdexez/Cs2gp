@@ -64,6 +64,29 @@ class CliJsonTests(unittest.TestCase):
             self.assertIn("scorecard", j_payload)
             self.assertIn("financial", j_payload)
 
+            # slate --json
+            fpath = Path(tmp) / "fixtures.csv"
+            fpath.write_text(f"date,team_a,team_b,best_of\n2026-01-10,{teams[0]},{teams[1]},3\n")
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(main([
+                    "slate", "--data", str(data), "--no-gbdt", "--fixtures", str(fpath),
+                    "--momentum", "0", "--no-calibration", "--json",
+                ]), 0)
+            slate_payload = json.loads(out.getvalue())
+            self.assertEqual(len(slate_payload["analyses"]), 1)
+            self.assertIn("fixture", slate_payload["analyses"][0])
+
+            # tipster-backtest --json
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(main([
+                    "tipster-backtest", "--data", str(data), "--no-gbdt", "--json",
+                ]), 0)
+            tb_payload = json.loads(out.getvalue())
+            self.assertIn("by_tier", tb_payload)
+            self.assertIn("by_market", tb_payload)
+
 
 if __name__ == "__main__":
     unittest.main()

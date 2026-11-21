@@ -143,6 +143,28 @@ class Pick:
         return ("legacy", self.date, tuple(sorted((normalize_team(self.team_a), normalize_team(self.team_b)))),
                 self.best_of, self.event)
 
+    def to_dict(self) -> dict:
+        return {
+            "date": self.date.isoformat(),
+            "team_a": self.team_a,
+            "team_b": self.team_b,
+            "best_of": self.best_of,
+            "event": self.event,
+            "market": self.market,
+            "selection": self.selection,
+            "probability": self.probability,
+            "fair_odds": self.fair_odds,
+            "tier": self.tier,
+            "verdict": self.verdict,
+            "rationale": list(self.rationale),
+            "odds": self.odds,
+            "edge": self.edge,
+            "ev": self.ev,
+            "stake": self.stake,
+            "match_id": self.match_id,
+            "data_through": self.data_through,
+        }
+
 
 @dataclass
 class Analysis:
@@ -159,6 +181,28 @@ class Analysis:
     @property
     def acted(self) -> bool:
         return any(p.is_actionable for p in self.picks)
+
+    def to_dict(self) -> dict:
+        fx = self.fixture
+        return {
+            "fixture": {
+                "date": fx.date.isoformat(),
+                "team_a": fx.team_a,
+                "team_b": fx.team_b,
+                "best_of": fx.best_of,
+                "lan": fx.lan,
+                "event": fx.event,
+                "match_id": fx.match_id,
+            },
+            "acted": self.acted,
+            "skipped": self.skipped,
+            "picks": [p.to_dict() for p in self.picks],
+            "prediction": None if self.prediction is None else self.prediction.to_dict(),
+            "scores": None if self.distribution is None else {
+                f"{wa}-{wb}": prob
+                for (wa, wb), prob in sorted(self.distribution.scores.items(), key=lambda kv: -kv[1])
+            },
+        }
 
 
 def _tier(p: float) -> str:
