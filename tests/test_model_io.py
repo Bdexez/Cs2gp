@@ -35,6 +35,28 @@ class ModelIntegrityTests(unittest.TestCase):
             restored = MatchPredictor.load(path)
             self.assertFalse(restored.use_gbdt)
             np.testing.assert_allclose(restored.predict_proba(X[:5]), model.predict_proba(X[:5]))
+            self.assertEqual(restored.predict_interval(X[0]), model.predict_interval(X[0]))
+
+    def test_predict_interval_is_symmetric_ordered_and_narrows_with_more_data(self):
+        rng = np.random.default_rng(13)
+        X_small = rng.normal(size=(80, 3))
+        y_small = (rng.random(80) < 1 / (1 + np.exp(-X_small[:, 0]))).astype(float)
+        X_large = rng.normal(size=(800, 3))
+        y_large = (rng.random(800) < 1 / (1 + np.exp(-X_large[:, 0]))).astype(float)
+        small = MatchPredictor(use_gbdt=False, calibration_frac=0.0).fit(X_small, y_small)
+        large = MatchPredictor(use_gbdt=False, calibration_frac=0.0).fit(X_large, y_large)
+        x = np.array([1.2, -0.4, 0.3])
+        p = small.predict_one(x)
+        lo, hi = small.predict_interval(x)
+        self.assertLess(lo, p)
+        self.assertLess(p, hi)
+        lo_rev, hi_rev = small.predict_interval(-x)
+        self.assertAlmostEqual(lo + hi_rev, 1.0, places=10)
+        self.assertAlmostEqual(hi + lo_rev, 1.0, places=10)
+        lo_big, hi_big = large.predict_interval(x)
+        self.assertLess(hi_big - lo_big, hi - lo)
+        with self.assertRaises(ValueError):
+            small.predict_interval(x, z_score=0)
 
 
 if __name__ == "__main__":
