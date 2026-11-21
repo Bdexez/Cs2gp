@@ -344,6 +344,7 @@ class Dataset:
     # veto. Permet de backtester la lecture "par maps" exactement comme elle est
     # servie en production, ou aucune map n'est encore connue.
     pool_X: np.ndarray | None = None
+    versioned_pool: bool = False
 
     def __len__(self) -> int:
         return len(self.y)
@@ -357,6 +358,7 @@ class Dataset:
             meta=[self.meta[i] for i in idx],
             feature_names=self.feature_names,
             pool_X=None if self.pool_X is None else self.pool_X[idx],
+            versioned_pool=self.versioned_pool,
         )
 
 
@@ -418,6 +420,7 @@ def build_datasets(
         pool_X=np.array(mpool, dtype=float).reshape(
             len(my), len(ACTIVE_DUTY), len(FeatureExtractor.MAP_FEATURES)
         ),
+        versioned_pool=versioned_pool,
     )
     map_ds = Dataset(
         X=np.array(pX, dtype=float).reshape(len(py), len(FeatureExtractor.MAP_FEATURES)),

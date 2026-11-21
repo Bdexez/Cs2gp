@@ -42,6 +42,21 @@ class MapPoolVersioningTests(unittest.TestCase):
         ])
         mds, _, _ = build_datasets(matches, warmup_maps=0, versioned_pool=True)
         self.assertEqual(mds.pool_X.shape, (2, 7, len(FeatureExtractor.MAP_FEATURES)))
+        self.assertTrue(mds.versioned_pool)
+
+    def test_analyzer_predict_uses_versioned_pool_for_target_date(self):
+        from cs2gp.predict import Analyzer
+        from cs2gp.sources import simulate_history
+
+        rows = simulate_history(n_teams=8, years=1.0, seed=5, start=dt.date(2023, 10, 1))
+        an = Analyzer(warmup_maps=2, versioned_pool=True).load_maps(rows).train(use_gbdt=False)
+        teams = an.known_teams()
+        pred_2024 = an.predict(teams[0], teams[1], on=dt.date(2024, 11, 1))
+        self.assertEqual({e.map_name for e in pred_2024.map_edges},
+                         set(active_duty_on(dt.date(2024, 11, 1), versioned=True)))
+        pred_2025 = an.predict(teams[0], teams[1], on=dt.date(2025, 8, 1))
+        self.assertEqual({e.map_name for e in pred_2025.map_edges},
+                         set(active_duty_on(dt.date(2025, 8, 1), versioned=True)))
 
 
 if __name__ == "__main__":

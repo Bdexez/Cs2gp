@@ -796,7 +796,7 @@ def _settle(pick: Pick, meta: dict, y_a: float) -> bool:
 def _fit_decider_on(match_ds, history, upto: int, lookback: int = 800,
                     momentum: float = 0.0) -> float:
     """Calibre la longueur de serie sur les matchs *anterieurs* a `upto`."""
-    from .schema import ACTIVE_DUTY
+    from .schema import active_duty_on
 
     samples = []
     for r in range(max(0, upto - lookback), upto):
@@ -805,7 +805,8 @@ def _fit_decider_on(match_ds, history, upto: int, lookback: int = 800,
         if bo < 3 or not history.trained_through[r]:
             continue
         ps = history.pools[r]
-        plan = project_veto(list(zip(ACTIVE_DUTY, ps.tolist())), bo)
+        pool_names = active_duty_on(match_ds.dates[r], versioned=getattr(match_ds, "versioned_pool", False))
+        plan = project_veto(list(zip(pool_names, ps.tolist())), bo)
         dist = series_distribution(plan.order, bo, momentum)
         wa, wb = (int(x) for x in meta["score"].split("-"))
         samples.append((dist.p_maps_played(bo), int(wa + wb == bo)))
@@ -875,9 +876,12 @@ def simulate_tipster(
                 n_skipped += 1
                 continue
 
+            from .schema import active_duty_on
+
+            pool_names = active_duty_on(match_ds.dates[r], versioned=getattr(match_ds, "versioned_pool", False))
             pool_ps = map_model.predict_proba(match_ds.pool_X[r])
-            pool = list(zip(ACTIVE_DUTY, pool_ps.tolist()))
-            p_maps = _pool_to_series(map_model, match_ds.pool_X[r], bo, momentum)
+            pool = list(zip(pool_names, pool_ps.tolist()))
+            p_maps = _pool_to_series(map_model, match_ds.pool_X[r], bo, momentum, pool_names)
             p_final, _ = combine_probability(
                 float(p_match_all[r - i]), p_maps,
                 meta.get("maps_played_min", 999), meta.get("days_idle_max", 0),
