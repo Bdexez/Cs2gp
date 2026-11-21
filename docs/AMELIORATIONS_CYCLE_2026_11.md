@@ -572,3 +572,19 @@ outillage domaine CS2 et sortie structuree).
 - **Tests de non-regression** : optimum analytique unidimensionnel pondere
   pour controler la force L2 et equivalence avec une augmentation explicite
   dont la penalite est ajustee ; antisymetrie des probabilites preservee.
+
+## Cycle 53 : Chronologie des bilans du journal
+
+- **Lectures ordonnees** (`journal.py`) : les bilans, filtres et exports suivent
+  la date du match puis l'emission convertie en UTC et l'identifiant stable du
+  pronostic. Les journaux anciens sans heure d'emission utilisent `emis_le`.
+  La lecture brute et les ecritures conservent l'ordre original du CSV.
+- **Reproduction et tests** : quatre pronostics sur quatre jours donnaient un
+  drawdown de 2 ou 3 unites et une serie de 2 ou 3 defaites selon l'ordre
+  d'import. Les trois permutations testees donnent maintenant le meme bilan,
+  le meme bootstrap a graine fixe et les memes pronostics ordonnes, sans
+  reecriture du fichier. Tests des fuseaux horaires et du format ancien.
+- **Resolution temporelle** : l'heure de reglement n'est pas disponible.
+  L'emission departage les pronostics d'une meme journee ; les indicateurs
+  intrajournaliers suivent cette convention et ne reconstituent pas l'ordre
+  reel de cloture des rencontres.

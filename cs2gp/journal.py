@@ -270,10 +270,9 @@ def _filter_by_date(
     since: dt.date | None = None,
     until: dt.date | None = None,
 ) -> list[dict]:
+    """Filtre et ordonne les lectures, sans changer l'ordre du CSV archive."""
     if since is not None and until is not None and since > until:
         raise ValueError("since ne peut pas etre posterieur a until")
-    if since is None and until is None:
-        return rows
     out = []
     for r in rows:
         d = parse_date(r["date"])
@@ -282,7 +281,22 @@ def _filter_by_date(
         if until is not None and d > until:
             continue
         out.append(r)
-    return out
+    return sorted(out, key=_chronological_key)
+
+
+def _chronological_key(row: dict) -> tuple:
+    """Date de rencontre, emission UTC, puis identifiant stable du pronostic.
+
+    L'emission departage les lignes d'une meme journee, sans pretendre connaitre
+    l'heure de reglement. Les anciens journaux sans heure utilisent emis_le.
+    """
+    if row.get("emis_a"):
+        issued = dt.datetime.fromisoformat(row["emis_a"].replace("Z", "+00:00"))
+    else:
+        issued = dt.datetime.combine(parse_date(row.get("emis_le") or row["date"]), dt.time())
+    if issued.tzinfo is None:
+        issued = issued.replace(tzinfo=dt.timezone.utc)
+    return parse_date(row["date"]), issued.astimezone(dt.timezone.utc), row["pick_id"]
 
 
 def scorecard(
@@ -326,6 +340,7 @@ def financial_summary(
 
     Sans cote prise au moment de l'annonce, aucun rendement n'est calculable.
     Reconstituer une cote apres coup produirait un chiffre inventé.
+    La trajectoire suit les dates de rencontre, puis l'emission au sein du jour.
     """
     rows = [
         r for r in _filter_by_date(load(journal_path), since=since, until=until)
