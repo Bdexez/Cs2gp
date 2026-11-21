@@ -8,16 +8,16 @@ from unittest.mock import patch
 
 import numpy as np
 
-from cs2edge.model import MatchPredictor
-from cs2edge.predict import Analyzer
-from cs2edge.sources import simulate_history
+from cs2gp.model import MatchPredictor
+from cs2gp.predict import Analyzer
+from cs2gp.sources import simulate_history
 
 
 class GBDTTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         if importlib.util.find_spec("sklearn") is None:
-            if os.environ.get("CS2EDGE_REQUIRE_GBDT") == "1":
+            if os.environ.get("CS2GP_REQUIRE_GBDT") == "1":
                 raise RuntimeError("scikit-learn est requis pour cette verification")
             raise unittest.SkipTest("option GBDT non installee")
         rng = np.random.default_rng(91)
@@ -66,7 +66,7 @@ class GBDTTests(unittest.TestCase):
         a, b = an.known_teams()[:2]
         expected = an.predict(a, b, on=on)
         with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "analyzer.cs2edge"
+            path = Path(tmp) / "analyzer.cs2gp"
             an.save(path)
             with patch.object(MatchPredictor, "fit", side_effect=AssertionError("refit")):
                 restored = Analyzer.load(path)
@@ -74,7 +74,7 @@ class GBDTTests(unittest.TestCase):
                 self.assertIsNone(restored.map_model.gbdt)
                 self.assertEqual(restored.predict(a, b, on=on), expected)
             for version in (None, "incompatible"):
-                with patch("cs2edge.snapshot._sklearn_version", return_value=version):
+                with patch("cs2gp.snapshot._sklearn_version", return_value=version):
                     with self.assertRaisesRegex(ValueError, "meme version de scikit-learn"):
                         Analyzer.load(path)
 

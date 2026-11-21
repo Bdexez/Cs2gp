@@ -5,7 +5,7 @@ import unittest
 
 import numpy as np
 
-from cs2edge.model import MatchPredictor
+from cs2gp.model import MatchPredictor
 
 
 class ModelIntegrityTests(unittest.TestCase):

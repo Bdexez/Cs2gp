@@ -1,7 +1,7 @@
 import datetime as dt
 import unittest
 
-from cs2edge.pronostic import Tipster, select_analysis_picks, simulate_tipster
+from cs2gp.pronostic import Tipster, select_analysis_picks, simulate_tipster
 
 
 class TipsterOptionsTests(unittest.TestCase):

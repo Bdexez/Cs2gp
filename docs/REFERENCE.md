@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🎯 cs2edge
+# 🎯 cs2gp
 
 **A calibrated tipster for professional CS2.**
 
@@ -9,7 +9,7 @@ speaks on*, explains why, archives its calls — and publishes its own track rec
 
 ![Python](https://img.shields.io/badge/Python-3.9+-3776AB?logo=python&logoColor=white)
 ![Engine](https://img.shields.io/badge/engine-NumPy%20only-013243?logo=numpy&logoColor=white)
-[![Tests](https://github.com/Bdexez/Cs2edge/actions/workflows/tests.yml/badge.svg)](https://github.com/Bdexez/Cs2edge/actions/workflows/tests.yml)
+[![Tests](https://github.com/Bdexez/Cs2gp/actions/workflows/tests.yml/badge.svg)](https://github.com/Bdexez/Cs2gp/actions/workflows/tests.yml)
 ![Probabilities](https://img.shields.io/badge/probabilities-calibrated-1f6feb)
 
 </div>
@@ -50,8 +50,8 @@ speaks on*, explains why, archives its calls — and publishes its own track rec
 ## Quick start
 
 ```bash
-git clone https://github.com/Bdexez/Cs2edge.git
-cd Cs2edge
+git clone https://github.com/Bdexez/Cs2gp.git
+cd Cs2gp
 python -m venv .venv && .venv/bin/pip install -e .
 
 # optional: adds a GBDT to the ensemble (+ pandas export)
@@ -62,13 +62,13 @@ The core depends only on **NumPy** — the logistic regression, the calibration 
 the whole pipeline are written by hand. `scikit-learn` is optional.
 
 ```bash
-cs2edge sample                              # synthetic history to try it out
-cs2edge fixtures --out data/fixtures.csv    # upcoming matches (example)
-cs2edge slate --fixtures data/fixtures.csv  # 🃏 the slate of tips
-cs2edge tipster-backtest                    # 📊 the tipster's track record
-cs2edge backtest --by-year                  # 📊 the model's track record
-cs2edge ratings --top 15                    # Elo ranking
-cs2edge predict navi g2 --bo 3 --odds-a 1.75 --odds-b 2.10
+cs2gp sample                              # synthetic history to try it out
+cs2gp fixtures --out data/fixtures.csv    # upcoming matches (example)
+cs2gp slate --fixtures data/fixtures.csv  # 🃏 the slate of tips
+cs2gp tipster-backtest                    # 📊 the tipster's track record
+cs2gp backtest --by-year                  # 📊 the model's track record
+cs2gp ratings --top 15                    # Elo ranking
+cs2gp predict navi g2 --bo 3 --odds-a 1.75 --odds-b 2.10
 python -m tests.test_smoke                  # 32 end-to-end tests
 ```
 
@@ -77,7 +77,7 @@ python -m tests.test_smoke                  # 32 end-to-end tests
 ## The tipster
 
 ```
-$ cs2edge slate --fixtures data/fixtures.csv --record data/journal.csv
+$ cs2gp slate --fixtures data/fixtures.csv --record data/journal.csv
 
 PRONOSTICS (8 matchs)
 ========================================================================
@@ -145,7 +145,7 @@ market mode — each market is evaluated independently.
 ## The veto, and why it changes everything
 
 A bo3 is not played on three randomly drawn maps: map 1 is picked by A, map 2 by
-B, and the decider is whatever survives the bans. `cs2edge` unrolls that sequence
+B, and the decider is whatever survives the bans. `cs2gp` unrolls that sequence
 and derives the **full score distribution** from it.
 
 On the winner, the effect is negligible. On derived markets, it is massive —
@@ -188,7 +188,7 @@ causal effect of winning a map.
 ## Analysing a single match
 
 ```
-$ cs2edge predict 9z faze --bo 3 --lan
+$ cs2gp predict 9z faze --bo 3 --lan
 
 9z  vs  faze   [bo3, LAN, 2026-09-06]
 
@@ -233,9 +233,9 @@ A tipster who does not archive their calls cannot be evaluated — and without a
 timestamped record, nothing stops anyone from mostly remembering the wins.
 
 ```bash
-cs2edge slate --fixtures f.csv --record data/journal.csv   # archive BEFORE the match
-cs2edge settle --journal data/journal.csv                  # settle AFTERWARDS
-cs2edge journal --journal data/journal.csv                 # the track record
+cs2gp slate --fixtures f.csv --record data/journal.csv   # archive BEFORE the match
+cs2gp settle --journal data/journal.csv                  # settle AFTERWARDS
+cs2gp journal --journal data/journal.csv                 # the track record
 ```
 
 The journal is **append-only**: settling completes the rows, it never rewrites
@@ -243,7 +243,7 @@ them. Both operations are idempotent.
 
 ### The tipster's track record
 
-`cs2edge tipster-backtest` replays the whole strategy over the history, using at
+`cs2gp tipster-backtest` replays the whole strategy over the history, using at
 each instant only the past:
 
 ```
@@ -299,7 +299,7 @@ schedule, current streak, roster tenure.
   then converted into a series.
 
 They are blended in equal parts. That weight is not chosen by intuition: it is
-measured by backtest, and `cs2edge backtest` displays the optimum on *your* data.
+measured by backtest, and `cs2gp backtest` displays the optimum on *your* data.
 
 <details>
 <summary><b>4. Two structural safeguards</b> — antisymmetry & decorrelation</summary>
@@ -408,9 +408,9 @@ estimate is cleared on import and recalculated during training using the new
 data and options. Explicitly configured momentum is preserved.
 
 ```bash
-cs2edge train --no-gbdt --bundle models/analyzer.cs2edge
-cs2edge predict navi g2 --model models/analyzer.cs2edge
-cs2edge slate --model models/analyzer.cs2edge --fixtures data/fixtures.csv
+cs2gp train --no-gbdt --bundle models/analyzer.cs2gp
+cs2gp predict navi g2 --model models/analyzer.cs2gp
+cs2gp slate --model models/analyzer.cs2gp --fixtures data/fixtures.csv
 ```
 
 The single archive includes the history, Elo configuration, feature schemas and
@@ -440,7 +440,7 @@ a series distribution requires exactly `best_of` ordered, distinct maps.
 ## Measuring, and distrusting flattering numbers
 
 ```bash
-cs2edge backtest --by-year
+cs2gp backtest --by-year
 ```
 
 The backtest is **walk-forward**: train on the past only, predict the next block,
@@ -499,7 +499,7 @@ increased coverage by **~40 %**, without any market stepping outside its margin.
 ## What it does not do
 
 > [!WARNING]
-> **The shipped data is synthetic.** `cs2edge sample` simulates a credible history,
+> **The shipped data is synthetic.** `cs2gp sample` simulates a credible history,
 > which makes it possible to run the whole chain without real data — but a simulated
 > world does not establish performance on real professional matches. The current
 > reproducible results are in the [latest verification report](NOUVEAUX_AXES_IMPLEMENTES.md).
@@ -532,7 +532,7 @@ quarter) make the comparison honest — they do not promise a return.
 ## Code structure
 
 ```
-cs2edge/
+cs2gp/
   schema.py     data model, name normalisation, CSV reading
   sources.py    data inputs + history simulator
   ratings.py    global and per-map Elo (margin, tier, inactivity, roster)

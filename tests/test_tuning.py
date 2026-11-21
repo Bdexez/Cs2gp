@@ -3,9 +3,9 @@ from dataclasses import replace
 import unittest
 from unittest.mock import patch
 
-from cs2edge import backtest
-from cs2edge.schema import group_matches
-from cs2edge.sources import simulate_history
+from cs2gp import backtest
+from cs2gp.schema import group_matches
+from cs2gp.sources import simulate_history
 
 
 class TuningTests(unittest.TestCase):

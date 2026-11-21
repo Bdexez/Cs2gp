@@ -5,9 +5,9 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from cs2edge.features import build_datasets
-from cs2edge.schema import MapResult, group_matches, parse_date, read_csv, write_csv
-from cs2edge.sources import from_records
+from cs2gp.features import build_datasets
+from cs2gp.schema import MapResult, group_matches, parse_date, read_csv, write_csv
+from cs2gp.sources import from_records
 
 
 class DateParsingTests(unittest.TestCase):

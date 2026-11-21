@@ -4,9 +4,9 @@ from unittest.mock import patch
 
 import numpy as np
 
-from cs2edge.model import MatchPredictor
-from cs2edge.predict import Analyzer
-from cs2edge.sources import simulate_history
+from cs2gp.model import MatchPredictor
+from cs2gp.predict import Analyzer
+from cs2gp.sources import simulate_history
 
 
 class AnalyzerStateTests(unittest.TestCase):
@@ -28,7 +28,7 @@ class AnalyzerStateTests(unittest.TestCase):
 
     def test_failed_feature_extraction_keeps_the_original_analyzer(self):
         expected = self.an.predict(self.a, self.b, on=self.on)
-        with patch("cs2edge.predict.build_datasets", side_effect=ValueError("extraction impossible")):
+        with patch("cs2gp.predict.build_datasets", side_effect=ValueError("extraction impossible")):
             with self.assertRaisesRegex(ValueError, "extraction impossible"):
                 self.an.load_maps(self.maps[:-10])
         self.assertEqual(self.an.maps, self.maps)
@@ -64,7 +64,7 @@ class AnalyzerStateTests(unittest.TestCase):
         self.an.load_maps(self.maps[:-10])
         self.assertEqual(self.an.momentum, 0.0)
         self.assertTrue(self.an._momentum_auto)
-        with patch("cs2edge.markets.estimate_momentum",
+        with patch("cs2gp.markets.estimate_momentum",
                    return_value={"significatif": True, "momentum": -.2}) as estimate:
             self.an.train(use_gbdt=False)
         self.assertEqual(estimate.call_count, 1)
@@ -73,7 +73,7 @@ class AnalyzerStateTests(unittest.TestCase):
 
     def test_retraining_refreshes_auto_momentum_with_new_options(self):
         self.activate_auto_momentum()
-        with patch("cs2edge.markets.estimate_momentum",
+        with patch("cs2gp.markets.estimate_momentum",
                    return_value={"significatif": False, "momentum": .1}) as estimate:
             self.an.train(use_gbdt=False, l2=4)
         self.assertEqual(estimate.call_count, 1)
@@ -87,7 +87,7 @@ class AnalyzerStateTests(unittest.TestCase):
         self.activate_auto_momentum()
         expected = self.an.predict(self.a, self.b, on=self.on)
         models = (self.an.match_model, self.an.map_model)
-        with patch("cs2edge.markets.estimate_momentum", side_effect=ValueError("calibration impossible")):
+        with patch("cs2gp.markets.estimate_momentum", side_effect=ValueError("calibration impossible")):
             with self.assertRaisesRegex(ValueError, "calibration impossible"):
                 self.an.train(use_gbdt=False, l2=4)
         self.assertIs(self.an.match_model, models[0])
@@ -96,7 +96,7 @@ class AnalyzerStateTests(unittest.TestCase):
         self.assertEqual(self.an.predict(self.a, self.b, on=self.on), expected)
 
     def test_explicit_momentum_survives_reload_and_training(self):
-        with patch("cs2edge.markets.estimate_momentum", side_effect=AssertionError("mode manuel")):
+        with patch("cs2gp.markets.estimate_momentum", side_effect=AssertionError("mode manuel")):
             self.an.load_maps(self.maps[:-10]).train(use_gbdt=False)
         self.assertEqual(self.an.momentum, .12)
         self.assertFalse(self.an._momentum_auto)

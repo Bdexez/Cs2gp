@@ -32,10 +32,10 @@ python3 -m unittest discover -s tests -q
 # 154 tests, OK, un ignore : scikit-learn absent de cet environnement de base.
 
 # Avec l'option GBDT installee (scikit-learn 1.9.1 lors de cette verification) :
-CS2EDGE_REQUIRE_GBDT=1 python3 -m unittest discover -s tests -q
+CS2GP_REQUIRE_GBDT=1 python3 -m unittest discover -s tests -q
 # 159 tests, OK, aucun ignore.
 
-python3 -m cs2edge backtest --no-gbdt --by-year
+python3 -m cs2gp backtest --no-gbdt --by-year
 # 1 418 rencontres evaluees ; log-loss 0,5709, Brier 0,1949.
 ```
 

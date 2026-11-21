@@ -3,7 +3,7 @@ import unittest
 
 import numpy as np
 
-from cs2edge.metrics import log_loss, paired_block_bootstrap
+from cs2gp.metrics import log_loss, paired_block_bootstrap
 
 
 class PairedBootstrapTests(unittest.TestCase):

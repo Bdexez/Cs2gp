@@ -2,8 +2,8 @@ import unittest
 
 import numpy as np
 
-from cs2edge.markets import _fit_momentum
-from cs2edge.model import sigmoid
+from cs2gp.markets import _fit_momentum
+from cs2gp.model import sigmoid
 
 
 class MomentumEstimatorTests(unittest.TestCase):

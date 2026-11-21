@@ -34,7 +34,7 @@ from .temporal import forward_splits
 from .schema import _to_bool, normalize_team, parse_date, parse_integer
 from .validation import finite_number
 
-# Seuils de tri. Valides par `cs2edge tipster-backtest` : chaque palier doit
+# Seuils de tri. Valides par `cs2gp tipster-backtest` : chaque palier doit
 # tenir sa promesse sur l'historique, sinon il ment a son lecteur.
 TIER_SOLIDE = 0.70
 TIER_INTERESSANT = 0.60
@@ -295,7 +295,7 @@ class Tipster:
         self.an = analyzer
         self.momentum = momentum
         # Calibration du marche "la serie va-t-elle a la derniere map".
-        # A estimer sur vos donnees : `cs2edge tipster-backtest` l'affiche.
+        # A estimer sur vos donnees : `cs2gp tipster-backtest` l'affiche.
         self.decider_temperature = decider_temperature
         self.calibrate_decider = calibrate_decider
         self.edge_min = edge_min

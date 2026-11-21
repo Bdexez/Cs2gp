@@ -24,14 +24,14 @@ Ce document décrit la première série, terminée au commit `5b9c0d2` ; les
 
 ```bash
 python -m unittest discover -s tests -v
-python -m cs2edge --data data/sample_matches.csv --no-gbdt backtest --by-year
-python -m cs2edge predict navi g2 --no-gbdt --date 2025-06-01
-python -m cs2edge slate --no-gbdt --fixtures data/fixtures.csv --record data/journal.csv
-python -m cs2edge journal --journal data/journal.csv
+python -m cs2gp --data data/sample_matches.csv --no-gbdt backtest --by-year
+python -m cs2gp predict navi g2 --no-gbdt --date 2025-06-01
+python -m cs2gp slate --no-gbdt --fixtures data/fixtures.csv --record data/journal.csv
+python -m cs2gp journal --journal data/journal.csv
 ```
 
 Le GBDT s’installe avec `pip install -e '.[gbdt]'`. La variable
-`CS2EDGE_REQUIRE_GBDT=1` fait échouer sa vérification si la dépendance manque,
+`CS2GP_REQUIRE_GBDT=1` fait échouer sa vérification si la dépendance manque,
 au lieu de laisser ce scénario ignoré dans un environnement censé la tester.
 
 Une prédiction sans date utilise aujourd’hui. Une demande historique exclut

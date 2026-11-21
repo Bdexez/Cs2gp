@@ -3,11 +3,11 @@ from dataclasses import replace
 import unittest
 from unittest.mock import patch
 
-from cs2edge.backtest import walk_forward
-from cs2edge.predict import Analyzer, combine_probability
-from cs2edge.pronostic import Fixture, Tipster, fit_decider_temperature, simulate_tipster
-from cs2edge.schema import group_matches, normalize_team
-from cs2edge.sources import simulate_history
+from cs2gp.backtest import walk_forward
+from cs2gp.predict import Analyzer, combine_probability
+from cs2gp.pronostic import Fixture, Tipster, fit_decider_temperature, simulate_tipster
+from cs2gp.schema import group_matches, normalize_team
+from cs2gp.sources import simulate_history
 
 
 class PredictionParityTests(unittest.TestCase):
@@ -57,7 +57,7 @@ class PredictionParityTests(unittest.TestCase):
 
     def test_gbdt_option_never_changes_map_model_family(self):
         # Le test du contrat ne depend pas de la presence de scikit-learn.
-        with patch("cs2edge.model.MatchPredictor._fit_gbdt", return_value=None):
+        with patch("cs2gp.model.MatchPredictor._fit_gbdt", return_value=None):
             an = Analyzer().load_maps(self.maps).train(use_gbdt=True)
         self.assertTrue(an.match_model.use_gbdt)
         self.assertFalse(an.map_model.use_gbdt)

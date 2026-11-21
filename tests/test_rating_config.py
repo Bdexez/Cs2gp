@@ -1,6 +1,6 @@
 import unittest
 
-from cs2edge.ratings import EloConfig
+from cs2gp.ratings import EloConfig
 
 
 class RatingConfigTests(unittest.TestCase):

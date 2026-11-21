@@ -8,14 +8,14 @@ from pathlib import Path
 
 import numpy as np
 
-from cs2edge.features import FeatureExtractor, build_datasets
-from cs2edge.metrics import log_loss, summarize
-from cs2edge.model import MatchPredictor, series_win_probability
-from cs2edge.odds import devig_power, expected_value, kelly_fraction
-from cs2edge.predict import MAX_CONFIDENCE, Analyzer
-from cs2edge.ratings import EloEngine, expected_score
-from cs2edge.schema import MapResult, group_matches, normalize_map, normalize_team, read_csv, write_csv
-from cs2edge.sources import simulate_history
+from cs2gp.features import FeatureExtractor, build_datasets
+from cs2gp.metrics import log_loss, summarize
+from cs2gp.model import MatchPredictor, series_win_probability
+from cs2gp.odds import devig_power, expected_value, kelly_fraction
+from cs2gp.predict import MAX_CONFIDENCE, Analyzer
+from cs2gp.ratings import EloEngine, expected_score
+from cs2gp.schema import MapResult, group_matches, normalize_map, normalize_team, read_csv, write_csv
+from cs2gp.sources import simulate_history
 
 
 def test_normalisation():
@@ -183,7 +183,7 @@ def test_chaine_complete_et_sauvegarde():
 
 
 def test_backtest_bat_le_hasard():
-    from cs2edge.backtest import walk_forward
+    from cs2gp.backtest import walk_forward
 
     maps = simulate_history(n_teams=20, years=2.5, seed=5)
     ds, _map_ds, _fx = build_datasets(group_matches(maps))
@@ -194,7 +194,7 @@ def test_backtest_bat_le_hasard():
 
 
 def test_backtest_melange_expose_les_trois_estimateurs():
-    from cs2edge.backtest import walk_forward
+    from cs2gp.backtest import walk_forward
 
     maps = simulate_history(n_teams=20, years=2.5, seed=6)
     mds, pds, _ = build_datasets(group_matches(maps))
@@ -202,7 +202,7 @@ def test_backtest_melange_expose_les_trois_estimateurs():
     assert res.match_only is not None and res.maps_only is not None
     assert 0.0 <= res.best_blend <= 1.0
 
-    from cs2edge.metrics import log_loss as ll
+    from cs2gp.metrics import log_loss as ll
 
     # Le melange doit battre chacun de ses deux composants.
     assert ll(res.y, res.blended_raw) < min(ll(res.y, res.match_only), ll(res.y, res.maps_only))
@@ -227,7 +227,7 @@ def test_equipe_inconnue_message_clair():
 
 
 def test_veto_produit_le_bon_nombre_de_maps():
-    from cs2edge.markets import project_veto
+    from cs2gp.markets import project_veto
 
     pool = [(f"m{i}", p) for i, p in enumerate([0.8, 0.72, 0.6, 0.5, 0.42, 0.3, 0.2])]
     for bo in (1, 3, 5):
@@ -241,8 +241,8 @@ def test_veto_produit_le_bon_nombre_de_maps():
 
 def test_structure_du_veto_change_la_loi_du_score():
     """Sur un pool polarise, le veto rallonge les series par rapport a l'i.i.d."""
-    from cs2edge.markets import project_veto, series_distribution
-    from cs2edge.model import series_win_probability
+    from cs2gp.markets import project_veto, series_distribution
+    from cs2gp.model import series_win_probability
 
     pool = [("a", .90), ("b", .85), ("c", .60), ("d", .50), ("e", .40), ("f", .15), ("g", .10)]
     dist = series_distribution(project_veto(pool, 3).order, 3)
@@ -253,7 +253,7 @@ def test_structure_du_veto_change_la_loi_du_score():
 
 
 def test_loi_du_score_est_une_loi():
-    from cs2edge.markets import project_veto, series_distribution
+    from cs2gp.markets import project_veto, series_distribution
 
     pool = [(f"m{i}", p) for i, p in enumerate([0.75, 0.7, 0.6, 0.5, 0.4, 0.3, 0.25])]
     for bo in (1, 3, 5):
@@ -264,7 +264,7 @@ def test_loi_du_score_est_une_loi():
 
 
 def test_marges_imposees_exactement():
-    from cs2edge.markets import enforce_margins, project_veto, series_distribution
+    from cs2gp.markets import enforce_margins, project_veto, series_distribution
 
     pool = [(f"m{i}", p) for i, p in enumerate([0.75, 0.7, 0.6, 0.5, 0.4, 0.3, 0.25])]
     d = series_distribution(project_veto(pool, 3).order, 3)
@@ -280,8 +280,8 @@ def test_marges_imposees_exactement():
 
 def test_momentum_nul_sur_donnees_independantes():
     """L'estimateur ne doit pas inventer d'effet la ou il n'y en a pas."""
-    from cs2edge.markets import estimate_momentum
-    from cs2edge.features import FeatureExtractor
+    from cs2gp.markets import estimate_momentum
+    from cs2gp.features import FeatureExtractor
 
     maps = simulate_history(n_teams=16, years=2.0, seed=21)
     an = Analyzer().load_maps(maps).train(use_gbdt=False)
@@ -292,7 +292,7 @@ def test_momentum_nul_sur_donnees_independantes():
 
 
 def test_pronostiqueur_se_tait_quand_c_est_serre():
-    from cs2edge.pronostic import SEUIL_ABSTENTION, select_analysis_picks
+    from cs2gp.pronostic import SEUIL_ABSTENTION, select_analysis_picks
 
     assert select_analysis_picks(dt.date(2026, 1, 1), "a", "b", 3, "", 0.52, None) == []
     picks = select_analysis_picks(dt.date(2026, 1, 1), "a", "b", 3, "", 0.80, None)
@@ -313,8 +313,8 @@ def test_momentum_branche_ne_s_active_pas_sur_donnees_independantes():
 
 
 def test_handicap_emis_seulement_sur_pool_desequilibre_et_regle_juste():
-    from cs2edge.markets import project_veto, series_distribution
-    from cs2edge.pronostic import _settle, select_analysis_picks
+    from cs2gp.markets import project_veto, series_distribution
+    from cs2gp.pronostic import _settle, select_analysis_picks
 
     # Pool tres desequilibre : le favori (A) domine partout -> 2-0 tres probable.
     pool = [(f"m{i}", p) for i, p in enumerate([0.97, 0.96, 0.95, 0.94, 0.93, 0.92, 0.9])]
@@ -354,7 +354,7 @@ def test_handicap_emis_seulement_sur_pool_desequilibre_et_regle_juste():
 
 
 def test_carte_de_pronostics_complete():
-    from cs2edge.pronostic import Fixture, Tipster, format_card
+    from cs2gp.pronostic import Fixture, Tipster, format_card
 
     maps = simulate_history(n_teams=18, years=2.0, seed=13)
     an = Analyzer().load_maps(maps).train(use_gbdt=False)
@@ -384,8 +384,8 @@ def test_mode_marche_n_annonce_jamais_une_ev_negative():
     """
     from types import SimpleNamespace
 
-    from cs2edge.odds import devig_power, expected_value
-    from cs2edge.pronostic import Fixture, Tipster
+    from cs2gp.odds import devig_power, expected_value
+    from cs2gp.pronostic import Fixture, Tipster
 
     # devig_power(1.55, 2.60) -> p_marche_a ~ 0.632 ; seuil de rentabilite 1/1.55 ~ 0.645.
     oa, ob = 1.55, 2.60
@@ -416,9 +416,9 @@ def test_handicap_en_mode_valeur():
     """Une cote de sweep declenche le marche handicap, meme sans cote vainqueur."""
     from types import SimpleNamespace
 
-    from cs2edge.markets import project_veto, series_distribution
-    from cs2edge.odds import expected_value
-    from cs2edge.pronostic import Fixture, Tipster
+    from cs2gp.markets import project_veto, series_distribution
+    from cs2gp.odds import expected_value
+    from cs2gp.pronostic import Fixture, Tipster
 
     pool = [(f"m{i}", p) for i, p in enumerate([0.9, 0.88, 0.85, 0.8, 0.78, 0.75, 0.7])]
     dist = series_distribution(project_veto(pool, 3).order, 3)
@@ -440,7 +440,7 @@ def test_handicap_en_mode_valeur():
 
 
 def test_mises_correlees_plafonnees_par_match():
-    from cs2edge.pronostic import STAKE_CAP_PER_FIXTURE, Pick, _cap_correlated_stakes
+    from cs2gp.pronostic import STAKE_CAP_PER_FIXTURE, Pick, _cap_correlated_stakes
 
     def mk(stake):
         p = Pick(dt.date(2026, 1, 1), "a", "b", 3, "", "vainqueur", "a", 0.7,
@@ -463,8 +463,8 @@ def test_mises_correlees_plafonnees_par_match():
 def test_journal_archive_pointe_et_ne_double_pas():
     import tempfile
 
-    from cs2edge import journal as jm
-    from cs2edge.pronostic import Fixture, Tipster
+    from cs2gp import journal as jm
+    from cs2gp.pronostic import Fixture, Tipster
 
     maps = simulate_history(n_teams=18, years=2.0, seed=31)
     an = Analyzer().load_maps(maps).train(use_gbdt=False)
@@ -491,7 +491,7 @@ def test_journal_archive_pointe_et_ne_double_pas():
 
 
 def test_bilan_ne_crie_pas_au_loup_sur_petit_echantillon():
-    from cs2edge.pronostic import Pick, SettledPick, TipsterRecord
+    from cs2gp.pronostic import Pick, SettledPick, TipsterRecord
 
     petits = [
         SettledPick(
@@ -510,7 +510,7 @@ def test_bilan_ne_crie_pas_au_loup_sur_petit_echantillon():
 
 def test_pronostiqueur_tient_ses_paliers():
     """Chaque palier doit realiser ce qu'il annonce, aux fluctuations pres."""
-    from cs2edge.pronostic import simulate_tipster
+    from cs2gp.pronostic import simulate_tipster
 
     maps = simulate_history(n_teams=22, years=3.0, seed=41)
     mds, pds, _ = build_datasets(group_matches(maps))
@@ -528,7 +528,7 @@ def test_pronostiqueur_tient_ses_paliers():
 def test_lecture_des_fixtures():
     import tempfile
 
-    from cs2edge.pronostic import read_fixtures
+    from cs2gp.pronostic import read_fixtures
 
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "f.csv"

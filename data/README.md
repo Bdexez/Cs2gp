@@ -9,8 +9,8 @@ ne représente pas les rotations historiques du circuit professionnel.
 Reproduction exacte du fichier :
 
 ```bash
-python -m cs2edge sample --start 2023-11-10 --regime realiste --teams 32 --years 3 --seed 7 --out data/sample_matches.csv
-python -m cs2edge fixtures --date 2026-11-10 --out data/fixtures.csv
+python -m cs2gp sample --start 2023-11-10 --regime realiste --teams 32 --years 3 --seed 7 --out data/sample_matches.csv
+python -m cs2gp fixtures --date 2026-11-10 --out data/fixtures.csv
 ```
 
 `fixtures.csv` contient des affiches fictives sans cotes. Pour une démonstration

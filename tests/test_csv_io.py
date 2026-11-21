@@ -4,9 +4,9 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from cs2edge import journal
-from cs2edge.pronostic import Pick, read_fixtures
-from cs2edge.schema import read_csv
+from cs2gp import journal
+from cs2gp.pronostic import Pick, read_fixtures
+from cs2gp.schema import read_csv
 
 
 class CsvStructureTests(unittest.TestCase):

@@ -1,7 +1,7 @@
 import unittest
 
-from cs2edge.markets import SeriesDistribution, build_markets, enforce_margins, project_veto, series_distribution
-from cs2edge.pronostic import shape_series
+from cs2gp.markets import SeriesDistribution, build_markets, enforce_margins, project_veto, series_distribution
+from cs2gp.pronostic import shape_series
 
 
 class HandicapTests(unittest.TestCase):

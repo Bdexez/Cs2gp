@@ -39,7 +39,7 @@ def _analyzer(args, train: bool = True) -> Analyzer:
     if not path.exists():
         sys.exit(
             f"fichier introuvable : {path}\n"
-            f"  -> genere un jeu de test : cs2edge sample --out {path}\n"
+            f"  -> genere un jeu de test : cs2gp sample --out {path}\n"
             f"  -> ou fournis un CSV : match_id,date,team_a,team_b,map,rounds_a,rounds_b"
         )
     elo = EloConfig.load(args.elo_config) if getattr(args, "elo_config", None) else None
@@ -115,7 +115,7 @@ def cmd_train(args) -> int:
     else:
         an.match_model.save(out)
         print(f"\nModele match enregistre -> {out}")
-    print("Pour une mesure honnete de la performance : cs2edge backtest")
+    print("Pour une mesure honnete de la performance : cs2gp backtest")
     return 0
 
 
@@ -260,7 +260,7 @@ def cmd_slate(args) -> int:
     if args.record:
         added = journal_mod.record_card(card, args.record)
         print(f"\n{added} ligne(s) archivee(s) dans {args.record} (pronostics et abstentions).")
-        print("Ils pourront etre pointes apres coup : cs2edge settle --journal "
+        print("Ils pourront etre pointes apres coup : cs2gp settle --journal "
               f"{args.record}")
     return 0
 
@@ -309,7 +309,7 @@ def cmd_tipster_backtest(args) -> int:
     print(rec.report())
     print(
         "\nCe bilan repond a 'quand cet outil parle, qu'est-ce que ca vaut',\n"
-        "pas a 'mes probabilites sont-elles justes' (voir `cs2edge backtest`).\n"
+        "pas a 'mes probabilites sont-elles justes' (voir `cs2gp backtest`).\n"
         "Un ecart n'est un defaut que s'il depasse sa marge (deux erreurs types) :\n"
         "ces lignes-la sont marquees '<- ecart reel, a corriger' et signalent un\n"
         "palier ou un marche qui ment a son lecteur. En dessous, l'ecart est du\n"
@@ -350,7 +350,7 @@ def cmd_tune(args) -> int:
     out.parent.mkdir(parents=True, exist_ok=True)
     cfg.save(out)
     print(f"\nConstantes enregistrees -> {out}")
-    print(f"Pour les utiliser : cs2edge --elo-config {out} backtest")
+    print(f"Pour les utiliser : cs2gp --elo-config {out} backtest")
     return 0
 
 
@@ -368,25 +368,25 @@ def _common_options(parser: argparse.ArgumentParser) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        prog="cs2edge",
+        prog="cs2gp",
         description="Analyse de matchs CS2 professionnels et estimation des probabilites de victoire.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "exemples :\n"
-            "  cs2edge sample                       # genere un jeu de donnees de test\n"
-            "  cs2edge backtest --by-year           # mesure la performance reelle\n"
-            "  cs2edge ratings --top 15             # classement Elo courant\n"
-            "  cs2edge predict vitality spirit --bo 3 --lan\n"
-            "  cs2edge predict navi g2 --odds-a 1.75 --odds-b 2.10\n"
+            "  cs2gp sample                       # genere un jeu de donnees de test\n"
+            "  cs2gp backtest --by-year           # mesure la performance reelle\n"
+            "  cs2gp ratings --top 15             # classement Elo courant\n"
+            "  cs2gp predict vitality spirit --bo 3 --lan\n"
+            "  cs2gp predict navi g2 --odds-a 1.75 --odds-b 2.10\n"
             "\n"
             "pronostiqueur :\n"
-            "  cs2edge fixtures --out data/fixtures.csv    # matchs a venir (exemple)\n"
-            "  cs2edge slate --fixtures data/fixtures.csv --record data/journal.csv\n"
-            "  cs2edge settle --journal data/journal.csv   # pointe les resultats\n"
-            "  cs2edge tipster-backtest                    # le bilan historique\n"
+            "  cs2gp fixtures --out data/fixtures.csv    # matchs a venir (exemple)\n"
+            "  cs2gp slate --fixtures data/fixtures.csv --record data/journal.csv\n"
+            "  cs2gp settle --journal data/journal.csv   # pointe les resultats\n"
+            "  cs2gp tipster-backtest                    # le bilan historique\n"
         ),
     )
-    p.add_argument("--version", action="version", version=f"cs2edge {__version__}")
+    p.add_argument("--version", action="version", version=f"cs2gp {__version__}")
 
     # Options communes, acceptees avant comme apres la sous-commande.
     common = argparse.ArgumentParser(add_help=False)
