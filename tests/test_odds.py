@@ -1,7 +1,9 @@
 import math
 import unittest
 
-from cs2gp.odds import devig_power, expected_value, find_value, kelly_fraction, simulate_flat
+from cs2gp.odds import (
+    closing_line_value, devig_power, expected_value, find_value, kelly_fraction, simulate_flat,
+)
 
 
 class PowerDevigTests(unittest.TestCase):
@@ -54,6 +56,22 @@ class OddsValidationTests(unittest.TestCase):
         result = simulate_flat([(.7, 2., 1), (.7, 2., 0)], stake=5)
         self.assertEqual(result["profit"], 0)
         self.assertEqual(result["turnover"], 10)
+        self.assertEqual(result["max_drawdown"], 5.0)
+        self.assertEqual(result["max_losing_streak"], 1)
+
+    def test_closing_line_value_and_drawdown_metrics(self):
+        # Took 2.20 on A; closing fair line is 1.90 / 1.90 (50% each) -> positive CLV
+        clv = closing_line_value(2.20, 1.90, 1.90, side="a")
+        self.assertAlmostEqual(clv["closing_p"], 0.5, places=10)
+        self.assertGreater(clv["clv_prob"], 0.0)
+        self.assertAlmostEqual(clv["clv_ev"], 0.10, places=10)
+        with self.assertRaises(ValueError):
+            closing_line_value(2.0, 1.9, 1.9, side="c")
+
+        seq = [(0.6, 2.0, 1), (0.6, 2.0, 0), (0.6, 2.0, 0), (0.6, 2.0, 0), (0.6, 2.0, 1)]
+        sim = simulate_flat(seq, stake=2.0)
+        self.assertEqual(sim["max_drawdown"], 6.0)
+        self.assertEqual(sim["max_losing_streak"], 3)
 
 
 if __name__ == "__main__":

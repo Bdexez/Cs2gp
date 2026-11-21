@@ -162,6 +162,16 @@ class JournalTests(unittest.TestCase):
         self.assertEqual(stats["pointes"], 0)
         mocked_write.assert_not_called()
 
+    def test_financial_summary_reports_drawdown_and_losing_streak(self):
+        p1 = replace(self.pick, match_id="one", odds=2.0, stake=0.02)
+        p2 = replace(self.pick, match_id="two", odds=2.0, stake=0.02)
+        journal.record([p1, p2], self.path)
+        journal.settle(self.path, self.results)
+        money = journal.financial_summary(self.path)
+        self.assertEqual(money["paris"], 2)
+        self.assertEqual(money["max_drawdown_mise_fixe"], 1.0)
+        self.assertEqual(money["pire_serie_defaites"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()
