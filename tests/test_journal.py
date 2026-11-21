@@ -250,6 +250,27 @@ class JournalTests(unittest.TestCase):
         self.assertEqual(risk["horizon"], 2)
         self.assertIn("p95_max_drawdown_pct", risk)
 
+    def test_roi_significance_counts_matches_instead_of_correlated_markets(self):
+        picks, results = [], []
+        for i in range(10):
+            day = self.day + dt.timedelta(days=i)
+            first = replace(self.pick, date=day, match_id=f"m{i}", best_of=3, odds=2.0)
+            picks.extend([first, replace(first, market="handicap -1.5"),
+                          replace(first, market="total maps -2.5", selection="oui")])
+            # Huit sweeps 2-0 puis deux defaites 1-2 : memes resultats sur les trois marches.
+            outcomes = [True, True] if i < 8 else [True, False, False]
+            for index, won in enumerate(outcomes):
+                results.append(MapResult(first.match_id, day, "a", "b",
+                                         ("mirage", "nuke", "inferno")[index],
+                                         13 if won else 5, 5 if won else 13, 3, map_index=index))
+        journal.record(picks, self.path)
+        self.assertEqual(journal.settle(self.path, group_matches(results))["pointes"], 30)
+        money = journal.financial_summary(self.path)
+        self.assertEqual(money["paris"], 30)
+        self.assertEqual(money["matchs"], 10)
+        self.assertFalse(money["roi_significant_5pct"])
+        self.assertAlmostEqual(money["roi_erreur_type"], 4.0 / 15.0, places=12)
+
     def test_monthly_summary_groups_calibration_and_pnl_by_month(self):
         d1 = dt.date(2026, 1, 10)
         d2 = dt.date(2026, 2, 15)

@@ -381,14 +381,16 @@ def financial_summary(
     sig = roi_significance([
         (float(r["probabilite"]), float(r["cote"]), int(r["resultat"] == "gagne"))
         for r in rows
-    ])
+    ], groups=[_pick_from_row(r).fixture_key for r in rows])
     return {
         "paris": n,
+        "matchs": sig["n_groups"],
         "taux_reussite": sum(1 for r in rows if r["resultat"] == "gagne") / n,
         "cote_moyenne": sum(float(r["cote"]) for r in rows) / n,
         "profit_mise_fixe": flat_profit,
         "roi_mise_fixe": flat_profit / n,
         "roi_p_value": sig["p_value"],
+        "roi_erreur_type": sig["se_return"],
         "roi_significant_5pct": sig["significant_5pct"],
         "max_drawdown_mise_fixe": max_drawdown_flat,
         "pire_serie_defaites": max_streak,

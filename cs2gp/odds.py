@@ -8,6 +8,7 @@ une fois la marge du bookmaker retiree, et la fiabilite de cet ecart.
 from __future__ import annotations
 
 import math
+from collections.abc import Hashable, Sequence
 from dataclasses import dataclass
 
 import numpy as np
@@ -130,39 +131,54 @@ def market_diagnostics(odds_a: float, odds_b: float) -> dict:
     }
 
 
-def roi_significance(results: list[tuple[float, float, int]]) -> dict:
-    """Test de significativite du ROI a mise fixe (t-stat et p-value bilaterale)."""
+def roi_significance(results: list[tuple[float, float, int]], *,
+                     groups: Sequence[Hashable] | None = None) -> dict:
+    """ROI moyen par pari, erreur type eventuellement regroupee par match.
+
+    Avec groups, covariance sandwich CR1 d'une moyenne (constante seule).
+    La p-value reste une approximation normale bilaterale ; au moins 30
+    groupes sont requis pour annoncer une significativite a 5 %.
+    """
     for p, odds, won in results:
         _probability(p)
         implied(odds)
         if won not in (0, 1):
             raise ValueError("le resultat d'un pari doit etre 0 ou 1")
     n = len(results)
-    if n < 2:
-        return {
-            "n": n, "mean_return": 0.0 if n == 0 else float((results[0][1] - 1.0) if results[0][2] else -1.0),
-            "std_return": None, "sharpe_ratio": None, "t_stat": None, "p_value": None, "significant_5pct": False,
-        }
+    group_indices = None
+    n_groups = n
+    if groups is not None:
+        if len(groups) != n:
+            raise ValueError("groups doit identifier le match de chaque pari")
+        labels = {}
+        try:
+            group_indices = [labels.setdefault(group, len(labels)) for group in groups]
+        except TypeError as exc:
+            raise ValueError("les identifiants de groups doivent etre hashables") from exc
+        n_groups = len(labels)
     returns = np.array([(odds - 1.0) if won else -1.0 for _p, odds, won in results], dtype=float)
-    mean_ret = float(returns.mean())
-    std_ret = float(returns.std(ddof=1))
-    if std_ret < 1e-12:
-        return {
-            "n": n, "mean_return": mean_ret, "std_return": 0.0, "sharpe_ratio": None,
-            "t_stat": None, "p_value": None, "significant_5pct": False,
-        }
-    sharpe = mean_ret / std_ret
-    t_stat = sharpe * math.sqrt(n)
-    p_value = math.erfc(abs(t_stat) / math.sqrt(2.0))
-    return {
-        "n": n,
-        "mean_return": mean_ret,
-        "std_return": std_ret,
-        "sharpe_ratio": float(sharpe),
-        "t_stat": float(t_stat),
-        "p_value": float(p_value),
-        "significant_5pct": bool(n >= 30 and p_value < 0.05),
+    mean_ret = float(returns.mean()) if n else 0.0
+    std_ret = float(returns.std(ddof=1)) if n > 1 else None
+    out = {
+        "n": n, "n_groups": n_groups, "mean_return": mean_ret, "std_return": std_ret,
+        "se_return": None, "sharpe_ratio": None, "t_stat": None, "p_value": None,
+        "significant_5pct": False,
     }
+    if n_groups < 2:
+        return out
+    if group_indices is None:
+        se = std_ret / math.sqrt(n)
+    else:
+        scores = np.bincount(group_indices, weights=returns - mean_ret, minlength=n_groups)
+        se = float(np.linalg.norm(scores) * math.sqrt(n_groups / (n_groups - 1)) / n)
+    out["se_return"] = se
+    if std_ret < 1e-12 or se < 1e-12:
+        return out
+    t_stat = mean_ret / se
+    p_value = math.erfc(abs(t_stat) / math.sqrt(2.0))
+    out.update(sharpe_ratio=float(mean_ret / std_ret), t_stat=float(t_stat),
+               p_value=float(p_value), significant_5pct=bool(n_groups >= 30 and p_value < 0.05))
+    return out
 
 
 def expected_value(p: float, odds: float) -> float:

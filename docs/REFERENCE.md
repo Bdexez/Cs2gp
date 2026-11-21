@@ -247,6 +247,13 @@ date. Raw journal loading preserves archive order. Settlement times are not
 stored, so the within-day ordering is a reporting convention rather than the
 actual sequence of match completions.
 
+The financial summary groups the ROI standard error by fixture, so several
+markets on the same match do not count as independent observations. JSON fields
+`matchs` and `roi_erreur_type` give the number of fixtures and the standard error
+of the mean return per bet. The two-sided p-value uses a normal approximation;
+`roi_significant_5pct` requires at least 30 fixtures. For Python callers,
+`roi_significance(results, groups=fixture_keys)` enables grouping explicitly.
+
 ### The tipster's track record
 
 `cs2gp tipster-backtest` replays the whole strategy over the history, using at

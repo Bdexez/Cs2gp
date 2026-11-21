@@ -933,7 +933,8 @@ def cmd_journal(args) -> int:
     if money:
         print()
         print("Bilan financier (uniquement les lignes ou une cote a ete enregistree) :")
-        print(f"  {money['paris']} paris, cote moyenne {money['cote_moyenne']:.2f}, "
+        print(f"  {money['paris']} paris sur {money['matchs']} matchs, "
+              f"cote moyenne {money['cote_moyenne']:.2f}, "
               f"reussite {money['taux_reussite']:.1%}")
         p_val = f", p={money['roi_p_value']:.3f}" if money.get("roi_p_value") is not None else ""
         print(f"  mise fixe : {money['profit_mise_fixe']:+.2f} unites, "
