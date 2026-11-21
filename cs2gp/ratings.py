@@ -74,8 +74,7 @@ class EloConfig:
         finite_number("roster_shock", self.roster_shock, maximum=1.0)
         if self.rd_min > self.rd_initial:
             raise ValueError("rd_min ne peut pas depasser rd_initial")
-        if not isinstance(self.lan_bonus, (int, float)) or not math.isfinite(self.lan_bonus):
-            raise ValueError("lan_bonus doit etre fini")
+        finite_number("lan_bonus", self.lan_bonus, minimum=-math.inf)
         for name in ("use_mov", "use_uncertainty"):
             if not isinstance(getattr(self, name), bool):
                 raise ValueError(f"{name} doit etre un booleen")
@@ -149,10 +148,6 @@ class TeamRating:
     map_ratings: dict[str, float] = field(default_factory=dict)
     map_counts: dict[str, int] = field(default_factory=dict)
     map_last_dates: dict[str, dt.date] = field(default_factory=dict)
-    #  Regression en ligne de l'ecart de rounds sur l'ecart de note : permet de
-    #  savoir ce qu'un score "aurait du" etre, sans constante magique.
-    xy: float = 0.0
-    xx: float = 0.0
 
 
 class EloEngine:
@@ -170,9 +165,13 @@ class EloEngine:
     def _team(self, name: str) -> TeamRating:
         return self.teams.setdefault(name, TeamRating(rd=self.cfg.rd_initial))
 
+    def _read_team(self, name: str) -> TeamRating:
+        tr = self.teams.get(name)
+        return tr if tr is not None else TeamRating(rd=self.cfg.rd_initial)
+
     def deviation(self, team: str, on: dt.date | None = None) -> float:
         """Ecart-type de la note, elargi par l'inactivite."""
-        tr = self._team(team)
+        tr = self._read_team(team)
         if not self.cfg.use_uncertainty:
             return self.cfg.rd_min
         rd = tr.rd
@@ -189,7 +188,7 @@ class EloEngine:
 
     def trajectory(self, team: str, on: dt.date | None = None) -> float:
         """Note rapide moins note lente : la pente, pas le niveau."""
-        tr = self._team(team)
+        tr = self._read_team(team)
         if tr.last_date is None:
             return 0.0
         decay = 1.0
@@ -210,7 +209,7 @@ class EloEngine:
 
     def rating(self, team: str, on: dt.date | None = None) -> float:
         """Note globale, amortie vers la moyenne si l'equipe est inactive."""
-        tr = self._team(team)
+        tr = self._read_team(team)
         if on is None or tr.last_date is None:
             return tr.rating
         idle = max(0, (on - tr.last_date).days)
@@ -221,7 +220,7 @@ class EloEngine:
 
     def map_rating(self, team: str, map_name: str, on: dt.date | None = None) -> float:
         """Note sur une map : melange note de map observee et note globale."""
-        tr = self._team(team)
+        tr = self._read_team(team)
         glob = self.rating(team, on)
         played = tr.map_counts.get(map_name, 0)
         if played == 0:
@@ -232,7 +231,7 @@ class EloEngine:
         return w * specific + (1.0 - w) * glob
 
     def _specific_rating(self, team: str, map_name: str, on: dt.date | None) -> float:
-        tr = self._team(team)
+        tr = self._read_team(team)
         if map_name not in tr.map_ratings:
             return self.rating(team, on)
         rating = tr.map_ratings[map_name]
@@ -243,7 +242,7 @@ class EloEngine:
         return BASE_RATING + (rating - BASE_RATING) * decay
 
     def maps_played(self, team: str) -> int:
-        return self._team(team).maps_played
+        return self._read_team(team).maps_played
 
     def win_probability(
         self, team_a: str, team_b: str, on: dt.date | None = None, map_name: str | None = None
