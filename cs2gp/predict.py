@@ -115,6 +115,7 @@ class Prediction:
     map_edges: list[MapEdge]
     data_quality: dict
     warnings: list[str] = field(default_factory=list)
+    p_a_interval: tuple[float, float] | None = None
 
     @property
     def favorite(self) -> str:
@@ -139,6 +140,7 @@ class Prediction:
             "p_b": 1.0 - self.p_a,
             "p_a_match_model": self.p_a_match_model,
             "p_a_from_maps": self.p_a_from_maps,
+            "p_a_interval": list(self.p_a_interval) if self.p_a_interval is not None else None,
             "favorite": self.favorite,
             "p_favorite": self.p_favorite,
             "fair_odds_a": oa,
@@ -171,6 +173,11 @@ class Prediction:
             f"  Favori : {self.favorite} ({self.p_favorite:.1%}) - confiance {self.confidence}",
             f"  Modele match {self.p_a_match_model:.1%} | reconstitue par maps "
             f"{self.p_a_from_maps:.1%} (vu de {self.team_a})",
+        ]
+        if self.p_a_interval is not None:
+            lo, hi = self.p_a_interval
+            lines.append(f"  IC 95% modele match : [{lo:.1%}, {hi:.1%}] (vu de {self.team_a})")
+        lines += [
             "",
             "  Ce qui pese (contribution au logit, vu de " + self.team_a + ") :",
         ]
@@ -448,6 +455,10 @@ class Analyzer:
             warnings.append("match a pile ou face : aucune valeur a chercher ici")
 
         confidence = confidence_label(thin, stale, n_h2h)
+        p_interval = (
+            self.match_model.predict_interval(x)
+            if self.match_model.logistic.cov is not None else None
+        )
 
         return Prediction(
             team_a=a, team_b=b, date=on, best_of=best_of, lan=lan,
@@ -455,4 +466,5 @@ class Analyzer:
             p_a_from_maps=float(p_from_maps), confidence=confidence,
             drivers=self.match_model.explain(x), map_edges=edges,
             data_quality=quality, warnings=warnings,
+            p_a_interval=p_interval,
         )
