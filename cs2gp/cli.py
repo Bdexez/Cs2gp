@@ -151,6 +151,15 @@ def cmd_backtest(args) -> int:
                 continue
             s = summarize(res.y[idx], res.predictions[idx])
             print(format_summary(f"  {y}", s))
+    if args.by_segment:
+        for title, key in (
+            ("Par format", lambda m: f"bo{m.get('best_of', '?')}"),
+            ("Par contexte", lambda m: "LAN" if m.get("lan") else "online"),
+            ("Par tier", lambda m: f"tier {str(m.get('tier', '?')).upper()}"),
+        ):
+            block = res.format_breakdown(title, key)
+            if block:
+                print(block)
     return 0
 
 
@@ -433,6 +442,8 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--initial-frac", type=float, default=0.4)
     s.add_argument("--refit-every", type=int, default=150)
     s.add_argument("--by-year", action="store_true")
+    s.add_argument("--by-segment", action="store_true",
+                   help="ventile les metriques par format, LAN/online et tier")
     s.add_argument("--blend", type=float, default=MATCH_MODEL_WEIGHT,
                    help="poids du modele match dans le melange (1 = lui seul)")
     s.add_argument("--no-maps", action="store_true",
