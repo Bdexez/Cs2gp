@@ -27,6 +27,25 @@ class RecordStatisticsTests(unittest.TestCase):
         self.assertTrue(single["significatif"])
         self.assertEqual(single["n_matchs"], doubled["n_matchs"])
 
+    def test_scoring_computes_proper_scoring_rules_on_settled_picks(self):
+        self.assertIsNone(TipsterRecord([], 0, 0).scoring())
+        settled = [
+            SettledPick(replace(self.pick, probability=0.8, match_id="m1"), True),
+            SettledPick(replace(self.pick, probability=0.8, match_id="m2"), True),
+            SettledPick(replace(self.pick, probability=0.8, match_id="m3"), True),
+            SettledPick(replace(self.pick, probability=0.8, match_id="m4"), True),
+            SettledPick(replace(self.pick, probability=0.8, match_id="m5"), False),
+        ]
+        rec = TipsterRecord(settled, 5, 0)
+        sc = rec.scoring()
+        self.assertEqual(sc["n"], 5)
+        self.assertAlmostEqual(sc["mean_predicted"], 0.8)
+        self.assertAlmostEqual(sc["mean_observed"], 0.8)
+        self.assertAlmostEqual(sc["ece"], 0.0, places=10)
+        self.assertAlmostEqual(sc["brier"], 0.16, places=10)
+        self.assertIn("Qualite probabiliste", rec.report())
+        self.assertEqual(rec.to_dict()["scoring"]["n"], 5)
+
 
 if __name__ == "__main__":
     unittest.main()
