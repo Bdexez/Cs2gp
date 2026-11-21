@@ -22,12 +22,19 @@ def _classify_score(rounds_a: int, rounds_b: int) -> str:
 def audit_history(
     maps: Sequence[MapResult],
     matches: Sequence[Match] | None = None,
+    *,
+    warmup_maps: int = 12,
 ) -> dict:
     """Produit un bilan structure de la qualite des donnees chargees."""
     maps = list(maps)
     matches = list(group_matches(maps)) if matches is None else list(matches)
 
-    teams = sorted({t for m in maps for t in (m.team_a, m.team_b)})
+    team_map_counts: Counter[str] = Counter()
+    for mp in maps:
+        team_map_counts[mp.team_a] += 1
+        team_map_counts[mp.team_b] += 1
+    teams = sorted(team_map_counts)
+    teams_under_warmup = sum(1 for c in team_map_counts.values() if c < warmup_maps)
     complete = [m for m in matches if m.is_complete]
     incomplete = len(matches) - len(complete)
 
@@ -45,10 +52,14 @@ def audit_history(
     for key in ("mr12_regulation", "mr12_overtime", "mr15_suspect", "other"):
         regimes.setdefault(key, 0)
 
-    dates = [m.date for m in matches]
-    date_min = min(dates).isoformat() if dates else None
-    date_max = max(dates).isoformat() if dates else None
-    span_days = (max(dates) - min(dates)).days if dates else 0
+    dates = sorted({m.date for m in matches})
+    date_min = dates[0].isoformat() if dates else None
+    date_max = dates[-1].isoformat() if dates else None
+    span_days = (dates[-1] - dates[0]).days if dates else 0
+    max_calendar_gap = max(((b - a).days for a, b in zip(dates, dates[1:])), default=0)
+
+    pair_days = Counter((m.date, tuple(sorted((m.team_a, m.team_b)))) for m in matches)
+    same_day_collisions = sum(1 for c in pair_days.values() if c > 1)
 
     warnings: list[str] = []
     if incomplete:
@@ -72,6 +83,15 @@ def audit_history(
         warnings.append(
             f"{regimes['other']} map(s) avec score non standard MR12 (forfaits ou reglement atypique)."
         )
+    if max_calendar_gap > 30:
+        warnings.append(
+            f"trou calendaire maximal de {max_calendar_gap} jours : verifier l'absence de coupure de collecte."
+        )
+    if same_day_collisions:
+        warnings.append(
+            f"{same_day_collisions} paire(s) d'equipes se rencontrent plusieurs fois le meme jour : "
+            "fournir match_id dans les fixtures pour un reglement sans ambiguite."
+        )
 
     return {
         "n_maps": len(maps),
@@ -79,9 +99,12 @@ def audit_history(
         "n_complete_matches": len(complete),
         "n_incomplete_matches": incomplete,
         "n_teams": len(teams),
+        "teams_under_warmup": teams_under_warmup,
         "date_min": date_min,
         "date_max": date_max,
         "span_days": span_days,
+        "max_calendar_gap_days": max_calendar_gap,
+        "same_day_pair_collisions": same_day_collisions,
         "formats": dict(sorted(formats.items())),
         "lan_matches": lan_count,
         "online_matches": len(matches) - lan_count,
