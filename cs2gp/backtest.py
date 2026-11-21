@@ -135,6 +135,29 @@ class BacktestResult:
             )
         return "\n".join(lines)
 
+    def to_dict(self) -> dict:
+        out = {
+            "folds": self.folds,
+            "n_matches": int(len(self.y)),
+            "date_start": self.dates[0].isoformat() if self.dates else None,
+            "date_end": self.dates[-1].isoformat() if self.dates else None,
+            "blend": self.blend,
+            "best_blend": self.best_blend,
+            "metrics": dict(self.metrics),
+            "elo_metrics": dict(self.elo_metrics),
+            "comparison": dict(self.comparison) if self.comparison is not None else None,
+            "calibration": calibration_slope_intercept(self.y, self.predictions) if len(self.y) else None,
+            "brier_decomposition": brier_decomposition(self.y, self.predictions) if len(self.y) else None,
+            "reliability": reliability_table(self.y, self.predictions) if len(self.y) else [],
+        }
+        if self.match_only is not None:
+            out["match_only_metrics"] = summarize(self.y, self.match_only)
+        if self.maps_only is not None:
+            out["maps_only_metrics"] = summarize(self.y, self.maps_only)
+        if self.blended_raw is not None:
+            out["blended_raw_metrics"] = summarize(self.y, self.blended_raw)
+        return out
+
 
 def _elo_reference(ds: Dataset) -> np.ndarray:
     """Baseline : Elo brut converti en probabilite, sans modele appris."""

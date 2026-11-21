@@ -99,6 +99,24 @@ def cmd_ratings(args) -> int:
     an = _analyzer(args, train=False)
     on = max(m.date for m in an.matches)
     board = an.fx.elo.leaderboard(on=on, min_maps=args.min_maps)
+    if args.json:
+        rows = []
+        for rank, (team, rating, played) in enumerate(board[: args.top], 1):
+            tr = an.fx.elo.teams[team]
+            best = sorted(
+                ((m, an.fx.elo.map_rating(team, m, on)) for m in tr.map_counts if tr.map_counts[m] >= 3),
+                key=lambda kv: -kv[1],
+            )[:3]
+            rows.append({
+                "rank": rank,
+                "team": team,
+                "rating": rating,
+                "maps_played": played,
+                "best_maps": [{"map": m, "rating": r} for m, r in best],
+            })
+        print(json.dumps({"as_of": on.isoformat(), "min_maps": args.min_maps, "ratings": rows},
+                         indent=2, ensure_ascii=False))
+        return 0
     print(f"Classement Elo au {on} (min {args.min_maps} maps)\n")
     print(f"{'#':<4}{'equipe':<20}{'elo':>8}{'maps':>7}   meilleures maps")
     for i, (team, rating, played) in enumerate(board[: args.top], 1):
@@ -148,6 +166,22 @@ def cmd_backtest(args) -> int:
         block_days=args.block_days,
         use_gbdt=not args.no_gbdt,
     )
+    if args.json:
+        payload = res.to_dict()
+        if args.by_year:
+            payload["by_year"] = {
+                str(y): summarize(res.y[idx], res.predictions[idx])
+                for y in sorted({d.year for d in res.dates})
+                if len(idx := [i for i, d in enumerate(res.dates) if d.year == y]) >= 20
+            }
+        if args.by_segment:
+            payload["by_segment"] = {
+                "format": res.breakdown(lambda m: f"bo{m.get('best_of', '?')}"),
+                "context": res.breakdown(lambda m: "LAN" if m.get("lan") else "online"),
+                "tier": res.breakdown(lambda m: f"tier {str(m.get('tier', '?')).upper()}"),
+            }
+        print(json.dumps(payload, indent=2, ensure_ascii=False))
+        return 0
     print()
     print(res.report())
     print(
@@ -182,6 +216,23 @@ def cmd_predict(args) -> int:
     an = _analyzer(args)
     on = parse_date(args.date) if args.date else None
     pred = an.predict(args.team_a, args.team_b, best_of=args.bo, lan=args.lan, on=on)
+    if args.json:
+        payload = pred.to_dict()
+        if args.odds_a is not None and args.odds_b is not None:
+            bet = find_value(
+                pred.p_a, args.odds_a, args.odds_b, pred.team_a, pred.team_b, min_edge=args.min_edge
+            )
+            payload["market"] = {
+                "odds_a": args.odds_a,
+                "odds_b": args.odds_b,
+                "overround": overround(args.odds_a, args.odds_b),
+                "value_bet": None if bet is None else {
+                    "side": bet.side, "model_p": bet.model_p, "market_p": bet.market_p,
+                    "odds": bet.odds, "edge": bet.edge, "ev": bet.ev, "stake": bet.stake,
+                },
+            }
+        print(json.dumps(payload, indent=2, ensure_ascii=False))
+        return 0
     print()
     print(pred.report())
 
@@ -307,12 +358,18 @@ def cmd_settle(args) -> int:
 
 def cmd_journal(args) -> int:
     record = journal_mod.scorecard(args.journal)
+    money = journal_mod.financial_summary(args.journal)
+    if getattr(args, "json", False):
+        print(json.dumps({
+            "scorecard": None if record is None else record.to_dict(),
+            "financial": money,
+        }, indent=2, ensure_ascii=False))
+        return 0
     if record is None:
         print("Aucun pronostic pointe pour le moment.")
         return 0
     print()
     print(record.report())
-    money = journal_mod.financial_summary(args.journal)
     if money:
         print()
         print("Bilan financier (uniquement les lignes ou une cote a ete enregistree) :")
@@ -447,6 +504,7 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("ratings", parents=[common], help="classement Elo et forces par map")
     s.add_argument("--top", type=int, default=20)
     s.add_argument("--min-maps", type=int, default=20)
+    s.add_argument("--json", action="store_true", help="sortie JSON structuree")
     s.set_defaults(func=cmd_ratings)
 
     s = sub.add_parser("train", parents=[common], help="entraine et sauvegarde le modele")
@@ -469,6 +527,7 @@ def build_parser() -> argparse.ArgumentParser:
                    help="tirages pour l'IC apparie face a Elo (defaut 1000, 0 desactive)")
     s.add_argument("--block-days", type=int, default=7,
                    help="taille des blocs calendaires de l'IC (defaut 7 jours)")
+    s.add_argument("--json", action="store_true", help="sortie JSON structuree")
     s.set_defaults(func=cmd_backtest)
 
     s = sub.add_parser("predict", parents=[common], help="probabilites pour un match a venir")
@@ -481,6 +540,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--odds-a", type=float, help="cote decimale sur team_a")
     s.add_argument("--odds-b", type=float, help="cote decimale sur team_b")
     s.add_argument("--min-edge", type=float, default=0.04)
+    s.add_argument("--json", action="store_true", help="sortie JSON structuree")
     s.set_defaults(func=cmd_predict)
 
     s = sub.add_parser("fixtures", parents=[common],
@@ -518,6 +578,7 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("journal", parents=[common],
                        help="bilan des pronostics deja pointes")
     s.add_argument("--journal", default="data/journal.csv")
+    s.add_argument("--json", action="store_true", help="sortie JSON structuree")
     s.set_defaults(func=cmd_journal)
 
     s = sub.add_parser("tune", parents=[common],

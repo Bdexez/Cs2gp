@@ -1,0 +1,69 @@
+import contextlib
+import datetime as dt
+import io
+import json
+from pathlib import Path
+import tempfile
+import unittest
+
+from cs2gp import journal
+from cs2gp.cli import main
+from cs2gp.pronostic import Pick
+from cs2gp.schema import write_csv
+from cs2gp.sources import simulate_history
+
+
+class CliJsonTests(unittest.TestCase):
+    def test_ratings_predict_backtest_and_journal_emit_valid_json(self):
+        rows = simulate_history(n_teams=8, years=1.0, seed=42, start=dt.date(2025, 1, 1))
+        with tempfile.TemporaryDirectory() as tmp:
+            data = Path(tmp) / "history.csv"
+            write_csv(str(data), rows)
+
+            # ratings --json
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(main(["ratings", "--data", str(data), "--top", "5", "--min-maps", "1", "--json"]), 0)
+            ratings_payload = json.loads(out.getvalue())
+            self.assertEqual(len(ratings_payload["ratings"]), 5)
+            teams = [r["team"] for r in ratings_payload["ratings"]]
+
+            # predict --json with odds
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(main([
+                    "predict", teams[0], teams[1], "--data", str(data), "--no-gbdt",
+                    "--odds-a", "1.85", "--odds-b", "2.00", "--json",
+                ]), 0)
+            pred_payload = json.loads(out.getvalue())
+            self.assertAlmostEqual(pred_payload["p_a"] + pred_payload["p_b"], 1.0, places=10)
+            self.assertIn("market", pred_payload)
+            self.assertGreater(pred_payload["market"]["overround"], 1.0)
+
+            # backtest --json --by-segment
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(main([
+                    "backtest", "--data", str(data), "--no-gbdt", "--bootstrap-samples", "0",
+                    "--by-segment", "--json",
+                ]), 0)
+            bt_payload = json.loads(out.getvalue())
+            self.assertIn("metrics", bt_payload)
+            self.assertIn("calibration", bt_payload)
+            self.assertIn("brier_decomposition", bt_payload)
+            self.assertIn("by_segment", bt_payload)
+
+            # journal --json
+            jpath = Path(tmp) / "journal.csv"
+            journal.record([Pick(dt.date(2026, 1, 1), teams[0], teams[1], 3, "",
+                                 "vainqueur", teams[0], 0.72, "solide", "PRONOSTIC")], jpath)
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(main(["journal", "--journal", str(jpath), "--json"]), 0)
+            j_payload = json.loads(out.getvalue())
+            self.assertIn("scorecard", j_payload)
+            self.assertIn("financial", j_payload)
+
+
+if __name__ == "__main__":
+    unittest.main()
