@@ -86,6 +86,18 @@ class NumericContractsTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 series_win_probability(0.6, bad_bo)
 
+    def test_backtest_validates_momentum_and_min_edge(self):
+        from cs2gp.backtest import BacktestResult, bet_backtest, walk_forward
+
+        with self.assertRaises(ValueError):
+            walk_forward(None, momentum=float("nan"))
+        empty = BacktestResult(
+            predictions=np.array([]), y=np.array([]), dates=[], meta=[],
+            elo_only=np.array([]), folds=0, metrics={}, elo_metrics={},
+        )
+        with self.assertRaises(ValueError):
+            bet_backtest(empty, {}, min_edge=float("nan"))
+
 
 if __name__ == "__main__":
     unittest.main()

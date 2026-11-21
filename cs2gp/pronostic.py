@@ -19,6 +19,7 @@ Deux modes, volontairement separes, parce qu'on les confond tout le temps :
 
 from __future__ import annotations
 
+from bisect import bisect_left
 import datetime as dt
 import math
 from dataclasses import dataclass, field
@@ -796,7 +797,7 @@ def simulate_tipster(
             match_ds.X[:i], match_ds.y[:i], match_ds.dates[:i], match_ds.feature_names
         )
         cutoff = match_ds.dates[i]
-        k = sum(1 for d in map_ds.dates if d < cutoff)
+        k = bisect_left(map_ds.dates, cutoff)
         map_model = map_predictor(**model_kwargs).fit(
             map_ds.X[:k], map_ds.y[:k], map_ds.dates[:k], map_ds.feature_names
         )
