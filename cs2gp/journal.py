@@ -254,7 +254,8 @@ def _settle_locked(path: Path, results: Sequence[Match], window_days: int) -> di
         row["resultat"] = "gagne" if won else "perdu"
         pointes += 1
 
-    _write(path, rows)
+    if pointes:
+        _write(path, rows)
     return {
         "pointes": pointes,
         "en_attente": sum(1 for r in rows if not r.get("resultat")
