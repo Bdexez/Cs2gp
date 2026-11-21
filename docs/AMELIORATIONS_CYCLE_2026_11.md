@@ -610,3 +610,22 @@ outillage domaine CS2 et sortie structuree).
   l'erreur type et la p-value ; dix rencontres restent dix observations.
   Verification d'un cas analytique a groupes de tailles differentes et du
   comportement independant existant.
+
+## Cycle 55 : Validation et precision du journal
+
+- **Contrat commun lecture/enregistrement** (`journal.py`) : controle des
+  probabilites, cotes, mises, formats BO1/BO3/BO5, equipes, selections,
+  verdicts et metadonnees temporelles. Les resultats doivent etre vides,
+  `gagne` ou `perdu` ; `annule` n'est plus interprete comme une defaite.
+  Une erreur CSV indique le fichier et le numero de ligne physique, y compris
+  apres une cellule multiligne. Un lot invalide ou un journal endommage ne
+  remplace jamais le fichier existant. Les 17 colonnes historiques restent
+  suffisantes et les anciennes metadonnees optionnelles vides sont acceptees.
+- **Valeurs numeriques preservees** (`journal.py`) : archivage decimal avec
+  aller-retour exact des flottants, sans arrondir a trois ou six decimales.
+  Une cote a peine superieure a 1 reste valide au rechargement et les petites
+  mises ne deviennent plus zero. Le ROI Kelly est calcule pour toute mise
+  strictement positive, independamment de son unite.
+- **Tests** : rejet des NaN/infinis et bornes invalides, atomicite d'un lot
+  contenant un pronostic invalide, conservation des fichiers endommages,
+  message d'erreur CLI sans JSON NaN, precision numerique et ancien format.

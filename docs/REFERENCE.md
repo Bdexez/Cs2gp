@@ -241,6 +241,12 @@ cs2gp journal --journal data/journal.csv                 # the track record
 The journal is **append-only**: settling completes the rows, it never rewrites
 them. Both operations are idempotent.
 
+Journal entries are validated before use: probabilities must be finite in
+[0, 1], odds finite and greater than 1, and stake fractions finite in [0, 1].
+Unknown result statuses are rejected rather than counted as losses. Invalid
+CSV rows report their physical line number; invalid batches leave the archive
+intact. Numeric values retain their full floating-point precision on disk.
+
 Journal summaries and filtered exports follow match dates, then emission time
 in UTC and pick ID. Legacy rows without an emission timestamp use the emission
 date. Raw journal loading preserves archive order. Settlement times are not
