@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import json
 import math
 import sys
 from pathlib import Path
 
 from . import __version__
+from .audit import audit_history, format_audit
 from .backtest import tune, walk_forward
 from .metrics import format_summary, summarize
 from .model import MatchPredictor
@@ -76,6 +78,17 @@ def cmd_teams(args) -> int:
     an = _analyzer(args, train=False)
     for t in an.known_teams():
         print(f"{t:<20} {an.fx.elo.maps_played(t):>5} maps")
+    return 0
+
+
+def cmd_audit(args) -> int:
+    an = _analyzer(args, train=False)
+    report = audit_history(an.maps, an.matches)
+    if args.json:
+        print(json.dumps(report, indent=2, ensure_ascii=False))
+    else:
+        print()
+        print(format_audit(report))
     return 0
 
 
@@ -426,6 +439,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser("teams", parents=[common], help="liste les equipes connues")
     s.set_defaults(func=cmd_teams)
+
+    s = sub.add_parser("audit", parents=[common], help="controle la qualite des donnees chargees")
+    s.add_argument("--json", action="store_true", help="sortie JSON structuree")
+    s.set_defaults(func=cmd_audit)
 
     s = sub.add_parser("ratings", parents=[common], help="classement Elo et forces par map")
     s.add_argument("--top", type=int, default=20)
