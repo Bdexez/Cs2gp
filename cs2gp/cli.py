@@ -25,7 +25,7 @@ from .pronostic import (
     simulate_tipster,
 )
 from . import journal as journal_mod
-from .schema import group_matches, parse_date, write_csv
+from .schema import group_matches, merge_histories, parse_date, read_csv, write_csv
 from .snapshot import diff_analyzers, inspect_analyzer
 from .sources import simulate_history
 from .validation import positive_integer
@@ -81,6 +81,17 @@ def cmd_sample(args) -> int:
     matches = group_matches(rows)
     print(f"{len(rows)} maps / {len(matches)} matchs simules -> {out}")
     print("Donnees synthetiques : utiles pour tester la chaine, pas pour parier.")
+    return 0
+
+
+def cmd_merge(args) -> int:
+    sources = [read_csv(src) for src in args.inputs]
+    merged, stats = merge_histories(sources)
+    write_csv(args.out, merged)
+    print(
+        f"{stats['unique_out']} maps fusionnees -> {args.out} "
+        f"({stats['total_in']} lues, {stats['duplicates_skipped']} doublon(s) ignores)"
+    )
     return 0
 
 
@@ -558,8 +569,9 @@ def cmd_journal(args) -> int:
         print("Bilan financier (uniquement les lignes ou une cote a ete enregistree) :")
         print(f"  {money['paris']} paris, cote moyenne {money['cote_moyenne']:.2f}, "
               f"reussite {money['taux_reussite']:.1%}")
+        p_val = f", p={money['roi_p_value']:.3f}" if money.get("roi_p_value") is not None else ""
         print(f"  mise fixe : {money['profit_mise_fixe']:+.2f} unites, "
-              f"ROI {money['roi_mise_fixe']:+.1%}, "
+              f"ROI {money['roi_mise_fixe']:+.1%}{p_val}, "
               f"drawdown max {money['max_drawdown_mise_fixe']:.2f} u, "
               f"pire serie {money['pire_serie_defaites']} defaites")
         print(f"  Kelly     : {money['profit_kelly']:+.3f} pour "
@@ -685,6 +697,11 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--with-rosters", action="store_true",
                    help="genere des effectifs de 5 joueurs renouveles lors des remaniements")
     s.set_defaults(func=cmd_sample)
+
+    s = sub.add_parser("merge", help="fusionne plusieurs CSV d'historique sans doublons ni conflits")
+    s.add_argument("inputs", nargs="+", help="fichiers CSV source")
+    s.add_argument("--out", required=True, help="CSV fusionne de sortie")
+    s.set_defaults(func=cmd_merge)
 
     s = sub.add_parser("teams", parents=[common], help="liste les equipes connues")
     s.set_defaults(func=cmd_teams)

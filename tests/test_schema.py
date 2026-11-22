@@ -6,7 +6,7 @@ import tempfile
 import unittest
 
 from cs2gp.features import build_datasets
-from cs2gp.schema import MapResult, group_matches, parse_date, read_csv, write_csv
+from cs2gp.schema import MapResult, group_matches, merge_histories, parse_date, read_csv, write_csv
 from cs2gp.sources import from_records
 
 
@@ -107,6 +107,23 @@ class SeriesTests(unittest.TestCase):
         match = group_matches([self.first, replace(self.first, map_name="nuke")])[0]
         self.assertTrue(match.is_complete)
         self.assertEqual([m.map_name for m in match.maps], ["mirage", "nuke"])
+
+    def test_merge_histories_deduplicates_enriches_and_rejects_conflicts(self):
+        day = dt.date(2026, 1, 1)
+        m1_plain = MapResult("m1", day, "navi", "g2", "mirage", 13, 8, best_of=1)
+        # Same match in flipped orientation with rosters & event filled in
+        m1_rich = MapResult("m1", day, "g2", "navi", "mirage", 8, 13, best_of=1,
+                            event="Katowice", roster_a=("p1",), roster_b=("p2",))
+        m2 = MapResult("m2", day + dt.timedelta(days=1), "navi", "faze", "nuke", 13, 10, best_of=1)
+        merged, stats = merge_histories([[m1_plain], [m1_rich, m2]])
+        self.assertEqual(stats, {"total_in": 3, "unique_out": 2, "duplicates_skipped": 1})
+        self.assertEqual(merged[0].event, "Katowice")
+        self.assertEqual(merged[0].roster_a, ("p2",))
+        self.assertEqual(merged[0].roster_b, ("p1",))
+
+        conflict = MapResult("m1", day, "navi", "g2", "mirage", 13, 9, best_of=1)
+        with self.assertRaisesRegex(ValueError, "conflit"):
+            merge_histories([[m1_plain], [conflict]])
 
 
 if __name__ == "__main__":
