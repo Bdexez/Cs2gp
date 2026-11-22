@@ -336,3 +336,76 @@ def equity_curve(
         val += wager * (odds - 1.0) if won else -wager
         curve.append(float(val))
     return curve
+
+
+def bootstrap_bankroll(
+    results: list[tuple[float, float, int]],
+    *,
+    mode: str = "kelly",
+    horizon: int | None = None,
+    samples: int = 500,
+    stake: float = 1.0,
+    initial_bankroll: float = 1.0,
+    cap: float = 0.05,
+    scale: float = 0.25,
+    seed: int = 0,
+) -> dict:
+    """Reechantillonnage Monte Carlo de la bankroll : distribution finale et drawdown p95."""
+    from .validation import positive_integer
+
+    if mode not in ("flat", "kelly"):
+        raise ValueError("mode doit valoir 'flat' ou 'kelly'")
+    positive_integer("samples", samples)
+    if not results:
+        raise ValueError("results doit contenir au moins un pari")
+    for p, odds, won in results:
+        _probability(p)
+        implied(odds)
+        if won not in (0, 1):
+            raise ValueError("le resultat d'un pari doit etre 0 ou 1")
+    h = len(results) if horizon is None else horizon
+    positive_integer("horizon", h)
+
+    rng = np.random.default_rng(seed)
+    n = len(results)
+    if mode == "flat":
+        finite_number("stake", stake, strict=True)
+        rets = np.array([(odds - 1.0) * stake if won else -stake for _p, odds, won in results], dtype=float)
+        idx = rng.integers(0, n, size=(samples, h))
+        paths = np.concatenate([np.zeros((samples, 1)), np.cumsum(rets[idx], axis=1)], axis=1)
+        finals = paths[:, -1]
+        peaks = np.maximum.accumulate(paths, axis=1)
+        max_dds = np.max(peaks - paths, axis=1)
+        return {
+            "mode": "flat", "horizon": h, "samples": samples,
+            "prob_profit": float(np.mean(finals > 0.0)),
+            "median_final": float(np.median(finals)),
+            "p05_final": float(np.quantile(finals, 0.05)),
+            "p95_final": float(np.quantile(finals, 0.95)),
+            "median_max_drawdown": float(np.median(max_dds)),
+            "p95_max_drawdown": float(np.quantile(max_dds, 0.95)),
+        }
+
+    finite_number("initial_bankroll", initial_bankroll, strict=True)
+    finite_number("cap", cap, maximum=1.0)
+    finite_number("scale", scale, maximum=1.0)
+    mults = np.array([
+        1.0 + kelly_fraction(p, odds, cap=cap, scale=scale) * ((odds - 1.0) if won else -1.0)
+        for p, odds, won in results
+    ], dtype=float)
+    idx = rng.integers(0, n, size=(samples, h))
+    paths = float(initial_bankroll) * np.concatenate(
+        [np.ones((samples, 1)), np.cumprod(mults[idx], axis=1)], axis=1
+    )
+    finals = paths[:, -1]
+    peaks = np.maximum.accumulate(paths, axis=1)
+    max_dds = np.max((peaks - paths) / np.maximum(peaks, 1e-12), axis=1)
+    return {
+        "mode": "kelly", "horizon": h, "samples": samples,
+        "prob_profit": float(np.mean(finals > float(initial_bankroll))),
+        "median_final": float(np.median(finals)),
+        "p05_final": float(np.quantile(finals, 0.05)),
+        "p95_final": float(np.quantile(finals, 0.95)),
+        "median_max_drawdown_pct": float(np.median(max_dds)),
+        "p95_max_drawdown_pct": float(np.quantile(max_dds, 0.95)),
+    }

@@ -112,6 +112,22 @@ class OddsValidationTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             equity_curve(seq, mode="unknown")
 
+    def test_bootstrap_bankroll_estimates_drawdown_quantiles(self):
+        from cs2gp.odds import bootstrap_bankroll
+
+        seq = [(0.65, 2.0, 1)] * 13 + [(0.65, 2.0, 0)] * 7
+        kelly = bootstrap_bankroll(seq, mode="kelly", horizon=30, samples=200, initial_bankroll=100.0, seed=0)
+        self.assertGreater(kelly["prob_profit"], 0.7)
+        self.assertLessEqual(kelly["p05_final"], kelly["median_final"])
+        self.assertLessEqual(kelly["median_final"], kelly["p95_final"])
+        self.assertLessEqual(kelly["median_max_drawdown_pct"], kelly["p95_max_drawdown_pct"])
+
+        flat = bootstrap_bankroll(seq, mode="flat", horizon=30, samples=200, stake=1.0, seed=0)
+        self.assertGreater(flat["median_final"], 0.0)
+        self.assertGreaterEqual(flat["p95_max_drawdown"], flat["median_max_drawdown"])
+        with self.assertRaises(ValueError):
+            bootstrap_bankroll([], mode="kelly")
+
 
 if __name__ == "__main__":
     unittest.main()
