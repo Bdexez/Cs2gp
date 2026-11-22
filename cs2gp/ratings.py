@@ -277,6 +277,50 @@ class EloEngine:
         rows.sort(key=lambda r: -r[1])
         return rows
 
+    def rating_summary(
+        self,
+        on: dt.date | None = None,
+        min_maps: int = 1,
+        *,
+        active_within_days: int | None = None,
+    ) -> dict:
+        """Resume statistique de la distribution Elo (moyenne, dispersion, quantiles, RD)."""
+        import numpy as np
+
+        board = self.leaderboard(on=on, min_maps=min_maps, active_within_days=active_within_days)
+        if not board:
+            return {
+                "n_teams": 0,
+                "mean": None,
+                "std": None,
+                "min": None,
+                "p25": None,
+                "median": None,
+                "p75": None,
+                "max": None,
+                "top_team": None,
+                "bottom_team": None,
+                "mean_rd": None,
+                "rounds_per_100_elo": self.rounds_per_100_elo(),
+            }
+        vals = np.asarray([r for _, r, _ in board], dtype=float)
+        rds = np.asarray([self.deviation(t, on) for t, _, _ in board], dtype=float)
+        p25, med, p75 = np.percentile(vals, [25.0, 50.0, 75.0])
+        return {
+            "n_teams": len(board),
+            "mean": float(vals.mean()),
+            "std": float(vals.std()),
+            "min": float(vals.min()),
+            "p25": float(p25),
+            "median": float(med),
+            "p75": float(p75),
+            "max": float(vals.max()),
+            "top_team": board[0][0],
+            "bottom_team": board[-1][0],
+            "mean_rd": float(rds.mean()),
+            "rounds_per_100_elo": self.rounds_per_100_elo(),
+        }
+
     # ----------------------------------------------------------------- ecriture
 
     def _apply_roster_shock(self, team: str, roster: tuple[str, ...]) -> None:
