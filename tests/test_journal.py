@@ -171,6 +171,7 @@ class JournalTests(unittest.TestCase):
         self.assertEqual(money["paris"], 2)
         self.assertEqual(money["max_drawdown_mise_fixe"], 1.0)
         self.assertEqual(money["pire_serie_defaites"], 1)
+        self.assertEqual(money["equity_curve_flat"], [0.0, 1.0, 0.0])
 
     def test_scorecard_and_financial_summary_support_date_filters(self):
         d1 = dt.date(2026, 1, 1)

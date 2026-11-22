@@ -336,6 +336,7 @@ def financial_summary(
     flat_profit = 0.0
     flat_peak = 0.0
     max_drawdown_flat = 0.0
+    equity_curve_flat = [0.0]
     streak = max_streak = 0
     kelly_profit = 0.0
     kelly_staked = 0.0
@@ -350,6 +351,7 @@ def financial_summary(
             streak += 1
             if streak > max_streak:
                 max_streak = streak
+        equity_curve_flat.append(float(flat_profit))
         if flat_profit > flat_peak:
             flat_peak = flat_profit
         dd = flat_peak - flat_profit
@@ -375,6 +377,7 @@ def financial_summary(
         "roi_significant_5pct": sig["significant_5pct"],
         "max_drawdown_mise_fixe": max_drawdown_flat,
         "pire_serie_defaites": max_streak,
+        "equity_curve_flat": equity_curve_flat,
         "profit_kelly": kelly_profit,
         "mise_kelly_totale": kelly_staked,
         "roi_kelly": kelly_profit / kelly_staked if kelly_staked > 1e-9 else 0.0,
