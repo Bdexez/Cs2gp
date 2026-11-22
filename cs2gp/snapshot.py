@@ -20,14 +20,13 @@ from zipfile import BadZipFile, ZIP_DEFLATED, ZipFile
 from . import __version__
 from .calibration import CalibrationHistory
 from .features import FeatureExtractor
-from .model import MatchPredictor
+from .model import MatchPredictor, _MODEL_OPTIONS
 from .ratings import EloConfig
 from .schema import ACTIVE_DUTY, MapResult, parse_date
 from .validation import finite_number
 
 _REQUIRED = {"history.json", "match.json", "map.json"}
 _ALLOWED = _REQUIRED | {"match.gbdt.pkl", "map.gbdt.pkl", "calibration.json"}
-_MODEL_OPTIONS = ("l2", "use_gbdt", "gbdt_weight", "calibration_frac", "recency_halflife")
 
 
 def _schemas() -> dict:
@@ -68,7 +67,8 @@ def save_analyzer(an, path: str | Path) -> None:
         elo=an.fx.elo.cfg.to_dict(), warmup_maps=an.warmup_maps,
         versioned_pool=getattr(an, "versioned_pool", False),
         momentum=an.momentum, momentum_auto=an._momentum_auto,
-        training_options={name: getattr(an.match_model, name) for name in _MODEL_OPTIONS},
+        training_options={name: an._training_options.get(name, getattr(an.match_model, name))
+                          for name in _MODEL_OPTIONS},
         sha256={name: hashlib.sha256(blob).hexdigest() for name, blob in files.items()},
     )
     path = Path(path)
@@ -131,9 +131,11 @@ def load_analyzer(path: str | Path):
         if not isinstance(manifest["momentum_auto"], bool):
             raise ValueError("momentum_auto doit etre un booleen")
         options = manifest["training_options"]
-        if set(options) != set(_MODEL_OPTIONS):
+        if (not isinstance(options, dict)
+                or set(options) not in (set(_MODEL_OPTIONS), set(_MODEL_OPTIONS) - {"l2_grid"})):
             raise ValueError("configuration d'entrainement incompatible")
-        MatchPredictor(**options)
+        options = dict(options)
+        options["l2_grid"] = MatchPredictor(**options).l2_grid
         history = []
         for row in json.loads(blobs["history.json"]):
             row["date"] = parse_date(row["date"])
@@ -158,9 +160,13 @@ def load_analyzer(path: str | Path):
         if an.map_model.gbdt is not None:
             raise ValueError("le modele map doit utiliser la regression logistique seule")
         an._training_options = options
-        for model in (an.match_model, an.map_model):
-            for name, value in options.items():
-                setattr(model, name, value)
+        for name, model in (("match", an.match_model), ("map", an.map_model)):
+            # Les anciens JSON ne conservaient pas tous les reglages : seul
+            # leur manifeste permet de les restaurer. Les nouveaux modeles
+            # gardent aussi leur propre L2 selectionne (match et map distincts).
+            if "use_gbdt" not in json.loads(blobs[f"{name}.json"]):
+                for option, value in options.items():
+                    setattr(model, option, value)
         an.map_model.use_gbdt = False
         an._momentum_auto = manifest["momentum_auto"]
         if "calibration.json" in blobs:

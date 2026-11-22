@@ -670,3 +670,22 @@ outillage domaine CS2 et sortie structuree).
   pretraitement hors plage est rejete explicitement sans detruire un modele
   deja appris. Tests des poids nuls extremes, de l'equivalence des predictions
   et covariances avec des features multipliees par 1e200, et du refit invalide.
+
+## Cycle 58 : Reglages d'entrainement preserves dans les modeles et instantanes
+
+- **Modele JSON** (`model.py`) : persistance de `use_gbdt`, `gbdt_weight`,
+  `calibration_frac`, `recency_halflife` et `l2_grid`, en plus du L2 appris.
+  La demande d'un GBDT reste distincte de la presence d'un composant ajuste :
+  un historique sous le seuil de 400 ne desactive plus l'option au rechargement.
+  Les grilles sont validees et normalisees en tuples ; la serialisation JSON
+  rejette les valeurs non finies avant d'ecrire les composants.
+- **Instantane complet** (`snapshot.py`) : le manifeste conserve la grille L2
+  et les options d'origine utilisees pour les reconstructions historiques.
+  Chaque modele garde son L2 selectionne, qui peut differer entre le modele
+  match et le modele map. Les anciens manifestes sans grille et les anciens
+  JSON restent lisibles ; le manifeste complete leurs reglages manquants.
+- **Tests** : egalite des predictions avant/apres chargement et apres refit
+  avec les memes donnees datees, conservation des reconstructions historiques
+  avec selection L2, double aller-retour d'un instantane, ancien JSON et ancien
+  manifeste, rejet des nouvelles metadonnees invalides et sauvegarde NaN sans
+  remplacement du fichier existant.

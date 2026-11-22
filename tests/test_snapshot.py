@@ -1,4 +1,5 @@
 import datetime as dt
+import hashlib
 import json
 from pathlib import Path
 import tempfile
@@ -70,6 +71,51 @@ class SnapshotTests(unittest.TestCase):
             with patch("cs2gp.model.MatchPredictor.load", side_effect=AssertionError("trop tot")):
                 with self.assertRaisesRegex(ValueError, "somme de controle.*history"):
                     Analyzer.load(path)
+
+    def test_bundle_preserves_l2_grid_and_historical_retraining(self):
+        an = Analyzer(warmup_maps=4, momentum=.1).load_maps(self.maps).train(
+            use_gbdt=False, l2=17.0, l2_grid=(.25, 4.0), calibration_frac=.1, recency_halflife=120,
+        )
+        a, b = an.known_teams()[:2]
+        on = an.match_ds.dates[-60]
+        expected = an.predict(a, b, on=on)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "grid.cs2gp"
+            an.save(path)
+            restored = Analyzer.load(path)
+            self.assertEqual(restored._training_options["l2_grid"], (.25, 4.0))
+            self.assertEqual(restored._training_options["l2"], 17.0)
+            self.assertEqual(restored.match_model.l2, an.match_model.l2)
+            self.assertEqual(restored.map_model.l2, an.map_model.l2)
+            self.assertEqual(restored.predict(a, b, on=on), expected)
+            restored.save(path)
+            self.assertEqual(Analyzer.load(path).predict(a, b, on=on), expected)
+
+    def test_legacy_model_json_uses_manifest_for_missing_training_settings(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "legacy-settings.cs2gp"
+            self.an.save(path)
+            with ZipFile(path) as archive:
+                files = {name: archive.read(name) for name in archive.namelist()}
+            manifest = json.loads(files["manifest.json"])
+            manifest["training_options"].pop("l2_grid")
+            for name in ("match.json", "map.json"):
+                payload = json.loads(files[name])
+                for option in ("use_gbdt", "calibration_frac", "recency_halflife", "l2_grid"):
+                    payload.pop(option)
+                payload["gbdt_weight"] = 0.0
+                files[name] = json.dumps(payload).encode()
+                manifest["sha256"][name] = hashlib.sha256(files[name]).hexdigest()
+            files["manifest.json"] = json.dumps(manifest).encode()
+            with ZipFile(path, "w") as archive:
+                for name, data in files.items():
+                    archive.writestr(name, data)
+            restored = Analyzer.load(path)
+            for model in (restored.match_model, restored.map_model):
+                self.assertEqual(model.calibration_frac, .25)
+                self.assertEqual(model.recency_halflife, 400)
+            a, b = self.an.known_teams()[:2]
+            self.assertEqual(restored.predict(a, b, on=self.on), self.an.predict(a, b, on=self.on))
 
     def test_incompatible_schema_and_unknown_archive_members_are_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -463,6 +463,14 @@ bundles require the same scikit-learn version and use pickle: load bundles only
 from trusted sources. `train --out models/match.json` retains the match-only
 JSON export and does not produce a complete analyzer.
 
+Both exports preserve the supported training settings: L2, requested GBDT use
+and blend weight, calibration fraction, recency half-life and optional L2 grid.
+`has_gbdt` indicates whether a GBDT was actually fitted; a small dataset may
+leave it absent even when requested. Complete archives retain the original
+options for historical reconstruction and each predictor's selected L2.
+Older JSON files use legacy defaults for absent settings; older archives can
+recover these settings from their manifest.
+
 New v2 archives also store the predictions used for calibration, with their
 training cutoff dates. This lets a future slate use the default momentum and
 length calibration without refitting classifiers. V1 archives remain readable;
