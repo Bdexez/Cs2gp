@@ -359,11 +359,11 @@ def walk_forward(
     )
 
 
-def read_odds_csv(path: str | Path) -> dict[str, tuple[float, float]]:
-    """Charge un CSV de cotes historiques : match_id,odds_a,odds_b."""
+def read_odds_csv(path: str | Path) -> dict[str, tuple]:
+    """Charge un CSV de cotes historiques : match_id,odds_a,odds_b[,closing_odds_a,closing_odds_b]."""
     from .odds import implied
 
-    out: dict[str, tuple[float, float]] = {}
+    out: dict[str, tuple] = {}
     for line, row in read_rows(path, {"match_id", "odds_a", "odds_b"}):
         mid = row["match_id"].strip()
         if not mid:
@@ -375,28 +375,42 @@ def read_odds_csv(path: str | Path) -> dict[str, tuple[float, float]]:
             ob = float(row["odds_b"])
             implied(oa)
             implied(ob)
+            ca_raw = (row.get("closing_odds_a") or "").strip()
+            cb_raw = (row.get("closing_odds_b") or "").strip()
+            if bool(ca_raw) != bool(cb_raw):
+                raise ValueError("closing_odds_a et closing_odds_b doivent etre fournis ensemble")
+            if ca_raw:
+                ca, cb = float(ca_raw), float(cb_raw)
+                implied(ca)
+                implied(cb)
+                out[mid] = (oa, ob, ca, cb)
+            else:
+                out[mid] = (oa, ob)
         except ValueError as exc:
             raise ValueError(f"ligne {line} invalide dans {path}: {exc}") from exc
-        out[mid] = (oa, ob)
     return out
 
 
 def bet_backtest(
     result: BacktestResult,
-    odds_lookup: dict[str, tuple[float, float]],
+    odds_lookup: dict[str, tuple],
     min_edge: float = 0.04,
 ) -> dict:
     """Rejoue le backtest contre des cotes historiques, si on en dispose.
 
-    `odds_lookup` : match_id -> (cote team_a, cote team_b).
+    `odds_lookup` : match_id -> (cote_a, cote_b) ou (cote_a, cote_b, cloture_a, cloture_b).
     Sans cotes reelles, cette fonction ne renvoie rien d'exploitable : ne pas
     substituer des cotes moyennes ou reconstituees, le biais serait total.
     """
-    from .odds import find_value, overround, roi_significance, simulate_flat, simulate_kelly
+    from .odds import (
+        closing_line_value, find_value, overround, roi_significance, simulate_flat, simulate_kelly,
+    )
 
     finite_number("min_edge", min_edge, maximum=1.0)
     plays = []
     overrounds = []
+    clv_probs = []
+    clv_evs = []
     for p, y, meta in zip(result.predictions, result.y, result.meta):
         odds = odds_lookup.get(meta["match_id"])
         if not odds:
@@ -407,11 +421,19 @@ def bet_backtest(
             continue
         won = int((bet.side == meta["team_a"] and y == 1) or (bet.side == meta["team_b"] and y == 0))
         plays.append((bet.model_p, bet.odds, won))
+        if len(odds) == 4:
+            side = "a" if bet.side == meta["team_a"] else "b"
+            clv = closing_line_value(bet.odds, odds[2], odds[3], side=side)
+            clv_probs.append(clv["clv_prob"])
+            clv_evs.append(clv["clv_ev"])
     out = simulate_flat(plays)
     out["kelly"] = simulate_kelly(plays)
     out["significance"] = roi_significance(plays)
     out["matches_with_odds"] = len(overrounds)
     out["avg_overround"] = float(np.mean(overrounds)) if overrounds else None
+    out["clv_bets"] = len(clv_probs)
+    out["avg_clv_prob"] = float(np.mean(clv_probs)) if clv_probs else None
+    out["avg_clv_ev"] = float(np.mean(clv_evs)) if clv_evs else None
     return out
 
 
