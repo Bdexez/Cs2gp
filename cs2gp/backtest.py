@@ -20,7 +20,7 @@ from .csvio import atomic_write_csv, read_rows
 from .features import Dataset
 from .metrics import (
     brier, brier_decomposition, calibration_slope_intercept, favorite_reliability_table,
-    format_summary, log_loss, paired_block_bootstrap, quantile_reliability_table,
+    format_summary, hosmer_lemeshow, log_loss, paired_block_bootstrap, quantile_reliability_table,
     reliability_table, spiegelhalter_z, summarize,
 )
 from .model import MatchPredictor, map_predictor
@@ -158,6 +158,7 @@ class BacktestResult:
             "comparison": dict(self.comparison) if self.comparison is not None else None,
             "calibration": calibration_slope_intercept(self.y, self.predictions) if len(self.y) else None,
             "spiegelhalter": spiegelhalter_z(self.y, self.predictions) if len(self.y) else None,
+            "hosmer_lemeshow": hosmer_lemeshow(self.y, self.predictions) if len(self.y) else None,
             "brier_decomposition": brier_decomposition(self.y, self.predictions) if len(self.y) else None,
             "reliability": reliability_table(self.y, self.predictions) if len(self.y) else [],
             "quantile_reliability": quantile_reliability_table(self.y, self.predictions) if len(self.y) else [],
