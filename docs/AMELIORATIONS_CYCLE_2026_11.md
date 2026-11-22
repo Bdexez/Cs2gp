@@ -445,3 +445,12 @@ outillage domaine CS2 et sortie structuree).
 - **Commande `cs2gp doctor`** (`cli.py`) : verifie en un coup d'oeil versions
   Python/NumPy/scikit-learn, disponibilite GBDT et lisibilite du fichier de
   donnees (texte et `--json`).
+
+## Cycle 42 : Garde booleenne dans `temporal.py`, `sample --json` et modularisation CLI
+
+- **Rejet des booleens dans `forward_splits`** (`temporal.py`) : `refit_every`
+  et `min_train` rejettent explicitement `bool` (`isinstance(True, Integral)`).
+- **Sortie `--json` sur `cs2gp sample`** (`cli.py`) : complete la couverture
+  `--json` sur l'ensemble des sous-commandes analytiques et generatrices.
+- **Extraction des formateurs CLI** (`cli_exports.py`, `cli.py`) : deplacement
+  de `format_team_profile()` et `format_compare()` dans `cli_exports.py`.
