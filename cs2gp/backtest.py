@@ -267,6 +267,45 @@ class BacktestResult:
             })
         return rows
 
+    def by_team(self, min_matches: int = 5) -> list[dict]:
+        """Performance hors-echantillon par equipe (triee du plus difficile au plus previsible)."""
+        positive_integer("min_matches", min_matches)
+        if not len(self.y):
+            return []
+        buckets: dict[str, list[tuple[float, float, float]]] = {}
+        for i, m in enumerate(self.meta):
+            ta = m.get("team_a")
+            tb = m.get("team_b")
+            yi = float(self.y[i])
+            pi = float(self.predictions[i])
+            ei = float(self.elo_only[i])
+            if ta:
+                buckets.setdefault(ta, []).append((yi, pi, ei))
+            if tb:
+                buckets.setdefault(tb, []).append((1.0 - yi, 1.0 - pi, 1.0 - ei))
+        rows = []
+        for team, items in buckets.items():
+            if len(items) < min_matches:
+                continue
+            ys = np.array([t[0] for t in items], dtype=float)
+            ps = np.array([t[1] for t in items], dtype=float)
+            es = np.array([t[2] for t in items], dtype=float)
+            s = summarize(ys, ps)
+            elo_ll = log_loss(ys, es)
+            rows.append({
+                "team": team,
+                "n": int(len(items)),
+                "win_rate": float(ys.mean()),
+                "mean_prob": float(ps.mean()),
+                "log_loss": s["log_loss"],
+                "elo_log_loss": elo_ll,
+                "gain_vs_elo": float(elo_ll - s["log_loss"]),
+                "brier": s["brier"],
+                "accuracy": s["accuracy"],
+            })
+        rows.sort(key=lambda r: (-r["log_loss"], r["team"]))
+        return rows
+
     def export_csv(self, path: str | Path) -> int:
         """Exporte atomiquement les predictions hors-echantillon en CSV."""
         cols = [
