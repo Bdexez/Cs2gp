@@ -172,6 +172,14 @@ class CliJsonTests(unittest.TestCase):
             self.assertEqual(len(hist_payload["history"]), 10)
             self.assertTrue(hist_csv.is_file())
 
+            # compare --json
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(main(["compare", teams[0], teams[1], "--data", str(data), "--json"]), 0)
+            cmp_payload = json.loads(out.getvalue())
+            self.assertEqual(cmp_payload["team_a"]["team"], teams[0])
+            self.assertEqual(len(cmp_payload["map_edges"]), 7)
+
     def test_public_package_api_exports(self):
         import cs2gp
 
