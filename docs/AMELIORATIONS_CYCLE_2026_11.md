@@ -355,3 +355,11 @@ outillage domaine CS2 et sortie structuree).
   seuil de confiance pour calibrer objectivement la selectivite.
 - **Statistiques par tournoi (`Analyzer.event_stats`)** (`predict.py`) :
   resume volume, dates, tier, LAN/online et taux d'upsets Elo par evenement.
+
+## Cycle 32 : Commande `events` et detection du biais d'orientation `team_a`
+
+- **Detection du biais d'orientation** (`audit.py`) : `audit_history()` calcule
+  `team_a_win_rate` et alerte si un export place systematiquement le vainqueur
+  dans la colonne `team_a`.
+- **Commande CLI `cs2gp events`** (`cli.py`) : expose `Analyzer.event_stats()`
+  en texte et `--json`.
