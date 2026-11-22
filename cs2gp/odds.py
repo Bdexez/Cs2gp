@@ -96,6 +96,17 @@ def devig_shin(odds_a: float, odds_b: float) -> tuple[float, float]:
     return float(pa / tot), float(pb / tot)
 
 
+def devig(odds_a: float, odds_b: float, method: str = "power") -> tuple[float, float]:
+    """Retrait de marge unifie : 'power' (defaut), 'shin' ou 'proportional'."""
+    if method == "power":
+        return devig_power(odds_a, odds_b)
+    if method == "shin":
+        return devig_shin(odds_a, odds_b)
+    if method == "proportional":
+        return devig_proportional(odds_a, odds_b)
+    raise ValueError(f"methode de devig inconnue : {method!r} (attendu: power, shin, proportional)")
+
+
 def market_diagnostics(odds_a: float, odds_b: float) -> dict:
     """Compare marge, arbitrage eventuel et probabilites sans marge (prop, power, Shin)."""
     ia, ib = implied(odds_a), implied(odds_b)
@@ -162,7 +173,8 @@ def expected_value(p: float, odds: float) -> float:
 
 
 def closing_line_value(
-    taken_odds: float, closing_odds_a: float, closing_odds_b: float, side: str = "a"
+    taken_odds: float, closing_odds_a: float, closing_odds_b: float,
+    side: str = "a", *, devig_method: str = "power",
 ) -> dict:
     """Valeur face a la ligne de cloture (CLV), sans marge.
 
@@ -172,7 +184,7 @@ def closing_line_value(
     if side not in ("a", "b"):
         raise ValueError("side doit valoir 'a' ou 'b'")
     taken_p = implied(taken_odds)
-    pa, pb = devig_power(closing_odds_a, closing_odds_b)
+    pa, pb = devig(closing_odds_a, closing_odds_b, method=devig_method)
     closing_p = pa if side == "a" else pb
     return {
         "closing_p": float(closing_p),
@@ -223,11 +235,13 @@ def find_value(
     team_a: str = "A",
     team_b: str = "B",
     min_edge: float = 0.03,
+    *,
+    devig_method: str = "power",
 ) -> ValueBet | None:
     """Retourne le cote qui offre de la valeur, ou None si le marche est correct."""
     _probability(p_a)
     finite_number("min_edge", min_edge, maximum=1.0)
-    ma, mb = devig_power(odds_a, odds_b)
+    ma, mb = devig(odds_a, odds_b, method=devig_method)
     cands = [
         ValueBet(team_a, p_a, ma, odds_a, p_a - ma, expected_value(p_a, odds_a),
                  kelly_fraction(p_a, odds_a)),

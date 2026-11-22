@@ -2,7 +2,7 @@ import math
 import unittest
 
 from cs2gp.odds import (
-    closing_line_value, devig_power, devig_shin, equity_curve, expected_value, find_value,
+    closing_line_value, devig, devig_power, devig_shin, equity_curve, expected_value, find_value,
     kelly_fraction, market_diagnostics, roi_significance, simulate_flat, simulate_kelly,
 )
 
@@ -39,6 +39,11 @@ class PowerDevigTests(unittest.TestCase):
         self.assertGreater(diag["shin_z"], 0.0)
         self.assertGreater(diag["shin_a"], diag["proportional_a"])
         self.assertAlmostEqual(diag["shin_a"] + diag["shin_b"], 1.0, places=12)
+        self.assertEqual(devig(1.75, 2.10, "shin"), devig_shin(1.75, 2.10))
+        self.assertEqual(devig(1.75, 2.10, "power"), devig_power(1.75, 2.10))
+        self.assertIsNotNone(find_value(0.65, 1.85, 2.00, devig_method="shin"))
+        with self.assertRaises(ValueError):
+            devig(1.80, 2.00, method="unknown")
 
 
 class OddsValidationTests(unittest.TestCase):
