@@ -427,6 +427,39 @@ class Analyzer:
             "recent_matches": recent[-10:],
         }
 
+    def team_history(self, name: str) -> list[dict]:
+        """Evolution chronologique de l'Elo, de l'incertitude RD et de la trajectoire."""
+        from .ratings import EloEngine
+
+        if self.fx is None or not self.maps:
+            raise RuntimeError("charger des donnees avant de consulter l'historique d'une equipe")
+        team = self.resolve_team(name)
+        engine = EloEngine(self.elo_config)
+        timeline: list[dict] = []
+        for mp in sorted(self.maps, key=lambda m: (m.date, m.match_id, m.map_index)):
+            involved = mp.team_a == team or mp.team_b == team
+            before = engine.rating(team, mp.date) if involved else 0.0
+            engine.observe(mp)
+            if not involved:
+                continue
+            is_a = mp.team_a == team
+            after = engine.rating(team, mp.date)
+            timeline.append({
+                "date": mp.date.isoformat(),
+                "match_id": mp.match_id,
+                "opponent": mp.team_b if is_a else mp.team_a,
+                "map": mp.map_name,
+                "won": bool(mp.a_won if is_a else not mp.a_won),
+                "round_diff": int(mp.round_diff if is_a else -mp.round_diff),
+                "rating_before": float(before),
+                "rating_after": float(after),
+                "delta": float(after - before),
+                "rd_after": float(engine.deviation(team, mp.date)),
+                "trajectory_after": float(engine.trajectory(team, mp.date)),
+                "event": mp.event,
+            })
+        return timeline
+
     def calibration_history(self):
         """Historique hors entrainement partage par les calibrations et mis en cache."""
         from .calibration import prequential_maps
