@@ -453,6 +453,56 @@ def benchmark_against_truth(result: BacktestResult, truth: dict[str, float]) -> 
     }
 
 
+def benchmark_regimes(
+    regimes: tuple[str, ...] = ("facile", "realiste"),
+    seeds: tuple[int, ...] = (3, 7, 11),
+    *,
+    n_teams: int = 12,
+    years: float = 1.5,
+    start: dt.date = dt.date(2024, 1, 1),
+    with_rosters: bool = False,
+    veto_samples: int = 50,
+    **wf_kwargs,
+) -> dict[str, dict]:
+    """Benchmark reproductible multi-graines comparant modele, Elo et oracle."""
+    from .features import build_datasets
+    from .schema import group_matches
+    from .sources import simulate_with_truth
+
+    if not regimes or not seeds:
+        raise ValueError("regimes et seeds doivent etre non vides")
+    summary: dict[str, dict] = {}
+    for regime in regimes:
+        runs = []
+        for seed in seeds:
+            rows, truth = simulate_with_truth(
+                n_teams=n_teams, years=years, seed=seed, start=start,
+                regime=regime, veto_samples=veto_samples, with_rosters=with_rosters,
+            )
+            mds, pds, _ = build_datasets(group_matches(rows))
+            res = walk_forward(mds, pds, **{"use_gbdt": False, **wf_kwargs})
+            bench = benchmark_against_truth(res, truth)
+            runs.append({
+                "seed": seed,
+                "n_matches": bench["n_matched"],
+                "model_log_loss": bench["model_log_loss"],
+                "elo_log_loss": float(res.elo_metrics["log_loss"]),
+                "oracle_log_loss": bench["oracle_log_loss"],
+                "excess_log_loss": bench["excess_log_loss"],
+                "gain_vs_elo": float(res.elo_metrics["log_loss"] - bench["model_log_loss"]),
+                "mean_abs_prob_error": bench["mean_abs_prob_error"],
+            })
+        keys = ("model_log_loss", "elo_log_loss", "oracle_log_loss", "excess_log_loss",
+                "gain_vs_elo", "mean_abs_prob_error")
+        summary[regime] = {
+            "seeds": list(seeds),
+            "runs": runs,
+            "mean": {k: float(np.mean([r[k] for r in runs])) for k in keys},
+            "std": {k: float(np.std([r[k] for r in runs])) for k in keys},
+        }
+    return summary
+
+
 # ---------------------------------------------------------------------------
 # Reglage des constantes.
 #
