@@ -444,6 +444,10 @@ checking they are finite. Zero-weight rows are excluded before preprocessing;
 weighted projections and RMS scaling avoid squaring large raw values. An
 unrepresentable transformation raises `ValueError` and preserves fitted state.
 
+`MatchPredictor.fit()` also prepares the full ensemble and its metadata before
+publishing them. Failed L2 selection, logistic fitting, GBDT fitting or
+temperature calibration preserves the previous fitted predictor and predictions.
+
 ```bash
 cs2gp train --no-gbdt --bundle models/analyzer.cs2gp
 cs2gp predict navi g2 --model models/analyzer.cs2gp

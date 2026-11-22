@@ -19,7 +19,7 @@ import json
 import hashlib
 import math
 import pickle
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 import numpy as np
@@ -332,6 +332,19 @@ class MatchPredictor:
 
     def fit(self, X: np.ndarray, y: np.ndarray, dates: list[dt.date] | None = None,
             feature_names: tuple[str, ...] = ()) -> "MatchPredictor":
+        """Publie l'ensemble et ses metadonnees apres reussite de toutes les etapes."""
+        candidate = replace(self)
+        candidate._fit_inplace(X, y, dates, feature_names)
+        (self.l2, self.logistic, self.gbdt, self.temperature,
+         self.feature_names, self.trained_on, self.last_date) = (
+            candidate.l2, candidate.logistic, candidate.gbdt, candidate.temperature,
+            candidate.feature_names, candidate.trained_on, candidate.last_date,
+        )
+        return self
+
+    def _fit_inplace(self, X: np.ndarray, y: np.ndarray, dates: list[dt.date] | None,
+                     feature_names: tuple[str, ...]) -> None:
+        """Entraine uniquement le candidat prive construit par fit()."""
         y = binary_labels(y)
         X = feature_matrix(X, rows=len(y))
         self.validate_config()
@@ -374,7 +387,6 @@ class MatchPredictor:
             self.temperature = _fit_temperature(z, y[n_fit:])
         else:
             self.temperature = 1.0
-        return self
 
     def _fit_gbdt(self, X: np.ndarray, y: np.ndarray, w: np.ndarray | None):
         try:
