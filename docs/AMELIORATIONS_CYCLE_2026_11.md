@@ -136,3 +136,15 @@ outillage domaine CS2 et sortie structuree).
   verification de la coherence des marches derives sur BO1/BO3/BO5 et de la
   monotonicite des fonctions coeur (`expected_score`, `series_win_probability`,
   `devig_power`, `kelly_fraction`).
+
+## Cycle 10 : Symetrie du veto stochastique, equilibre du pool et filtres journal
+
+- **Symetrie du veto stochastique** (`markets.py`) : `stochastic_veto_distribution`
+  moyenne les deux ordres de premier pick pour garantir exactement
+  `p(A|B) + p(B|A) = 1` meme avec `temperature > 0` et `momentum != 0`.
+- **Repartition annuelle et equilibre du pool** (`audit.py`) : `audit_history`
+  ajoute `matches_by_year` et `map_balance_ratio` (alerte en cas de fort
+  desequilibre des maps Active Duty).
+- **Filtres temporels sur le journal** (`journal.py`, `cli.py`) : options
+  `since`/`until` (`--since`, `--until` sur `cs2gp journal`) pour evaluer une
+  periode donnee sans modifier le CSV.
