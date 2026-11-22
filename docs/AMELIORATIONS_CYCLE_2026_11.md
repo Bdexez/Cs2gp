@@ -97,3 +97,16 @@ outillage domaine CS2 et sortie structuree).
 - **Confrontation a des cotes historiques en CLI** (`backtest.py`, `cli.py`) :
   `read_odds_csv` (validation stricte, rejet des doublons et cotes <= 1) et
   `cs2gp backtest --odds-csv` affichant ROI, profit et drawdown.
+
+## Cycle 7 : Simulation Kelly, profil d'equipe, inspection et benchmark multi-graines
+
+- **Simulation de bankroll Kelly** (`odds.py`, `backtest.py`) : `simulate_kelly`
+  calcule la croissance multiplicative de bankroll, le drawdown relatif maximal
+  et la pire serie de defaites ; integre dans `bet_backtest`.
+- **Profil d'equipe et inspection d'instantane** (`predict.py`, `snapshot.py`,
+  `cli.py`) : nouvelles commandes `cs2gp team <equipe>` (Elo, RD, trajectoire,
+  forme, SOS, charge 21j, roster, pool de maps) et `cs2gp inspect <bundle>`
+  (verification SHA-256 et metadonnees sans unpickler le GBDT), en texte et `--json`.
+- **Benchmark multi-graines** (`backtest.py`) : `benchmark_regimes` agrege
+  moyenne et ecart-type des metriques modele / Elo / oracle sur plusieurs
+  graines et regimes (`facile`, `realiste`).
