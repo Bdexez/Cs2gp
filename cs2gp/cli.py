@@ -12,7 +12,7 @@ from pathlib import Path
 from . import __version__
 from .audit import audit_fixtures, audit_history, format_audit
 from .backtest import bet_backtest, read_odds_csv, tune, walk_forward, walk_forward_importance
-from .csvio import atomic_write_csv
+from .cli_exports import export_history_csv, export_ratings_csv, export_slate_csv, format_movers
 from .features import feature_correlation_report
 from .markets import build_markets, project_veto
 from .metrics import format_summary, summarize
@@ -213,22 +213,7 @@ def cmd_history(args) -> int:
     timeline = an.team_history(args.team)
     shown = timeline[-args.last :] if args.last is not None else timeline
     if args.export_csv:
-        written = atomic_write_csv(
-            args.export_csv,
-            [
-                "date", "match_id", "opponent", "map", "won", "round_diff",
-                "rating_before", "rating_after", "delta", "rd_after", "trajectory_after", "event",
-            ],
-            (
-                [
-                    r["date"], r["match_id"], r["opponent"], r["map"], int(r["won"]),
-                    r["round_diff"], f"{r['rating_before']:.2f}", f"{r['rating_after']:.2f}",
-                    f"{r['delta']:+.2f}", f"{r['rd_after']:.2f}", f"{r['trajectory_after']:+.2f}",
-                    r["event"],
-                ]
-                for r in shown
-            ),
-        )
+        written = export_history_csv(args.export_csv, shown)
         print(f"{written} maps exportees -> {args.export_csv}", file=sys.stderr)
     if args.json:
         print(json.dumps({"team": an.resolve_team(args.team), "n_maps": len(shown), "history": shown},
@@ -274,6 +259,17 @@ def cmd_compare(args) -> int:
     print("\n  Ecart Elo par map (vu de " + a["team"] + ") :")
     for row in cmp["map_edges"]:
         print(f"    {row['map']:<10} {row['elo_edge']:+7.1f}")
+    return 0
+
+
+def cmd_movers(args) -> int:
+    an = _analyzer(args, train=False)
+    mv = an.movers(window_days=args.days, min_maps=args.min_maps, top=args.top)
+    if args.json:
+        print(json.dumps(mv, indent=2, ensure_ascii=False))
+        return 0
+    print()
+    print(format_movers(mv))
     return 0
 
 
@@ -323,22 +319,7 @@ def cmd_ratings(args) -> int:
         on=on, min_maps=args.min_maps, active_within_days=args.active_within
     )
     if args.export_csv:
-        pool = list(an.fx.pool_on(on))
-        written = atomic_write_csv(
-            args.export_csv,
-            ["rank", "team", "rating", "deviation", "trajectory", "maps_played", "last_date", *pool],
-            (
-                [
-                    rank, team, f"{rating:.2f}",
-                    f"{an.fx.elo.deviation(team, on):.2f}",
-                    f"{an.fx.elo.trajectory(team, on):.2f}",
-                    played,
-                    tr.last_date.isoformat() if (tr := an.fx.elo._read_team(team)).last_date else "",
-                    *(f"{an.fx.elo.map_rating(team, mp, on):.2f}" for mp in pool),
-                ]
-                for rank, (team, rating, played) in enumerate(board[: args.top], 1)
-            ),
-        )
+        written = export_ratings_csv(args.export_csv, an, board, on, args.top)
         print(f"{written} equipes exportees -> {args.export_csv}", file=sys.stderr)
     if args.json:
         rows = []
@@ -676,37 +657,7 @@ def cmd_slate(args) -> int:
     card = _tipster(an, args).card(fixtures)
     added = journal_mod.record_card(card, args.record) if args.record else None
     if args.export_csv:
-        csv_rows = []
-        for a in card:
-            fx = a.fixture
-            if a.picks:
-                for pk in a.picks:
-                    csv_rows.append([
-                        pk.date.isoformat(), pk.match_id, pk.team_a, pk.team_b,
-                        pk.best_of, pk.event, pk.market, pk.selection,
-                        f"{pk.probability:.6f}", f"{pk.fair_odds:.3f}", pk.tier,
-                        pk.verdict,
-                        "" if pk.odds is None else f"{pk.odds:.3f}",
-                        "" if pk.edge is None else f"{pk.edge:.6f}",
-                        "" if pk.ev is None else f"{pk.ev:.6f}",
-                        "" if pk.stake is None else f"{pk.stake:.6f}",
-                        "",
-                    ])
-            else:
-                csv_rows.append([
-                    fx.date.isoformat(), fx.match_id, fx.team_a, fx.team_b,
-                    fx.best_of, fx.event, "abstention", "", "", "", "",
-                    "ABSTENTION", "", "", "", "", a.skipped or "",
-                ])
-        written = atomic_write_csv(
-            args.export_csv,
-            [
-                "date", "match_id", "team_a", "team_b", "best_of", "event",
-                "market", "selection", "probability", "fair_odds", "tier",
-                "verdict", "odds", "edge", "ev", "stake", "skipped",
-            ],
-            csv_rows,
-        )
+        written = export_slate_csv(args.export_csv, card)
         print(f"{written} ligne(s) de carte exportee(s) -> {args.export_csv}", file=sys.stderr)
     if args.json:
         payload = {
@@ -955,6 +906,13 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--date", help="date de reference (defaut : dernier match connu)")
     s.add_argument("--json", action="store_true", help="sortie JSON structuree")
     s.set_defaults(func=cmd_compare)
+
+    s = sub.add_parser("movers", parents=[common], help="plus fortes hausses et baisses Elo recentes")
+    s.add_argument("--days", type=int, default=30, help="fenetre glissante en jours (defaut 30)")
+    s.add_argument("--min-maps", type=int, default=20, help="maps minimum par equipe (defaut 20)")
+    s.add_argument("--top", type=int, default=5, help="nombre d'equipes par categorie (defaut 5)")
+    s.add_argument("--json", action="store_true", help="sortie JSON structuree")
+    s.set_defaults(func=cmd_movers)
 
     s = sub.add_parser("audit", parents=[common], help="controle la qualite des donnees chargees")
     s.add_argument("--fixtures", help="CSV de matchs a venir a verifier avant prediction")
