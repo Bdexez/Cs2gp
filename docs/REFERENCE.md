@@ -558,19 +558,25 @@ tests/          unittest suite covering core, reliability, diagnostics and CLI
 ### Additional CLI commands and options
 
 ```bash
-cs2gp audit [--json]                              # dataset quality check
+cs2gp audit [--fixtures f.csv] [--json]           # dataset & fixtures quality check
 cs2gp team navi [--date YYYY-MM-DD] [--json]      # full team profile and map pool
+cs2gp history navi [--last 20] [--export-csv ...] # chronological Elo & RD timeline
+cs2gp compare navi g2 [--date YYYY-MM-DD] [--json]# fast pre-training scouting comparison
 cs2gp h2h navi g2 [--date YYYY-MM-DD] [--json]    # head-to-head history
+cs2gp movers [--days 30] [--top 5] [--json]       # biggest recent Elo risers & fallers
+cs2gp maps [--json]                               # global map stats (OT, rounds, Elo fav)
 cs2gp inspect models/analyzer.cs2gp [--json]      # verify and inspect a bundle safely
 cs2gp diff old.cs2gp new.cs2gp [--json]           # compare two bundles safely
 cs2gp merge part1.csv part2.csv --out all.csv     # deduplicate & merge CSV histories
-cs2gp backtest --by-segment --by-fold --export-csv out.csv --odds-csv odds.csv [--json]
+cs2gp ratings --active-within 60 --export-csv r.csv
+cs2gp predict navi g2 --markets [--json]
+cs2gp backtest --by-segment --by-fold --importance --errors 10 --export-csv out.csv --odds-csv odds.csv [--json]
+cs2gp journal --since 2026-01-01 --risk [--json]
 cs2gp sample --regime realiste --with-rosters     # synthetic data with roster reshuffles
 ```
 
-All analytical commands (`audit`, `ratings`, `team`, `h2h`, `inspect`, `predict`,
-`backtest`, `slate`, `journal`, `tipster-backtest`) accept `--json`. Pass
-`--versioned-pool` to align Active Duty map pools with historical CS2 rotations.
+All analytical commands accept `--json`. Pass `--versioned-pool` to align Active
+Duty map pools with historical CS2 rotations.
 
 The tipster's decision rules live in a **pure function**, called both by the live
 service and by its own backtest. Decision logic written in two copies always ends up
