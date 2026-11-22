@@ -408,3 +408,53 @@ def bankroll_risk(
         for r in rows
     ]
     return bootstrap_bankroll(plays, mode=mode, horizon=horizon, samples=samples, seed=seed)
+
+
+def monthly_summary(
+    journal_path: str | Path,
+    *,
+    since: dt.date | None = None,
+    until: dt.date | None = None,
+) -> list[dict]:
+    """Ventile calibration et P&L mise fixe des pronostics pointes par mois (YYYY-MM)."""
+    rows = [
+        r for r in _filter_by_date(load(journal_path), since=since, until=until)
+        if r.get("resultat") and r["verdict"] in ("PRONOSTIC", "VALEUR")
+    ]
+    buckets: dict[str, list[dict]] = {}
+    for r in rows:
+        month = parse_date(r["date"]).strftime("%Y-%m")
+        buckets.setdefault(month, []).append(r)
+
+    out = []
+    for month in sorted(buckets):
+        items = buckets[month]
+        n = len(items)
+        wins = sum(1 for r in items if r["resultat"] == "gagne")
+        mean_prob = sum(float(r["probabilite"]) for r in items) / n
+        brier = sum(
+            (float(r["probabilite"]) - (1.0 if r["resultat"] == "gagne" else 0.0)) ** 2
+            for r in items
+        ) / n
+        priced = [r for r in items if r.get("cote")]
+        if priced:
+            flat_profit = sum(
+                float(r["cote"]) - 1.0 if r["resultat"] == "gagne" else -1.0
+                for r in priced
+            )
+            flat_roi = flat_profit / len(priced)
+        else:
+            flat_profit = None
+            flat_roi = None
+        out.append({
+            "month": month,
+            "n": n,
+            "wins": wins,
+            "hit_rate": wins / n,
+            "mean_prob": mean_prob,
+            "brier": brier,
+            "priced_bets": len(priced),
+            "flat_profit": flat_profit,
+            "flat_roi": flat_roi,
+        })
+    return out
