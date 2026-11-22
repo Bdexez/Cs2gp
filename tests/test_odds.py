@@ -3,7 +3,7 @@ import unittest
 
 from cs2gp.odds import (
     closing_line_value, devig_power, expected_value, find_value,
-    kelly_fraction, simulate_flat, simulate_kelly,
+    kelly_fraction, market_diagnostics, roi_significance, simulate_flat, simulate_kelly,
 )
 
 
@@ -86,6 +86,20 @@ class OddsValidationTests(unittest.TestCase):
         self.assertEqual(res["max_losing_streak"], 1)
         with self.assertRaises(ValueError):
             simulate_kelly([(0.6, 2.0, 1)], initial_bankroll=0.0)
+
+    def test_market_diagnostics_and_roi_significance(self):
+        diag = market_diagnostics(1.50, 2.80)
+        self.assertGreater(diag["vig"], 0.0)
+        self.assertFalse(diag["is_arbitrage"])
+        self.assertAlmostEqual(diag["power_a"] + diag["power_b"], 1.0, places=12)
+        arb = market_diagnostics(2.10, 2.10)
+        self.assertTrue(arb["is_arbitrage"])
+
+        small = roi_significance([(0.6, 2.0, 1), (0.6, 2.0, 0)])
+        self.assertFalse(small["significant_5pct"])
+        strong = roi_significance([(0.7, 2.0, 1)] * 35 + [(0.7, 2.0, 0)] * 5)
+        self.assertTrue(strong["significant_5pct"])
+        self.assertLess(strong["p_value"], 0.01)
 
 
 if __name__ == "__main__":
