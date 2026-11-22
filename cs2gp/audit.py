@@ -61,6 +61,13 @@ def audit_history(
     pair_days = Counter((m.date, tuple(sorted((m.team_a, m.team_b)))) for m in matches)
     same_day_collisions = sum(1 for c in pair_days.values() if c > 1)
 
+    matches_by_year = {str(y): c for y, c in sorted(Counter(m.date.year for m in matches).items())}
+    active_counts = [maps_by_name.get(m, 0) for m in ACTIVE_DUTY]
+    map_balance_ratio = (
+        float(min(active_counts) / max(active_counts))
+        if active_counts and max(active_counts) > 0 else None
+    )
+
     warnings: list[str] = []
     if incomplete:
         warnings.append(
@@ -92,6 +99,10 @@ def audit_history(
             f"{same_day_collisions} paire(s) d'equipes se rencontrent plusieurs fois le meme jour : "
             "fournir match_id dans les fixtures pour un reglement sans ambiguite."
         )
+    if len(maps) >= 50 and map_balance_ratio is not None and map_balance_ratio < 0.25:
+        warnings.append(
+            f"pool Active Duty tres desequilibre (ratio min/max = {map_balance_ratio:.2f})."
+        )
 
     return {
         "n_maps": len(maps),
@@ -105,11 +116,13 @@ def audit_history(
         "span_days": span_days,
         "max_calendar_gap_days": max_calendar_gap,
         "same_day_pair_collisions": same_day_collisions,
+        "matches_by_year": matches_by_year,
         "formats": dict(sorted(formats.items())),
         "lan_matches": lan_count,
         "online_matches": len(matches) - lan_count,
         "tiers": dict(sorted(tiers.items())),
         "maps_by_name": dict(sorted(maps_by_name.items())),
+        "map_balance_ratio": map_balance_ratio,
         "out_of_pool_maps": out_of_pool,
         "roster_coverage": float(roster_cov),
         "round_regimes": dict(sorted(regimes.items())),
