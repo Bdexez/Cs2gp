@@ -265,9 +265,34 @@ def _settle_locked(path: Path, results: Sequence[Match], window_days: int) -> di
     }
 
 
-def scorecard(journal_path: str | Path) -> TipsterRecord | None:
-    """Reconstruit un bilan a partir du journal pointe."""
-    all_rows = load(journal_path)
+def _filter_by_date(
+    rows: list[dict],
+    since: dt.date | None = None,
+    until: dt.date | None = None,
+) -> list[dict]:
+    if since is not None and until is not None and since > until:
+        raise ValueError("since ne peut pas etre posterieur a until")
+    if since is None and until is None:
+        return rows
+    out = []
+    for r in rows:
+        d = parse_date(r["date"])
+        if since is not None and d < since:
+            continue
+        if until is not None and d > until:
+            continue
+        out.append(r)
+    return out
+
+
+def scorecard(
+    journal_path: str | Path,
+    *,
+    since: dt.date | None = None,
+    until: dt.date | None = None,
+) -> TipsterRecord | None:
+    """Reconstruit un bilan a partir du journal pointe (filtre optionnel par date)."""
+    all_rows = _filter_by_date(load(journal_path), since=since, until=until)
     rows = [r for r in all_rows if r.get("resultat")
             and r["verdict"] in ("PRONOSTIC", "VALEUR")]
     if (not rows and not any(r["verdict"] == "ABSTENTION" for r in all_rows)
@@ -291,14 +316,19 @@ def scorecard(journal_path: str | Path) -> TipsterRecord | None:
     )
 
 
-def financial_summary(journal_path: str | Path) -> dict | None:
+def financial_summary(
+    journal_path: str | Path,
+    *,
+    since: dt.date | None = None,
+    until: dt.date | None = None,
+) -> dict | None:
     """Bilan financier, uniquement sur les lignes ou une cote a ete enregistree.
 
     Sans cote prise au moment de l'annonce, aucun rendement n'est calculable.
     Reconstituer une cote apres coup produirait un chiffre inventé.
     """
     rows = [
-        r for r in load(journal_path)
+        r for r in _filter_by_date(load(journal_path), since=since, until=until)
         if r.get("resultat") and r.get("cote")
     ]
     if not rows:

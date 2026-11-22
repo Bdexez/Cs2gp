@@ -172,6 +172,26 @@ class JournalTests(unittest.TestCase):
         self.assertEqual(money["max_drawdown_mise_fixe"], 1.0)
         self.assertEqual(money["pire_serie_defaites"], 1)
 
+    def test_scorecard_and_financial_summary_support_date_filters(self):
+        d1 = dt.date(2026, 1, 1)
+        d2 = dt.date(2026, 2, 1)
+        p1 = replace(self.pick, date=d1, match_id="m1", odds=2.0, stake=0.02)
+        p2 = replace(self.pick, date=d2, match_id="m2", odds=2.0, stake=0.02)
+        results = group_matches([
+            MapResult("m1", d1, "a", "b", "mirage", 13, 5, 1),
+            MapResult("m2", d2, "a", "b", "mirage", 5, 13, 1),
+        ])
+        journal.record([p1, p2], self.path)
+        journal.settle(self.path, results)
+        jan = journal.scorecard(self.path, since=dt.date(2026, 1, 1), until=dt.date(2026, 1, 31))
+        self.assertEqual(len(jan.settled), 1)
+        self.assertTrue(jan.settled[0].won)
+        feb_money = journal.financial_summary(self.path, since=dt.date(2026, 2, 1))
+        self.assertEqual(feb_money["paris"], 1)
+        self.assertEqual(feb_money["profit_mise_fixe"], -1.0)
+        with self.assertRaises(ValueError):
+            journal.scorecard(self.path, since=d2, until=d1)
+
 
 if __name__ == "__main__":
     unittest.main()
