@@ -36,9 +36,17 @@ def probability_from_pool(
 
     Remplace l'ancienne moyenne du milieu du pool : le veto n'est pas un tirage
     au hasard, il est joue par deux equipes qui connaissent leurs terrains.
+    Avant le tirage au sort de l'ordre du veto, aucun camp n'est garanti de
+    choisir la map 1 : avec momentum non nul, on moyenne donc les deux ordres
+    pour conserver exactement p(A|B) + p(B|A) = 1.
     """
-    plan = project_veto(pool_probs, best_of)
-    return series_distribution(plan.order, best_of, momentum).p_a
+    plan_a = project_veto(pool_probs, best_of)
+    p_a_first = series_distribution(plan_a.order, best_of, momentum).p_a
+    if momentum == 0.0 or best_of < 3:
+        return p_a_first
+    plan_b = project_veto([(name, 1.0 - p) for name, p in pool_probs], best_of)
+    p_b_first = 1.0 - series_distribution(plan_b.order, best_of, momentum).p_a
+    return 0.5 * (p_a_first + p_b_first)
 
 
 def confidence_label(maps_played: int, days_since_last: int, h2h_n: int) -> str:
