@@ -9,17 +9,14 @@ notes Elo d'un match donne encodent deja des matchs posterieurs.
 from __future__ import annotations
 
 from bisect import bisect_left
-import csv
 import datetime as dt
 from dataclasses import dataclass, field
 import math
-import os
 from pathlib import Path
-import tempfile
 
 import numpy as np
 
-from .csvio import read_rows
+from .csvio import atomic_write_csv, read_rows
 from .features import Dataset
 from .metrics import (
     brier, brier_decomposition, calibration_slope_intercept, format_summary, log_loss,
@@ -199,44 +196,29 @@ class BacktestResult:
 
     def export_csv(self, path: str | Path) -> int:
         """Exporte atomiquement les predictions hors-echantillon en CSV."""
-        path = Path(path)
-        path.parent.mkdir(parents=True, exist_ok=True)
         cols = [
             "match_id", "date", "team_a", "team_b", "best_of", "lan", "tier", "event",
             "y", "p_model", "p_elo", "p_match", "p_maps",
         ]
-        temporary = None
-        try:
-            with tempfile.NamedTemporaryFile(mode="w", newline="", encoding="utf-8",
-                                             dir=path.parent, prefix=f".{path.name}.",
-                                             suffix=".tmp", delete=False) as fh:
-                temporary = Path(fh.name)
-                writer = csv.writer(fh, lineterminator="\n")
-                writer.writerow(cols)
-                for i in range(len(self.y)):
-                    m = self.meta[i]
-                    writer.writerow([
-                        m.get("match_id", ""),
-                        self.dates[i].isoformat(),
-                        m.get("team_a", ""),
-                        m.get("team_b", ""),
-                        m.get("best_of", ""),
-                        int(bool(m.get("lan", False))),
-                        m.get("tier", ""),
-                        m.get("event", ""),
-                        int(self.y[i]),
-                        f"{float(self.predictions[i]):.6f}",
-                        f"{float(self.elo_only[i]):.6f}",
-                        "" if self.match_only is None else f"{float(self.match_only[i]):.6f}",
-                        "" if self.maps_only is None else f"{float(self.maps_only[i]):.6f}",
-                    ])
-                fh.flush()
-                os.fsync(fh.fileno())
-            os.replace(temporary, path)
-        finally:
-            if temporary is not None:
-                temporary.unlink(missing_ok=True)
-        return int(len(self.y))
+        rows = (
+            [
+                self.meta[i].get("match_id", ""),
+                self.dates[i].isoformat(),
+                self.meta[i].get("team_a", ""),
+                self.meta[i].get("team_b", ""),
+                self.meta[i].get("best_of", ""),
+                int(bool(self.meta[i].get("lan", False))),
+                self.meta[i].get("tier", ""),
+                self.meta[i].get("event", ""),
+                int(self.y[i]),
+                f"{float(self.predictions[i]):.6f}",
+                f"{float(self.elo_only[i]):.6f}",
+                "" if self.match_only is None else f"{float(self.match_only[i]):.6f}",
+                "" if self.maps_only is None else f"{float(self.maps_only[i]):.6f}",
+            ]
+            for i in range(len(self.y))
+        )
+        return atomic_write_csv(path, cols, rows)
 
 
 def _elo_reference(ds: Dataset) -> np.ndarray:
@@ -405,14 +387,16 @@ def bet_backtest(
     Sans cotes reelles, cette fonction ne renvoie rien d'exploitable : ne pas
     substituer des cotes moyennes ou reconstituees, le biais serait total.
     """
-    from .odds import find_value, roi_significance, simulate_flat, simulate_kelly
+    from .odds import find_value, overround, roi_significance, simulate_flat, simulate_kelly
 
     finite_number("min_edge", min_edge, maximum=1.0)
     plays = []
+    overrounds = []
     for p, y, meta in zip(result.predictions, result.y, result.meta):
         odds = odds_lookup.get(meta["match_id"])
         if not odds:
             continue
+        overrounds.append(overround(odds[0], odds[1]))
         bet = find_value(float(p), odds[0], odds[1], meta["team_a"], meta["team_b"], min_edge)
         if bet is None:
             continue
@@ -421,7 +405,8 @@ def bet_backtest(
     out = simulate_flat(plays)
     out["kelly"] = simulate_kelly(plays)
     out["significance"] = roi_significance(plays)
-    out["matches_with_odds"] = sum(1 for m in result.meta if m["match_id"] in odds_lookup)
+    out["matches_with_odds"] = len(overrounds)
+    out["avg_overround"] = float(np.mean(overrounds)) if overrounds else None
     return out
 
 

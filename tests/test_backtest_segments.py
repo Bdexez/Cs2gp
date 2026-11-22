@@ -121,6 +121,7 @@ class BacktestSegmentTests(unittest.TestCase):
             self.assertIn("by_fold", payload)
             self.assertIn("bet_backtest", payload)
             self.assertGreater(payload["bet_backtest"]["matches_with_odds"], 0)
+            self.assertGreater(payload["bet_backtest"]["avg_overround"], 1.0)
             self.assertTrue(export_path.is_file())
 
     def test_benchmark_regimes_aggregates_multiple_seeds(self):
