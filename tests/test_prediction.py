@@ -130,6 +130,16 @@ class PredictionParityTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.an.compare_teams(a, a)
 
+    def test_movers_ranks_risers_and_fallers_over_window(self):
+        mv = self.an.movers(window_days=30, min_maps=5, top=3)
+        self.assertEqual(mv["window_days"], 30)
+        self.assertEqual(len(mv["risers"]), 3)
+        self.assertEqual(len(mv["fallers"]), 3)
+        self.assertGreaterEqual(mv["risers"][0]["delta"], mv["risers"][-1]["delta"])
+        self.assertLessEqual(mv["fallers"][0]["delta"], mv["fallers"][-1]["delta"])
+        with self.assertRaises(ValueError):
+            self.an.movers(window_days=0)
+
 
 if __name__ == "__main__":
     unittest.main()
