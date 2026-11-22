@@ -347,3 +347,11 @@ outillage domaine CS2 et sortie structuree).
 - **Verification d'hygiene AST et reference CLI** (`docs/REFERENCE.md`) :
   audit des imports inutilises sur tout `cs2gp/` et mise a jour complete de la
   reference CLI.
+
+## Cycle 31 : Courbe d'abstention et bilan par tournoi (`event_stats`)
+
+- **Courbe d'abstention (`abstention_curve` / `--abstention-curve`)** (`backtest.py`,
+  `cli.py`) : mesure le compromis couverture / precision / log-loss / Brier par
+  seuil de confiance pour calibrer objectivement la selectivite.
+- **Statistiques par tournoi (`Analyzer.event_stats`)** (`predict.py`) :
+  resume volume, dates, tier, LAN/online et taux d'upsets Elo par evenement.
