@@ -88,6 +88,8 @@ class EloConfig:
 
     @classmethod
     def from_dict(cls, data: dict) -> "EloConfig":
+        if not isinstance(data, dict):
+            raise ValueError("la configuration Elo doit etre un objet JSON")
         known = {f.name for f in fields(cls)}
         unknown = set(data) - known
         if unknown:
