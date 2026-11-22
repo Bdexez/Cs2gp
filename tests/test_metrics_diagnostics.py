@@ -136,6 +136,16 @@ class MetricsDiagnosticsTests(unittest.TestCase):
         self.assertEqual(good["df"], 8)
         self.assertLess(good["statistic"], bad["statistic"] * 0.1)
 
+    def test_roc_auc_handles_perfect_random_ties_and_single_class(self):
+        self.assertAlmostEqual(metrics.roc_auc([0, 0, 1, 1], [0.1, 0.2, 0.8, 0.9]), 1.0, places=10)
+        self.assertAlmostEqual(metrics.roc_auc([1, 1, 0, 0], [0.1, 0.2, 0.8, 0.9]), 0.0, places=10)
+        self.assertAlmostEqual(metrics.roc_auc([0, 1, 0, 1], [0.5, 0.5, 0.5, 0.5]), 0.5, places=10)
+        self.assertAlmostEqual(metrics.roc_auc([0, 1, 0, 1], [0.2, 0.5, 0.5, 0.8]), 0.875, places=10)
+        self.assertIsNone(metrics.roc_auc([1, 1, 1], [0.7, 0.8, 0.9]))
+        summary = metrics.summarize([0, 0, 1, 1], [0.1, 0.2, 0.8, 0.9])
+        self.assertAlmostEqual(summary["roc_auc"], 1.0, places=10)
+        self.assertIn("auc=1.000", metrics.format_summary("test", summary))
+
 
 if __name__ == "__main__":
     unittest.main()

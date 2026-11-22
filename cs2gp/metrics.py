@@ -256,6 +256,24 @@ def hosmer_lemeshow(y: np.ndarray, p: np.ndarray, bins: int = 10) -> dict:
     }
 
 
+def roc_auc(y, p) -> float | None:
+    """Aire sous la courbe ROC (statistique U de Mann-Whitney, gestion exacte des ex-aequo)."""
+    y, p = probability_pair(y, p)
+    n_pos = int(np.sum(y == 1.0))
+    n_neg = int(len(y) - n_pos)
+    if n_pos == 0 or n_neg == 0:
+        return None
+    order = np.argsort(p, kind="mergesort")
+    ps = p[order]
+    ys = y[order]
+    edges = np.flatnonzero(np.diff(ps)) + 1
+    starts = np.concatenate(([0], edges))
+    ends = np.concatenate((edges, [len(ps)]))
+    ranks = np.repeat(0.5 * (starts + 1.0 + ends), ends - starts)
+    u = float(np.sum(ranks[ys == 1.0])) - n_pos * (n_pos + 1) / 2.0
+    return float(u / (n_pos * n_neg))
+
+
 def summarize(y: np.ndarray, p: np.ndarray) -> dict:
     y = np.asarray(y, dtype=float)
     ll = log_loss(y, p)
@@ -268,17 +286,19 @@ def summarize(y: np.ndarray, p: np.ndarray) -> dict:
         "skill_score": float(1.0 - ll / base) if base > 0 else 0.0,
         "brier": brier(y, p),
         "accuracy": accuracy(y, p),
+        "roc_auc": roc_auc(y, p),
         "ece": expected_calibration_error(y, p),
         "mce": max_calibration_error(y, p),
     }
 
 
 def format_summary(name: str, s: dict) -> str:
+    auc_txt = f"  auc={s['roc_auc']:.3f}" if s.get("roc_auc") is not None else ""
     mce_txt = f"  mce={s['mce']:.3f}" if "mce" in s else ""
     return (
         f"{name:<22} n={s['n']:<6} logloss={s['log_loss']:.4f} "
         f"(base {s['baseline_log_loss']:.4f}, skill {s['skill_score']:+.1%})  "
-        f"acc={s['accuracy']:.1%}  brier={s['brier']:.4f}  ece={s['ece']:.3f}{mce_txt}"
+        f"acc={s['accuracy']:.1%}{auc_txt}  brier={s['brier']:.4f}  ece={s['ece']:.3f}{mce_txt}"
     )
 
 
