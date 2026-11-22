@@ -454,3 +454,11 @@ outillage domaine CS2 et sortie structuree).
   `--json` sur l'ensemble des sous-commandes analytiques et generatrices.
 - **Extraction des formateurs CLI** (`cli_exports.py`, `cli.py`) : deplacement
   de `format_team_profile()` et `format_compare()` dans `cli_exports.py`.
+
+## Cycle 43 : Retrait de marge configurable (`devig` / `--devig`)
+
+- **Dispatcher unifie `devig()`** (`odds.py`) : selectionne `power` (defaut),
+  `shin` ou `proportional`, et l'expose via `devig_method` dans `find_value()`
+  et `closing_line_value()`.
+- **Option `--devig` sur `cs2gp predict`** (`cli.py`) : permet de confronter
+  directement une prediction au marche en mode `power`, `shin` ou `proportional`.

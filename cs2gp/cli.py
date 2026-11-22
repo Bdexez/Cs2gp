@@ -687,12 +687,15 @@ def cmd_predict(args) -> int:
             if veto_sens is not None:
                 payload["veto_sensitivity"] = veto_sens
         if args.odds_a is not None and args.odds_b is not None:
+            devig_method = getattr(args, "devig", "power")
             bet = find_value(
-                pred.p_a, args.odds_a, args.odds_b, pred.team_a, pred.team_b, min_edge=args.min_edge
+                pred.p_a, args.odds_a, args.odds_b, pred.team_a, pred.team_b,
+                min_edge=args.min_edge, devig_method=devig_method,
             )
             payload["market"] = {
                 "odds_a": args.odds_a,
                 "odds_b": args.odds_b,
+                "devig": devig_method,
                 "overround": overround(args.odds_a, args.odds_b),
                 "value_bet": None if bet is None else {
                     "side": bet.side, "model_p": bet.model_p, "market_p": bet.market_p,
@@ -718,7 +721,8 @@ def cmd_predict(args) -> int:
         print(f"  Marche : {args.odds_a:.2f} / {args.odds_b:.2f} "
               f"(marge {overround(args.odds_a, args.odds_b) - 1:.1%})")
         bet = find_value(
-            pred.p_a, args.odds_a, args.odds_b, pred.team_a, pred.team_b, min_edge=args.min_edge
+            pred.p_a, args.odds_a, args.odds_b, pred.team_a, pred.team_b,
+            min_edge=args.min_edge, devig_method=getattr(args, "devig", "power"),
         )
         if bet is None:
             print(f"  Aucun ecart >= {args.min_edge:.0%} avec le marche : pas de valeur.")
@@ -1185,6 +1189,8 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--odds-a", type=float, help="cote decimale sur team_a")
     s.add_argument("--odds-b", type=float, help="cote decimale sur team_b")
     s.add_argument("--min-edge", type=float, default=0.04)
+    s.add_argument("--devig", choices=("power", "shin", "proportional"), default="power",
+                   help="methode de retrait de marge bookmaker (defaut power)")
     s.add_argument("--markets", action="store_true", help="affiche tous les marches derives et cotes justes")
     s.add_argument("--no-calibration", action="store_true",
                    help="desactive la calibration de longueur de serie pour --markets")
