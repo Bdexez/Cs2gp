@@ -61,6 +61,7 @@ class CliJsonTests(unittest.TestCase):
             self.assertIn("metrics", bt_payload)
             self.assertIn("calibration", bt_payload)
             self.assertIn("brier_decomposition", bt_payload)
+            self.assertIn("sharpness", bt_payload)
             self.assertIn("by_segment", bt_payload)
             self.assertIn("by_team", bt_payload)
 
@@ -237,6 +238,18 @@ class CliJsonTests(unittest.TestCase):
             self.assertGreater(len(ev_payload["events"]), 0)
             self.assertLessEqual(len(ev_payload["events"]), 5)
             self.assertTrue(events_csv.is_file())
+
+            # fixtures --json (atomic write)
+            gen_fx = Path(tmp) / "gen_fixtures.csv"
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(main([
+                    "fixtures", "--data", str(data), "--teams", "4", "--count", "3",
+                    "--out", str(gen_fx), "--json",
+                ]), 0)
+            fx_payload = json.loads(out.getvalue())
+            self.assertEqual(fx_payload["n_fixtures"], 3)
+            self.assertTrue(gen_fx.is_file())
 
     def test_public_package_api_exports(self):
         import cs2gp

@@ -418,3 +418,12 @@ outillage domaine CS2 et sortie structuree).
   hypothetiques sans muter l'instance source.
 - **Sortie JSON sur `cs2gp teams` et `cs2gp merge`** (`cli.py`) : complete
   l'uniformite `--json` de l'interface CLI pour l'automatisation.
+
+## Cycle 39 : Nettete probabiliste (`sharpness`) et ecriture atomique de `cs2gp fixtures`
+
+- **Metrique de nettete (`sharpness`)** (`metrics.py`, `backtest.py`) : mesure
+  confiance moyenne, ecart-type, entropie moyenne et part de predictions
+  decisives (>= 70 %), exposee dans `BacktestResult.to_dict()`.
+- **Ecriture atomique et `--json` sur `cs2gp fixtures`** (`cli.py`) : utilise
+  `atomic_write_csv()` (plus aucune ecriture CSV non atomique dans le paquet)
+  et ajoute `--json`.
