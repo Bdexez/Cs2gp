@@ -180,3 +180,14 @@ outillage domaine CS2 et sortie structuree).
   `BacktestResult.to_dict()`.
 - **Export CSV de la carte (`cs2gp slate --export-csv`)** (`cli.py`) : ecriture
   atomique de tous les pronostics et abstentions de la carte du jour.
+
+## Cycle 14 : Factorisation des ecritures atomiques, overround et sensibilite au veto
+
+- **Ecritures atomiques centralisees** (`csvio.py`, `schema.py`, `model.py`,
+  `backtest.py`, `cli.py`) : `atomic_write_bytes` et `atomic_write_csv`
+  eliminent la duplication du motif `NamedTemporaryFile + fsync + replace`.
+- **Marge bookmaker moyenne** (`backtest.py`) : `bet_backtest` rapporte
+  `avg_overround` sur les matchs cotes pour contextualiser le ROI.
+- **Sensibilite au veto** (`markets.py`) : `veto_sensitivity()` mesure la
+  distance en variation totale entre la loi du score deterministe et la loi
+  du score sous veto stochastique.
