@@ -460,6 +460,31 @@ class Analyzer:
             })
         return timeline
 
+    def compare_teams(self, team_a: str, team_b: str, on: dt.date | None = None) -> dict:
+        """Comparaison directe de deux equipes (profils, pool de maps et H2H) sans entrainement."""
+        if self.fx is None or not self.matches:
+            raise RuntimeError("charger des donnees avant de comparer deux equipes")
+        a, b = self.resolve_team(team_a), self.resolve_team(team_b)
+        if a == b:
+            raise ValueError("une equipe ne joue pas contre elle-meme")
+        as_of = on or max(m.date for m in self.matches)
+        prof_a = self.team_profile(a, on=as_of)
+        prof_b = self.team_profile(b, on=as_of)
+        edges = self.fx.map_pool_edges(a, b, as_of)
+        return {
+            "as_of": as_of.isoformat(),
+            "team_a": prof_a,
+            "team_b": prof_b,
+            "elo_diff": float(prof_a["rating"] - prof_b["rating"]),
+            "elo_win_prob_a": float(self.fx.elo.win_probability(a, b, as_of)),
+            "certainty": float(self.fx.elo.certainty(a, b, as_of)),
+            "map_edges": [
+                {"map": m, "elo_edge": float(val)}
+                for m, val in sorted(edges.items(), key=lambda kv: -kv[1])
+            ],
+            "h2h": self.head_to_head(a, b, on=on),
+        }
+
     def calibration_history(self):
         """Historique hors entrainement partage par les calibrations et mis en cache."""
         from .calibration import prequential_maps
