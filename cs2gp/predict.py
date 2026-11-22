@@ -362,6 +362,63 @@ class Analyzer:
             "map_pool": pool_rows,
         }
 
+    def head_to_head(self, team_a: str, team_b: str, on: dt.date | None = None) -> dict:
+        """Historique direct entre deux equipes (series, maps et bilan par terrain)."""
+        if self.fx is None or not self.matches:
+            raise RuntimeError("charger des donnees avant de consulter l'historique direct")
+        a, b = self.resolve_team(team_a), self.resolve_team(team_b)
+        if a == b:
+            raise ValueError("une equipe ne joue pas contre elle-meme")
+        as_of = on or max(m.date for m in self.matches)
+        encounters = [
+            m for m in self.matches
+            if {m.team_a, m.team_b} == {a, b} and (on is None or m.date < on)
+        ]
+        series_a = series_b = 0
+        maps_a = maps_b = 0
+        by_map: dict[str, dict] = {}
+        recent = []
+        for m in encounters:
+            flipped = m.team_a != a
+            ma, mb = (m.maps_b, m.maps_a) if flipped else (m.maps_a, m.maps_b)
+            if m.is_complete:
+                if ma > mb:
+                    series_a += 1
+                else:
+                    series_b += 1
+            for mp in m.maps:
+                ra, rb = (mp.rounds_b, mp.rounds_a) if flipped else (mp.rounds_a, mp.rounds_b)
+                won_a = int(ra > rb)
+                maps_a += won_a
+                maps_b += 1 - won_a
+                slot = by_map.setdefault(mp.map_name, {"played": 0, "a_wins": 0, "b_wins": 0, "round_diff_a": 0})
+                slot["played"] += 1
+                slot["a_wins"] += won_a
+                slot["b_wins"] += 1 - won_a
+                slot["round_diff_a"] += ra - rb
+            recent.append({
+                "match_id": m.match_id,
+                "date": m.date.isoformat(),
+                "best_of": m.best_of,
+                "event": m.event,
+                "score": f"{ma}-{mb}",
+                "winner": (a if ma > mb else b) if m.is_complete else None,
+            })
+        return {
+            "team_a": a,
+            "team_b": b,
+            "as_of": as_of.isoformat(),
+            "series_total": series_a + series_b,
+            "series_a_wins": series_a,
+            "series_b_wins": series_b,
+            "maps_total": maps_a + maps_b,
+            "maps_a_wins": maps_a,
+            "maps_b_wins": maps_b,
+            "weighted_h2h_score": float(self.fx._h2h(a, b, as_of)),
+            "by_map": dict(sorted(by_map.items())),
+            "recent_matches": recent[-10:],
+        }
+
     def calibration_history(self):
         """Historique hors entrainement partage par les calibrations et mis en cache."""
         from .calibration import prequential_maps

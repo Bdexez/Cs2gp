@@ -143,6 +143,34 @@ def cmd_inspect(args) -> int:
     return 0
 
 
+def cmd_h2h(args) -> int:
+    an = _analyzer(args, train=False)
+    on = parse_date(args.date) if args.date else None
+    h2h = an.head_to_head(args.team_a, args.team_b, on=on)
+    if args.json:
+        print(json.dumps(h2h, indent=2, ensure_ascii=False))
+        return 0
+    print()
+    print(f"Confrontations directes : {h2h['team_a']} vs {h2h['team_b']}   [au {h2h['as_of']}]")
+    print(
+        f"  Series : {h2h['series_a_wins']}-{h2h['series_b_wins']} ({h2h['series_total']} completes) | "
+        f"Maps : {h2h['maps_a_wins']}-{h2h['maps_b_wins']} ({h2h['maps_total']} jouees) | "
+        f"score pondere {h2h['weighted_h2h_score']:+.3f}"
+    )
+    if h2h["by_map"]:
+        print("\n  Par map :")
+        for mp, stats in h2h["by_map"].items():
+            print(
+                f"    {mp:<10} {stats['a_wins']}-{stats['b_wins']}   "
+                f"({stats['played']} maps, diff rounds {stats['round_diff_a']:+d})"
+            )
+    if h2h["recent_matches"]:
+        print("\n  Dernieres series :")
+        for item in h2h["recent_matches"][-5:]:
+            print(f"    {item['date']}  bo{item['best_of']}  {item['score']}  [{item['event']}]")
+    return 0
+
+
 def cmd_audit(args) -> int:
     an = _analyzer(args, train=False)
     report = audit_history(an.maps, an.matches)
@@ -611,6 +639,13 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("bundle", help="chemin vers l'archive .cs2gp")
     s.add_argument("--json", action="store_true", help="sortie JSON structuree")
     s.set_defaults(func=cmd_inspect)
+
+    s = sub.add_parser("h2h", parents=[common], help="bilan des confrontations directes entre deux equipes")
+    s.add_argument("team_a")
+    s.add_argument("team_b")
+    s.add_argument("--date", help="exclut les matchs a partir de cette date")
+    s.add_argument("--json", action="store_true", help="sortie JSON structuree")
+    s.set_defaults(func=cmd_h2h)
 
     s = sub.add_parser("audit", parents=[common], help="controle la qualite des donnees chargees")
     s.add_argument("--json", action="store_true", help="sortie JSON structuree")

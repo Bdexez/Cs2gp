@@ -109,6 +109,18 @@ class CliJsonTests(unittest.TestCase):
             self.assertTrue(inspect_payload["has_calibration_history"])
             self.assertFalse(inspect_payload["has_gbdt"])
 
+            # h2h --json
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(main(["h2h", teams[0], teams[1], "--data", str(data), "--json"]), 0)
+            h2h_payload = json.loads(out.getvalue())
+            self.assertEqual(h2h_payload["team_a"], teams[0])
+            self.assertEqual(h2h_payload["team_b"], teams[1])
+            self.assertEqual(
+                h2h_payload["series_a_wins"] + h2h_payload["series_b_wins"],
+                h2h_payload["series_total"],
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
