@@ -11,7 +11,7 @@ from pathlib import Path
 
 from . import __version__
 from .audit import audit_fixtures, audit_history, format_audit
-from .backtest import bet_backtest, read_odds_csv, tune, walk_forward
+from .backtest import bet_backtest, read_odds_csv, tune, walk_forward, walk_forward_importance
 from .csvio import atomic_write_csv
 from .features import feature_correlation_report
 from .markets import build_markets, project_veto
@@ -386,6 +386,15 @@ def cmd_backtest(args) -> int:
         bet_backtest(res, read_odds_csv(args.odds_csv), min_edge=args.min_edge)
         if args.odds_csv else None
     )
+    importance = (
+        walk_forward_importance(
+            an.match_ds,
+            initial_frac=args.initial_frac,
+            refit_every=args.refit_every,
+            use_gbdt=not args.no_gbdt,
+        )
+        if getattr(args, "importance", False) else None
+    )
     if args.json:
         payload = res.to_dict()
         if args.by_year:
@@ -404,6 +413,8 @@ def cmd_backtest(args) -> int:
             payload["by_fold"] = res.drift_report()
         if odds_summary is not None:
             payload["bet_backtest"] = odds_summary
+        if importance is not None:
+            payload["importance"] = importance
         print(json.dumps(payload, indent=2, ensure_ascii=False))
         return 0
     print()
@@ -466,6 +477,10 @@ def cmd_backtest(args) -> int:
                 f"ecart proba {odds_summary['avg_clv_prob']:+.2%} | "
                 f"EV cloture {odds_summary['avg_clv_ev']:+.2%}"
             )
+    if importance is not None:
+        print("\nImportance hors-echantillon par permutation (delta log-loss) :")
+        for row in importance[:10]:
+            print(f"  {row['feature']:<22} {row['mean_delta']:+.5f}  (std folds {row['fold_std']:.5f})")
     return 0
 
 
@@ -719,6 +734,9 @@ def cmd_tipster_backtest(args) -> int:
         momentum=args.momentum,
         use_gbdt=not args.no_gbdt,
     )
+    if getattr(args, "export_csv", None):
+        written = rec.export_csv(args.export_csv)
+        print(f"{written} pronostics regles exportes -> {args.export_csv}", file=sys.stderr)
     if args.json:
         print(json.dumps(rec.to_dict(), indent=2, ensure_ascii=False))
         return 0
@@ -903,6 +921,8 @@ def build_parser() -> argparse.ArgumentParser:
                    help="ventile les metriques par format, LAN/online et tier")
     s.add_argument("--by-fold", action="store_true",
                    help="affiche l'evolution du log-loss et de la calibration par fold")
+    s.add_argument("--importance", action="store_true",
+                   help="calcule l'importance hors-echantillon par permutation")
     s.add_argument("--export-csv", help="exporte les predictions hors-echantillon en CSV")
     s.add_argument("--odds-csv", help="CSV de cotes historiques (match_id,odds_a,odds_b)")
     s.add_argument("--min-edge", type=float, default=0.04,
@@ -993,6 +1013,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--momentum", type=float, default=0.0,
                    help="decalage momentum en logit a appliquer (defaut 0 ; mesurer "
                         "d'abord avec `slate --momentum auto`)")
+    s.add_argument("--export-csv", help="exporte les pronostics regles en CSV")
     s.add_argument("--json", action="store_true", help="sortie JSON structuree")
     s.set_defaults(func=cmd_tipster_backtest)
     return p
