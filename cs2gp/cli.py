@@ -248,7 +248,9 @@ def cmd_ratings(args) -> int:
         raise ValueError("min-maps doit etre positif ou nul")
     an = _analyzer(args, train=False)
     on = max(m.date for m in an.matches)
-    board = an.fx.elo.leaderboard(on=on, min_maps=args.min_maps)
+    board = an.fx.elo.leaderboard(
+        on=on, min_maps=args.min_maps, active_within_days=args.active_within
+    )
     if args.export_csv:
         pool = list(an.fx.pool_on(on))
         written = atomic_write_csv(
@@ -435,8 +437,10 @@ def cmd_predict(args) -> int:
     pred = an.predict(args.team_a, args.team_b, best_of=args.bo, lan=args.lan, on=on)
     market_lines = None
     if getattr(args, "markets", False):
+        past = an.as_of(pred.date)
+        temp = 1.0 if getattr(args, "no_calibration", False) else fit_decider_temperature(past, momentum=past.momentum)
         veto = project_veto([(e.map_name, e.p_a) for e in pred.map_edges], pred.best_of)
-        dist = shape_series(veto, pred.best_of, pred.p_a, an.momentum, 1.0)
+        dist = shape_series(veto, pred.best_of, pred.p_a, past.momentum, temp)
         market_lines = build_markets(dist, pred.team_a, pred.team_b)
     if args.json:
         payload = pred.to_dict()
@@ -832,6 +836,8 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("ratings", parents=[common], help="classement Elo et forces par map")
     s.add_argument("--top", type=int, default=20)
     s.add_argument("--min-maps", type=int, default=20)
+    s.add_argument("--active-within", type=int, default=None,
+                   help="exclut les equipes inactives depuis plus de N jours")
     s.add_argument("--export-csv", help="exporte le classement et les notes par map en CSV")
     s.add_argument("--json", action="store_true", help="sortie JSON structuree")
     s.set_defaults(func=cmd_ratings)
@@ -876,6 +882,8 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--odds-b", type=float, help="cote decimale sur team_b")
     s.add_argument("--min-edge", type=float, default=0.04)
     s.add_argument("--markets", action="store_true", help="affiche tous les marches derives et cotes justes")
+    s.add_argument("--no-calibration", action="store_true",
+                   help="desactive la calibration de longueur de serie pour --markets")
     s.add_argument("--json", action="store_true", help="sortie JSON structuree")
     s.set_defaults(func=cmd_predict)
 
