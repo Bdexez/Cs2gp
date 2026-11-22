@@ -19,8 +19,9 @@ import numpy as np
 from .csvio import atomic_write_csv, read_rows
 from .features import Dataset
 from .metrics import (
-    brier, brier_decomposition, calibration_slope_intercept, format_summary, log_loss,
-    paired_block_bootstrap, quantile_reliability_table, reliability_table, spiegelhalter_z, summarize,
+    brier, brier_decomposition, calibration_slope_intercept, favorite_reliability_table,
+    format_summary, log_loss, paired_block_bootstrap, quantile_reliability_table,
+    reliability_table, spiegelhalter_z, summarize,
 )
 from .model import MatchPredictor, map_predictor
 from .ratings import expected_score
@@ -48,6 +49,7 @@ class BacktestResult:
     best_blend: float | None = None
     comparison: dict | None = None
     fold_slices: list[tuple[int, int]] = field(default_factory=list)
+    temperatures: list[float] = field(default_factory=list)
 
     def report(self) -> str:
         lines = [
@@ -159,6 +161,8 @@ class BacktestResult:
             "brier_decomposition": brier_decomposition(self.y, self.predictions) if len(self.y) else None,
             "reliability": reliability_table(self.y, self.predictions) if len(self.y) else [],
             "quantile_reliability": quantile_reliability_table(self.y, self.predictions) if len(self.y) else [],
+            "favorite_reliability": favorite_reliability_table(self.y, self.predictions) if len(self.y) else [],
+            "temperatures": list(self.temperatures),
         }
         if self.match_only is not None:
             out["match_only_metrics"] = summarize(self.y, self.match_only)
@@ -279,9 +283,11 @@ def walk_forward(
     p_match = np.zeros(n - start)
     p_maps = np.zeros(n - start) if use_maps else None
     folds = 0
+    temperatures: list[float] = []
     for i, j in splits:
         model = MatchPredictor(**model_kwargs)
         model.fit(ds.X[:i], ds.y[:i], ds.dates[:i], ds.feature_names)
+        temperatures.append(float(model.temperature))
         p_match[i - start : j - start] = model.predict_proba(ds.X[i:j])
 
         if use_maps:
@@ -356,6 +362,7 @@ def walk_forward(
                                           samples=bootstrap_samples, block_days=block_days)
                     if bootstrap_samples else None),
         fold_slices=[(i - start, j - start) for i, j in splits],
+        temperatures=temperatures,
     )
 
 
