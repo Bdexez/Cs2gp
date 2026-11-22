@@ -122,3 +122,17 @@ outillage domaine CS2 et sortie structuree).
 - **Veto stochastique** (`markets.py`) : `stochastic_veto_distribution`
   moyenne la loi du score sur des vetos softmax (reduit exactement a
   `project_veto` quand `temperature=0`) afin de quantifier la sensibilite au veto.
+
+## Cycle 9 : Diagnostics CLI, export du classement et suite d'invariants
+
+- **Diagnostics CLI enrichis** (`cli.py`) : `cs2gp train` affiche les z-scores
+  de Wald (`*` si `|z| > 1.96`) ; `cs2gp journal` affiche le drawdown maximal
+  et la pire serie de defaites ; `cs2gp ratings --export-csv` exporte
+  atomiquement le classement Elo et les 7 notes par map.
+- **Suite d'invariants globaux et symetrie sous momentum** (`predict.py`,
+  `tests/test_invariants.py`) : correction d'un biais d'ordre des equipes
+  dans `probability_from_pool` lorsque `momentum != 0` (moyennage 50/50 des
+  deux ordres de premier pick pour preserver exactement `p(A|B) + p(B|A) = 1`),
+  verification de la coherence des marches derives sur BO1/BO3/BO5 et de la
+  monotonicite des fonctions coeur (`expected_score`, `series_win_probability`,
+  `devig_power`, `kelly_fraction`).
