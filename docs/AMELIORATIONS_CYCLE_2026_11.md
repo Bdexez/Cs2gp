@@ -202,3 +202,13 @@ outillage domaine CS2 et sortie structuree).
   prevenir la scission silencieuse d'une equipe dans un CSV reel.
 - **Courbe d'equite** (`odds.py`) : `equity_curve(results, mode="flat"|"kelly")`
   retourne la trajectoire cumulee pari par pari.
+
+## Cycle 16 : Diagnostics journal, CLV en backtest et alias personnalises
+
+- **Scoring enrichi du pronostiqueur** (`pronostic.py`) : `TipsterRecord.scoring()`
+  inclut `spiegelhalter` et `brier_decomposition` (rapport et JSON).
+- **CLV dans `bet_backtest`** (`backtest.py`) : `read_odds_csv` accepte les
+  colonnes optionnelles `closing_odds_a, closing_odds_b` et `bet_backtest`
+  calcule `clv_bets`, `avg_clv_prob` et `avg_clv_ev`.
+- **Alias personnalises** (`schema.py`) : `normalize_team(name, extra_aliases=...)`
+  permet de resoudre des variantes de noms detectees par `cs2gp audit`.
