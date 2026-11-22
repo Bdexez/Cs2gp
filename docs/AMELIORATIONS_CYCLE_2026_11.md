@@ -282,3 +282,13 @@ outillage domaine CS2 et sortie structuree).
   hors-echantillon par feature sur les folds temporels.
 - **Scoring propre par groupe** (`pronostic.py`) : `TipsterRecord.by()` expose
   `log_loss` et `brier` pour chaque palier et chaque marche.
+
+## Cycle 24 : Fiabilite cote favori, `backtest --importance` et export tipster
+
+- **Fiabilite cote favori (`favorite_reliability_table`)** (`metrics.py`) :
+  replie les probabilites dans `[0.5, 1.0]` pour evaluer la calibration du
+  favori annonce par tranche.
+- **`cs2gp backtest --importance`** (`cli.py`) : expose `walk_forward_importance`
+  directement en CLI (texte et `--json`).
+- **Export CSV du `tipster-backtest`** (`pronostic.py`, `cli.py`) :
+  `TipsterRecord.export_csv()` et `--export-csv` sur `cs2gp tipster-backtest`.
