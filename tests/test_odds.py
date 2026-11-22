@@ -2,7 +2,7 @@ import math
 import unittest
 
 from cs2gp.odds import (
-    closing_line_value, devig_power, equity_curve, expected_value, find_value,
+    closing_line_value, devig_power, devig_shin, equity_curve, expected_value, find_value,
     kelly_fraction, market_diagnostics, roi_significance, simulate_flat, simulate_kelly,
 )
 
@@ -25,6 +25,20 @@ class PowerDevigTests(unittest.TestCase):
             self.assertAlmostEqual(result[0], pa, places=12)
         for odds in (1.01, 1.5, 2, 10, 1000):
             self.assertEqual(devig_power(odds, odds), (.5, .5))
+
+    def test_shin_devig_is_symmetric_and_handles_fair_and_vigged_markets(self):
+        for odds in ((1.25, 4.0), (1.75, 2.10), (1.05, 10.0), (2.0, 2.0)):
+            with self.subTest(odds=odds):
+                pa, pb = devig_shin(*odds)
+                self.assertAlmostEqual(pa + pb, 1.0, places=12)
+                rev = devig_shin(*reversed(odds))
+                self.assertAlmostEqual(pa, rev[1], places=12)
+        self.assertEqual(devig_shin(1.8, 1.8), (0.5, 0.5))
+        # On a vigged favorite/longshot market, Shin assigns higher prob to favorite than proportional
+        diag = market_diagnostics(1.25, 4.20)
+        self.assertGreater(diag["shin_z"], 0.0)
+        self.assertGreater(diag["shin_a"], diag["proportional_a"])
+        self.assertAlmostEqual(diag["shin_a"] + diag["shin_b"], 1.0, places=12)
 
 
 class OddsValidationTests(unittest.TestCase):

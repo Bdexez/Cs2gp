@@ -61,12 +61,48 @@ def devig_power(odds_a: float, odds_b: float) -> tuple[float, float]:
     return ia**k / s, ib**k / s
 
 
+def _shin_z(ia: float, ib: float) -> float:
+    s = ia + ib
+    if s <= 1.0:
+        return 0.0
+
+    def _sum_p(z: float) -> float:
+        denom = 2.0 * (1.0 - z)
+        pa = (math.sqrt(z * z + 4.0 * (1.0 - z) * ia * ia / s) - z) / denom
+        pb = (math.sqrt(z * z + 4.0 * (1.0 - z) * ib * ib / s) - z) / denom
+        return pa + pb
+
+    lo, hi = 0.0, 1.0 - 1e-12
+    for _ in range(80):
+        mid = 0.5 * (lo + hi)
+        if _sum_p(mid) > 1.0:
+            lo = mid
+        else:
+            hi = mid
+    return 0.5 * (lo + hi)
+
+
+def devig_shin(odds_a: float, odds_b: float) -> tuple[float, float]:
+    """Retrait de marge selon le modele de Shin (part d'inities z)."""
+    ia, ib = implied(odds_a), implied(odds_b)
+    s = ia + ib
+    if s <= 1.0:
+        return ia / s, ib / s
+    z = _shin_z(ia, ib)
+    denom = 2.0 * (1.0 - z)
+    pa = (math.sqrt(z * z + 4.0 * (1.0 - z) * ia * ia / s) - z) / denom
+    pb = (math.sqrt(z * z + 4.0 * (1.0 - z) * ib * ib / s) - z) / denom
+    tot = pa + pb
+    return float(pa / tot), float(pb / tot)
+
+
 def market_diagnostics(odds_a: float, odds_b: float) -> dict:
-    """Compare marge, arbitrage eventuel et probabilites sans marge (prop vs power)."""
+    """Compare marge, arbitrage eventuel et probabilites sans marge (prop, power, Shin)."""
     ia, ib = implied(odds_a), implied(odds_b)
     ov = ia + ib
     pa_prop, pb_prop = devig_proportional(odds_a, odds_b)
     pa_pow, pb_pow = devig_power(odds_a, odds_b)
+    pa_shin, pb_shin = devig_shin(odds_a, odds_b)
     return {
         "overround": float(ov),
         "vig": float(ov - 1.0),
@@ -77,6 +113,9 @@ def market_diagnostics(odds_a: float, odds_b: float) -> dict:
         "proportional_b": float(pb_prop),
         "power_a": float(pa_pow),
         "power_b": float(pb_pow),
+        "shin_a": float(pa_shin),
+        "shin_b": float(pb_shin),
+        "shin_z": float(_shin_z(ia, ib)),
     }
 
 
