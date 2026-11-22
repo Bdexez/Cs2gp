@@ -226,10 +226,11 @@ def summarize(y: np.ndarray, p: np.ndarray) -> dict:
 
 
 def format_summary(name: str, s: dict) -> str:
+    mce_txt = f"  mce={s['mce']:.3f}" if "mce" in s else ""
     return (
         f"{name:<22} n={s['n']:<6} logloss={s['log_loss']:.4f} "
         f"(base {s['baseline_log_loss']:.4f}, skill {s['skill_score']:+.1%})  "
-        f"acc={s['accuracy']:.1%}  brier={s['brier']:.4f}  ece={s['ece']:.3f}"
+        f"acc={s['accuracy']:.1%}  brier={s['brier']:.4f}  ece={s['ece']:.3f}{mce_txt}"
     )
 
 
