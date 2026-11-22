@@ -427,3 +427,12 @@ outillage domaine CS2 et sortie structuree).
 - **Ecriture atomique et `--json` sur `cs2gp fixtures`** (`cli.py`) : utilise
   `atomic_write_csv()` (plus aucune ecriture CSV non atomique dans le paquet)
   et ajoute `--json`.
+
+## Cycle 40 : Simulation Elo *what-if* (`simulate_outcome`) et invariants analytiques
+
+- **Simulation *what-if* (`EloEngine.simulate_outcome`)** (`ratings.py`) :
+  calcule sans muter l'etat les gains/pertes Elo (global et map) en cas de
+  victoire de A ou de B.
+- **Invariants mathematiques etendus** (`tests/test_invariants.py`) : couvre
+  l'antisymetrie de `roc_auc`, l'invariance par retournement de `sharpness`, la
+  monotonicite de `devig_shin` et la purete/symetrie de `simulate_outcome`.

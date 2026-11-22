@@ -2,8 +2,9 @@ import datetime as dt
 import unittest
 
 from cs2gp.markets import build_markets, project_veto
+from cs2gp.metrics import roc_auc, sharpness
 from cs2gp.model import series_win_probability
-from cs2gp.odds import devig_power, kelly_fraction
+from cs2gp.odds import devig_power, devig_shin, kelly_fraction
 from cs2gp.predict import Analyzer
 from cs2gp.pronostic import shape_series
 from cs2gp.ratings import expected_score
@@ -86,6 +87,39 @@ class GlobalInvariantsTests(unittest.TestCase):
         # kelly_fraction is non-decreasing with model probability
         ks = [kelly_fraction(p, 2.0) for p in (0.45, 0.50, 0.55, 0.60, 0.70)]
         self.assertTrue(all(x <= y for x, y in zip(ks, ks[1:])))
+
+    def test_diagnostic_metrics_and_what_if_elo_satisfy_symmetry_invariants(self):
+        import numpy as np
+
+        rng = np.random.default_rng(77)
+        p = rng.uniform(0.1, 0.9, size=120)
+        y = (rng.random(120) < p).astype(float)
+
+        # ROC-AUC flip & complement invariants
+        self.assertAlmostEqual(roc_auc(y, p), roc_auc(1.0 - y, 1.0 - p), places=12)
+        self.assertAlmostEqual(roc_auc(y, p) + roc_auc(y, 1.0 - p), 1.0, places=12)
+
+        # Sharpness flip invariance
+        s_fwd = sharpness(p)
+        s_rev = sharpness(1.0 - p)
+        for key in ("mean_confidence", "std_p", "mean_entropy", "pct_decisive_70"):
+            self.assertAlmostEqual(s_fwd[key], s_rev[key], places=12)
+
+        # Shin devig monotonicity
+        s1, _ = devig_shin(1.60, 2.30)
+        s2, _ = devig_shin(2.00, 1.85)
+        self.assertGreater(s1, s2)
+
+        # Elo simulate_outcome is pure and symmetric under team swap
+        a, b = self.an.known_teams()[:2]
+        ra_before = self.an.fx.elo.rating(a, self.on)
+        sim_ab = self.an.fx.elo.simulate_outcome(a, b, "mirage", self.on)
+        sim_ba = self.an.fx.elo.simulate_outcome(b, a, "mirage", self.on)
+        self.assertEqual(self.an.fx.elo.rating(a, self.on), ra_before)
+        self.assertGreater(sim_ab["if_a_wins"]["delta_a"], 0.0)
+        self.assertLess(sim_ab["if_b_wins"]["delta_a"], 0.0)
+        self.assertAlmostEqual(sim_ab["if_a_wins"]["delta_a"], sim_ba["if_b_wins"]["delta_b"], places=10)
+        self.assertAlmostEqual(sim_ab["if_b_wins"]["delta_a"], sim_ba["if_a_wins"]["delta_b"], places=10)
 
 
 if __name__ == "__main__":
