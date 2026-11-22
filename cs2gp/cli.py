@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 
 from . import __version__
-from .audit import audit_history, format_audit
+from .audit import audit_fixtures, audit_history, format_audit
 from .backtest import bet_backtest, read_odds_csv, tune, walk_forward
 from .csvio import atomic_write_csv
 from .metrics import format_summary, summarize
@@ -207,11 +207,21 @@ def cmd_h2h(args) -> int:
 def cmd_audit(args) -> int:
     an = _analyzer(args, train=False)
     report = audit_history(an.maps, an.matches)
+    fx_report = audit_fixtures(read_fixtures(args.fixtures), an) if args.fixtures else None
     if args.json:
-        print(json.dumps(report, indent=2, ensure_ascii=False))
-    else:
-        print()
-        print(format_audit(report))
+        payload = {**report, "fixtures": fx_report} if fx_report is not None else report
+        print(json.dumps(payload, indent=2, ensure_ascii=False))
+        return 0
+    print()
+    print(format_audit(report))
+    if fx_report is not None:
+        print(
+            f"\nAudit fixtures : {fx_report['n_fixtures']} affiches "
+            f"({fx_report['with_odds']} avec cotes) | "
+            f"statut {'OK' if fx_report['ok'] else 'A VERIFIER'}"
+        )
+        for w in fx_report["warnings"]:
+            print(f"  /!\\ {w}")
     return 0
 
 
@@ -779,6 +789,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.set_defaults(func=cmd_h2h)
 
     s = sub.add_parser("audit", parents=[common], help="controle la qualite des donnees chargees")
+    s.add_argument("--fixtures", help="CSV de matchs a venir a verifier avant prediction")
     s.add_argument("--json", action="store_true", help="sortie JSON structuree")
     s.set_defaults(func=cmd_audit)
 
