@@ -562,6 +562,8 @@ cs2gp audit [--json]                              # dataset quality check
 cs2gp team navi [--date YYYY-MM-DD] [--json]      # full team profile and map pool
 cs2gp h2h navi g2 [--date YYYY-MM-DD] [--json]    # head-to-head history
 cs2gp inspect models/analyzer.cs2gp [--json]      # verify and inspect a bundle safely
+cs2gp diff old.cs2gp new.cs2gp [--json]           # compare two bundles safely
+cs2gp merge part1.csv part2.csv --out all.csv     # deduplicate & merge CSV histories
 cs2gp backtest --by-segment --by-fold --export-csv out.csv --odds-csv odds.csv [--json]
 cs2gp sample --regime realiste --with-rosters     # synthetic data with roster reshuffles
 ```
