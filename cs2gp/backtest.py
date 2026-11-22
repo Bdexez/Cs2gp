@@ -234,6 +234,39 @@ class BacktestResult:
             })
         return rows
 
+    def abstention_curve(
+        self,
+        thresholds: tuple[float, ...] = (0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80),
+    ) -> list[dict]:
+        """Compromis couverture vs exactitude/log-loss selon le seuil d'abstention."""
+        if not len(self.y):
+            return []
+        for t in thresholds:
+            finite_number("threshold", t, minimum=0.5, maximum=1.0)
+        p_fav = np.maximum(self.predictions, 1.0 - self.predictions)
+        total = len(self.y)
+        rows = []
+        for t in thresholds:
+            mask = p_fav >= t
+            n = int(mask.sum())
+            if n == 0:
+                rows.append({
+                    "threshold": float(t), "n": 0, "coverage": 0.0,
+                    "mean_confidence": None, "accuracy": None, "log_loss": None, "brier": None,
+                })
+                continue
+            s = summarize(self.y[mask], self.predictions[mask])
+            rows.append({
+                "threshold": float(t),
+                "n": n,
+                "coverage": float(n / total),
+                "mean_confidence": float(p_fav[mask].mean()),
+                "accuracy": s["accuracy"],
+                "log_loss": s["log_loss"],
+                "brier": s["brier"],
+            })
+        return rows
+
     def export_csv(self, path: str | Path) -> int:
         """Exporte atomiquement les predictions hors-echantillon en CSV."""
         cols = [
