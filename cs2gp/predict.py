@@ -565,6 +565,54 @@ class Analyzer:
         rows.sort(key=lambda r: (-r["played"], r["map"]))
         return rows
 
+    def event_stats(self, min_matches: int = 1) -> list[dict]:
+        """Bilan par tournoi (dates, tier, LAN, volume et taux d'upsets Elo)."""
+        from .ratings import EloEngine
+
+        if min_matches < 1:
+            raise ValueError("min_matches doit etre au moins 1")
+        if self.fx is None or not self.matches:
+            raise RuntimeError("charger des donnees avant de calculer les statistiques par tournoi")
+        engine = EloEngine(self.elo_config)
+        buckets: dict[str, dict] = {}
+        for match in sorted(self.matches, key=lambda m: (m.date, m.match_id)):
+            key = match.event or "(sans evenement)"
+            slot = buckets.setdefault(key, {
+                "date_min": match.date, "date_max": match.date,
+                "tier": match.tier, "lan": match.lan,
+                "n_matches": 0, "n_complete": 0, "fav_total": 0, "upsets": 0,
+            })
+            slot["date_min"] = min(slot["date_min"], match.date)
+            slot["date_max"] = max(slot["date_max"], match.date)
+            slot["n_matches"] += 1
+            if match.is_complete:
+                slot["n_complete"] += 1
+                ra = engine.rating(match.team_a, match.date)
+                rb = engine.rating(match.team_b, match.date)
+                if abs(ra - rb) > 1e-6:
+                    slot["fav_total"] += 1
+                    fav_a = ra > rb
+                    if (fav_a and not match.a_won) or (not fav_a and match.a_won):
+                        slot["upsets"] += 1
+            for mp in sorted(match.maps, key=lambda x: x.map_index):
+                engine.observe(mp)
+        rows = [
+            {
+                "event": name,
+                "date_start": b["date_min"].isoformat(),
+                "date_end": b["date_max"].isoformat(),
+                "tier": b["tier"],
+                "lan": bool(b["lan"]),
+                "n_matches": b["n_matches"],
+                "n_complete": b["n_complete"],
+                "elo_upset_rate": float(b["upsets"] / b["fav_total"]) if b["fav_total"] else None,
+            }
+            for name, b in buckets.items()
+            if b["n_matches"] >= min_matches
+        ]
+        rows.sort(key=lambda r: (r["date_end"], r["n_matches"]), reverse=True)
+        return rows
+
     def calibration_history(self):
         """Historique hors entrainement partage par les calibrations et mis en cache."""
         from .calibration import prequential_maps
