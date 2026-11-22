@@ -260,6 +260,18 @@ class CliJsonTests(unittest.TestCase):
             self.assertEqual(fx_payload["n_fixtures"], 3)
             self.assertTrue(gen_fx.is_file())
 
+            # sample --json
+            sim_out = Path(tmp) / "sim.csv"
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(main([
+                    "sample", "--teams", "4", "--years", "0.2", "--seed", "3",
+                    "--out", str(sim_out), "--json",
+                ]), 0)
+            sim_payload = json.loads(out.getvalue())
+            self.assertGreater(sim_payload["n_maps"], 0)
+            self.assertTrue(sim_out.is_file())
+
     def test_public_package_api_exports(self):
         import cs2gp
 
