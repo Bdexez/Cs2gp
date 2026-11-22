@@ -297,3 +297,40 @@ def simulate_kelly(
         "max_drawdown_pct": float(max_dd_pct),
         "max_losing_streak": int(max_streak),
     }
+
+
+def equity_curve(
+    results: list[tuple[float, float, int]],
+    *,
+    mode: str = "flat",
+    stake: float = 1.0,
+    initial_bankroll: float = 1.0,
+    cap: float = 0.05,
+    scale: float = 0.25,
+) -> list[float]:
+    """Trajectoire cumulee de la bankroll pari par pari (longueur n + 1)."""
+    if mode not in ("flat", "kelly"):
+        raise ValueError("mode doit valoir 'flat' ou 'kelly'")
+    for p, odds, won in results:
+        _probability(p)
+        implied(odds)
+        if won not in (0, 1):
+            raise ValueError("le resultat d'un pari doit etre 0 ou 1")
+    if mode == "flat":
+        finite_number("stake", stake, strict=True)
+        val = 0.0
+        curve = [val]
+        for _p, odds, won in results:
+            val += (odds - 1.0) * stake if won else -stake
+            curve.append(float(val))
+        return curve
+    finite_number("initial_bankroll", initial_bankroll, strict=True)
+    finite_number("cap", cap, maximum=1.0)
+    finite_number("scale", scale, maximum=1.0)
+    val = float(initial_bankroll)
+    curve = [val]
+    for p, odds, won in results:
+        wager = val * kelly_fraction(p, odds, cap=cap, scale=scale)
+        val += wager * (odds - 1.0) if won else -wager
+        curve.append(float(val))
+    return curve
