@@ -81,15 +81,20 @@ _MAP_ALIASES = {
 }
 
 
-def normalize_team(name: str) -> str:
+def normalize_team(name: str, extra_aliases: dict[str, str] | None = None) -> str:
     """Canonicalise un nom d'equipe (casse, accents, ponctuation, alias)."""
     s = unicodedata.normalize("NFKD", str(name)).encode("ascii", "ignore").decode()
     s = s.strip().lower()
     s = re.sub(r"\s+", " ", s)
+    extra = {k.strip().lower(): v.strip().lower() for k, v in extra_aliases.items()} if extra_aliases else {}
+    if s in extra:
+        return extra[s]
     if s in _ALIASES:
         return _ALIASES[s]
     s = re.sub(r"\b(esports?|gaming|team|clan|gg)\b", "", s).strip()
     s = re.sub(r"\s+", " ", s)
+    if s in extra:
+        return extra[s]
     return _ALIASES.get(s, s)
 
 
