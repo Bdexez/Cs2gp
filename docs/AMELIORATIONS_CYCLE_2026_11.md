@@ -478,3 +478,11 @@ outillage domaine CS2 et sortie structuree).
   retrait de marge sur l'ensemble des commandes marche (`predict`, `backtest`, `slate`).
 - **Test de contrat `--json` global** (`tests/test_cli_json.py`) : garantit que
   les 24 sous-commandes CLI exposent toutes `--json`.
+
+## Cycle 46 : Ecriture atomique de `EloConfig.save()` et couverture CI
+
+- **Ecriture atomique de `EloConfig.save()`** (`ratings.py`) : utilise
+  `atomic_write_bytes()` (creation automatique des repertoires parents +
+  `fsync`/`os.replace`), rendant 100 % des ecritures disque du paquet atomiques.
+- **Extension des smoke checks CI** (`.github/workflows/tests.yml`) : ajout de
+  `cs2gp doctor --json`, `cs2gp maps --json` et `cs2gp events --json`.

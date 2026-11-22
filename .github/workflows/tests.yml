@@ -36,7 +36,10 @@ jobs:
       - run: cs2gp backtest --no-gbdt
       - name: Reuse trained analyzer without CSV input
         run: |
+          cs2gp doctor --json > /dev/null
           cs2gp audit --fixtures data/fixtures.csv
+          cs2gp maps --json > /dev/null
+          cs2gp events --json > /dev/null
           cs2gp train --no-gbdt --bundle /tmp/analyzer.cs2gp
           cs2gp inspect /tmp/analyzer.cs2gp
           cs2gp diff /tmp/analyzer.cs2gp /tmp/analyzer.cs2gp
