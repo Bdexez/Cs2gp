@@ -11,7 +11,7 @@ from pathlib import Path
 
 from . import __version__
 from .audit import audit_history, format_audit
-from .backtest import tune, walk_forward
+from .backtest import bet_backtest, read_odds_csv, tune, walk_forward
 from .metrics import format_summary, summarize
 from .model import MatchPredictor
 from .odds import find_value, overround
@@ -172,6 +172,13 @@ def cmd_backtest(args) -> int:
         block_days=args.block_days,
         use_gbdt=not args.no_gbdt,
     )
+    if args.export_csv:
+        written = res.export_csv(args.export_csv)
+        print(f"{written} predictions hors-echantillon exportees -> {args.export_csv}", file=sys.stderr)
+    odds_summary = (
+        bet_backtest(res, read_odds_csv(args.odds_csv), min_edge=args.min_edge)
+        if args.odds_csv else None
+    )
     if args.json:
         payload = res.to_dict()
         if args.by_year:
@@ -186,6 +193,10 @@ def cmd_backtest(args) -> int:
                 "context": res.breakdown(lambda m: "LAN" if m.get("lan") else "online"),
                 "tier": res.breakdown(lambda m: f"tier {str(m.get('tier', '?')).upper()}"),
             }
+        if args.by_fold:
+            payload["by_fold"] = res.drift_report()
+        if odds_summary is not None:
+            payload["bet_backtest"] = odds_summary
         print(json.dumps(payload, indent=2, ensure_ascii=False))
         return 0
     print()
@@ -213,6 +224,23 @@ def cmd_backtest(args) -> int:
             block = res.format_breakdown(title, key)
             if block:
                 print(block)
+    if args.by_fold:
+        print("\nPar fold (derive temporelle) :")
+        for row in res.drift_report():
+            slope = "n/a" if row["calibration_slope"] is None else f"{row['calibration_slope']:.2f}"
+            print(
+                f"  fold {row['fold']:<3} {row['date_start']} -> {row['date_end']} "
+                f"n={row['n']:<4} logloss={row['log_loss']:.4f} "
+                f"gain_elo={row['gain_vs_elo']:+.4f} ece={row['ece']:.3f} pente={slope}"
+            )
+    if odds_summary is not None:
+        print("\nConfrontation aux cotes historiques :")
+        print(
+            f"  {odds_summary['bets']} paris sur {odds_summary['matches_with_odds']} matchs cotes | "
+            f"reussite {odds_summary['hit_rate']:.1%} | "
+            f"profit {odds_summary['profit']:+.2f} u | ROI {odds_summary['roi']:+.1%} | "
+            f"drawdown max {odds_summary['max_drawdown']:.2f} u"
+        )
     return 0
 
 
@@ -539,6 +567,12 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--by-year", action="store_true")
     s.add_argument("--by-segment", action="store_true",
                    help="ventile les metriques par format, LAN/online et tier")
+    s.add_argument("--by-fold", action="store_true",
+                   help="affiche l'evolution du log-loss et de la calibration par fold")
+    s.add_argument("--export-csv", help="exporte les predictions hors-echantillon en CSV")
+    s.add_argument("--odds-csv", help="CSV de cotes historiques (match_id,odds_a,odds_b)")
+    s.add_argument("--min-edge", type=float, default=0.04,
+                   help="ecart minimal avec le marche pour --odds-csv (defaut 0.04)")
     s.add_argument("--blend", type=float, default=MATCH_MODEL_WEIGHT,
                    help="poids du modele match dans le melange (1 = lui seul)")
     s.add_argument("--no-maps", action="store_true",

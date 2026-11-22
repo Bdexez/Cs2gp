@@ -1,10 +1,19 @@
+import contextlib
+import csv
 import datetime as dt
+import io
+import json
+from pathlib import Path
+import tempfile
 import unittest
 
 import numpy as np
 
-from cs2gp.backtest import BacktestResult, benchmark_against_truth
+from cs2gp.backtest import BacktestResult, benchmark_against_truth, read_odds_csv
+from cs2gp.cli import main
 from cs2gp.metrics import summarize
+from cs2gp.schema import write_csv
+from cs2gp.sources import simulate_history
 
 
 class BacktestSegmentTests(unittest.TestCase):
@@ -57,6 +66,62 @@ class BacktestSegmentTests(unittest.TestCase):
         self.assertGreater(bench["elo_excess_log_loss"], bench["excess_log_loss"])
         with self.assertRaises(ValueError):
             benchmark_against_truth(res, {"unknown": 0.5})
+
+    def test_drift_report_export_csv_and_read_odds_csv(self):
+        res = self._sample_result()
+        res.fold_slices = [(0, 20), (20, 40)]
+        drift = res.drift_report()
+        self.assertEqual(len(drift), 2)
+        self.assertEqual(drift[0]["fold"], 1)
+        self.assertEqual(drift[0]["n"], 20)
+        self.assertGreater(drift[0]["gain_vs_elo"], 0.0)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            csv_out = Path(tmp) / "preds.csv"
+            self.assertEqual(res.export_csv(csv_out), 40)
+            with csv_out.open(newline="", encoding="utf-8") as fh:
+                rows = list(csv.DictReader(fh))
+            self.assertEqual(len(rows), 40)
+            self.assertEqual(rows[0]["match_id"], "m0")
+
+            odds_path = Path(tmp) / "odds.csv"
+            odds_path.write_text("match_id,odds_a,odds_b\nm0,1.90,1.90\nm1,2.10,1.80\n", encoding="utf-8")
+            lookup = read_odds_csv(odds_path)
+            self.assertEqual(lookup["m0"], (1.90, 1.90))
+
+            dup_path = Path(tmp) / "dup.csv"
+            dup_path.write_text("match_id,odds_a,odds_b\nm0,1.90,1.90\nm0,2.00,1.85\n", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "duplique"):
+                read_odds_csv(dup_path)
+
+            bad_path = Path(tmp) / "bad.csv"
+            bad_path.write_text("match_id,odds_a,odds_b\nm0,0.95,2.00\n", encoding="utf-8")
+            with self.assertRaises(ValueError):
+                read_odds_csv(bad_path)
+
+    def test_cli_backtest_supports_by_fold_export_csv_and_odds_csv(self):
+        rows = simulate_history(n_teams=8, years=1.0, seed=19, start=dt.date(2025, 1, 1))
+        with tempfile.TemporaryDirectory() as tmp:
+            data = Path(tmp) / "history.csv"
+            export_path = Path(tmp) / "oos.csv"
+            odds_path = Path(tmp) / "odds.csv"
+            write_csv(str(data), rows)
+            match_ids = sorted({m.match_id for m in rows})
+            odds_lines = ["match_id,odds_a,odds_b"] + [f"{mid},1.95,1.95" for mid in match_ids]
+            odds_path.write_text("\n".join(odds_lines) + "\n", encoding="utf-8")
+
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(main([
+                    "backtest", "--data", str(data), "--no-gbdt", "--bootstrap-samples", "0",
+                    "--by-fold", "--export-csv", str(export_path),
+                    "--odds-csv", str(odds_path), "--json",
+                ]), 0)
+            payload = json.loads(out.getvalue())
+            self.assertIn("by_fold", payload)
+            self.assertIn("bet_backtest", payload)
+            self.assertGreater(payload["bet_backtest"]["matches_with_odds"], 0)
+            self.assertTrue(export_path.is_file())
 
 
 if __name__ == "__main__":
