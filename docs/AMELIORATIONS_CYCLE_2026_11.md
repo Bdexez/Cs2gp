@@ -274,3 +274,11 @@ outillage domaine CS2 et sortie structuree).
 - **Bootstrap Monte Carlo de bankroll** (`odds.py`) : `bootstrap_bankroll()`
   estime probabilite de profit, quantiles finaux (p05/mediane/p95) et drawdown
   p95 sur un horizon de paris donne (mise fixe ou Kelly).
+
+## Cycle 23 : Importance walk-forward, scoring par groupe et CI
+
+- **Importance par permutation en walk-forward** (`backtest.py`) :
+  `walk_forward_importance()` agrege sans fuite temporelle la degradation
+  hors-echantillon par feature sur les folds temporels.
+- **Scoring propre par groupe** (`pronostic.py`) : `TipsterRecord.by()` expose
+  `log_loss` et `brier` pour chaque palier et chaque marche.
