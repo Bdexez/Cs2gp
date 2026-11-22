@@ -222,3 +222,13 @@ outillage domaine CS2 et sortie structuree).
   cotes de cloture sont fournies.
 - **`cs2gp tune --json`** (`cli.py`) : exporte configuration retenue, statut
   d'enregistrement et rapport de validation temporelle en JSON structure.
+
+## Cycle 18 : MCE, controle pre-vol des fixtures et courbe d'equite du journal
+
+- **Maximum Calibration Error (`mce`)** (`metrics.py`) :
+  `max_calibration_error(y, p)` et exposition dans `summarize()` pour reperer
+  la pire tranche de calibration.
+- **Controle pre-vol des fixtures (`audit_fixtures`)** (`audit.py`) : detecte
+  les equipes inconnues, historiques minces/anciens et collisions sans `match_id`.
+- **Courbe d'equite dans le journal** (`journal.py`) : `equity_curve_flat`
+  exposee dans `financial_summary()` (et donc via `cs2gp journal --json`).
