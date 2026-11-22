@@ -428,3 +428,38 @@ def build_datasets(
         dates=pdates, meta=pmeta, feature_names=FeatureExtractor.MAP_FEATURES,
     )
     return match_ds, map_ds, fx
+
+
+def feature_correlation_report(ds: Dataset, *, threshold: float = 0.80) -> dict:
+    """Detecte les features constantes et les paires fortement correlees (|r| >= threshold)."""
+    if not math.isfinite(threshold) or not 0.0 <= threshold <= 1.0:
+        raise ValueError("threshold doit etre dans [0, 1]")
+    X = np.asarray(ds.X, dtype=float)
+    names = ds.feature_names or tuple(f"f{i}" for i in range(X.shape[1]))
+    n_samples, n_features = X.shape if X.ndim == 2 else (0, 0)
+    if n_samples < 2 or n_features == 0:
+        return {"n_samples": n_samples, "n_features": n_features, "constant_features": [], "high_pairs": []}
+    stds = X.std(axis=0)
+    constant = [names[i] for i, s in enumerate(stds) if s < 1e-12]
+    active = [i for i, s in enumerate(stds) if s >= 1e-12]
+    high_pairs = []
+    if len(active) >= 2:
+        Xc = X[:, active] - X[:, active].mean(axis=0)
+        Xn = Xc / stds[active]
+        corr = (Xn.T @ Xn) / n_samples
+        for a_pos in range(len(active)):
+            for b_pos in range(a_pos + 1, len(active)):
+                r = float(corr[a_pos, b_pos])
+                if abs(r) >= threshold:
+                    high_pairs.append({
+                        "a": names[active[a_pos]],
+                        "b": names[active[b_pos]],
+                        "corr": r,
+                    })
+        high_pairs.sort(key=lambda row: -abs(row["corr"]))
+    return {
+        "n_samples": int(n_samples),
+        "n_features": int(n_features),
+        "constant_features": constant,
+        "high_pairs": high_pairs,
+    }

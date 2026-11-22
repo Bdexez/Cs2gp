@@ -22,6 +22,24 @@ class RecentStateTests(unittest.TestCase):
         feature = fx.match_features("a", "b", day)[fx.MATCH_FEATURES.index("streak_diff")]
         self.assertAlmostEqual(feature, 2/3)
 
+    def test_feature_correlation_report_detects_collinear_and_constant_columns(self):
+        import numpy as np
+        from cs2gp.features import Dataset, feature_correlation_report
+
+        x = np.arange(1, 21, dtype=float)
+        X = np.column_stack([x, 2.0 * x + 1.0, np.zeros_like(x), np.sin(x)])
+        ds = Dataset(
+            X=X, y=np.zeros(20), dates=[dt.date(2026, 1, 1)] * 20,
+            meta=[{}] * 20, feature_names=("f0", "f1", "const", "indep"),
+        )
+        rep = feature_correlation_report(ds, threshold=0.95)
+        self.assertEqual(rep["constant_features"], ["const"])
+        self.assertEqual(len(rep["high_pairs"]), 1)
+        self.assertEqual((rep["high_pairs"][0]["a"], rep["high_pairs"][0]["b"]), ("f0", "f1"))
+        self.assertAlmostEqual(rep["high_pairs"][0]["corr"], 1.0, places=10)
+        with self.assertRaises(ValueError):
+            feature_correlation_report(ds, threshold=1.5)
+
 
 if __name__ == "__main__":
     unittest.main()
