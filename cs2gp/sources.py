@@ -19,7 +19,7 @@ import datetime as dt
 import math
 import random
 from dataclasses import dataclass
-from typing import Iterable, Sequence
+from typing import Iterable
 
 from .schema import ACTIVE_DUTY, MapResult, map_from_record, read_csv
 
