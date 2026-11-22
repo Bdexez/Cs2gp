@@ -193,6 +193,16 @@ class JournalTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             journal.scorecard(self.path, since=d2, until=d1)
 
+    def test_bankroll_risk_bootstraps_settled_odds_from_journal(self):
+        self.assertIsNone(journal.bankroll_risk(self.path))
+        p1 = replace(self.pick, match_id="one", odds=2.0, stake=0.02)
+        p2 = replace(self.pick, match_id="two", odds=2.0, stake=0.02)
+        journal.record([p1, p2], self.path)
+        journal.settle(self.path, self.results)
+        risk = journal.bankroll_risk(self.path, samples=100, seed=0)
+        self.assertEqual(risk["horizon"], 2)
+        self.assertIn("p95_max_drawdown_pct", risk)
+
 
 if __name__ == "__main__":
     unittest.main()
