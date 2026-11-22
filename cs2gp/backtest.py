@@ -97,9 +97,14 @@ class BacktestResult:
                 f"intercept={cox['intercept']:+.3f} (ideal 0.000)."
             )
         murphy = brier_decomposition(self.y, self.predictions)
+        spieg = spiegelhalter_z(self.y, self.predictions)
+        spieg_txt = (
+            f" | Spiegelhalter Z={spieg['z_stat']:+.2f} (p={spieg['p_value']:.3f})"
+            if spieg["z_stat"] is not None else ""
+        )
         lines.append(
             f"Decomposition de Brier (Murphy) : fiabilite={murphy['reliability']:.4f}, "
-            f"resolution={murphy['resolution']:.4f}, BSS={murphy['brier_skill_score']:+.1%}."
+            f"resolution={murphy['resolution']:.4f}, BSS={murphy['brier_skill_score']:+.1%}.{spieg_txt}"
         )
         return "\n".join(lines)
 
