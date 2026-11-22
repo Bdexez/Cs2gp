@@ -179,3 +179,51 @@ def format_audit(report: dict) -> str:
         for w in report["warnings"]:
             lines.append(f"  /!\\ {w}")
     return "\n".join(lines)
+
+
+def audit_fixtures(fixtures: Sequence, analyzer) -> dict:
+    """Controle pre-vol d'une carte de matchs a venir avant prediction ou archivage."""
+    if analyzer.fx is None:
+        raise RuntimeError("charger des donnees dans l'analyseur avant de verifier les fixtures")
+    fixtures = list(fixtures)
+    unknown: list[str] = []
+    thin_or_stale: list[str] = []
+    with_odds = 0
+    pair_days: Counter = Counter()
+    for fx in fixtures:
+        if any(getattr(fx, k) is not None for k in (
+            "odds_a", "odds_b", "odds_over", "odds_under", "odds_a_sweep", "odds_b_sweep"
+        )):
+            with_odds += 1
+        if not fx.match_id:
+            pair_days[(fx.date, tuple(sorted((fx.team_a, fx.team_b))))] += 1
+        resolved = []
+        for raw in (fx.team_a, fx.team_b):
+            try:
+                resolved.append(analyzer.resolve_team(raw))
+            except ValueError:
+                if raw not in unknown:
+                    unknown.append(raw)
+        if len(resolved) == 2:
+            ctx = analyzer.fx.match_context(resolved[0], resolved[1], fx.date)
+            if ctx["maps_played_min"] < 25 or ctx["days_idle_max"] > 60:
+                thin_or_stale.append(fx.label)
+    collisions = sum(1 for c in pair_days.values() if c > 1)
+    warnings: list[str] = []
+    if unknown:
+        warnings.append(f"equipe(s) inconnue(s) dans l'historique : {', '.join(sorted(unknown))}.")
+    if thin_or_stale:
+        warnings.append(f"{len(thin_or_stale)} affiche(s) a historique mince ou ancien (confiance faible).")
+    if collisions:
+        warnings.append(
+            f"{collisions} collision(s) (date, paire) sans match_id : le reglement du journal sera ambigu."
+        )
+    return {
+        "n_fixtures": len(fixtures),
+        "with_odds": with_odds,
+        "unknown_teams": sorted(unknown),
+        "thin_or_stale": thin_or_stale,
+        "missing_match_id_collisions": collisions,
+        "warnings": warnings,
+        "ok": not unknown and collisions == 0,
+    }
