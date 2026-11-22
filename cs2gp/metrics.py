@@ -274,6 +274,25 @@ def roc_auc(y, p) -> float | None:
     return float(u / (n_pos * n_neg))
 
 
+def sharpness(p) -> dict:
+    """Nettete (sharpness) des probabilites : confiance moyenne, dispersion, entropie."""
+    arr = np.asarray(p, dtype=float)
+    if arr.ndim != 1 or len(arr) == 0:
+        raise ValueError("p doit etre un vecteur non vide")
+    if not np.all(np.isfinite(arr)) or np.any((arr < 0.0) | (arr > 1.0)):
+        raise ValueError("les probabilites doivent etre finies et dans [0, 1]")
+    pc = np.clip(arr, EPS, 1.0 - EPS)
+    conf = np.maximum(arr, 1.0 - arr)
+    entropy = -(pc * np.log(pc) + (1.0 - pc) * np.log(1.0 - pc))
+    return {
+        "n": int(len(arr)),
+        "mean_confidence": float(conf.mean()),
+        "std_p": float(arr.std()),
+        "mean_entropy": float(entropy.mean()),
+        "pct_decisive_70": float(np.mean(conf >= 0.70)),
+    }
+
+
 def summarize(y: np.ndarray, p: np.ndarray) -> dict:
     y = np.asarray(y, dtype=float)
     ll = log_loss(y, p)
