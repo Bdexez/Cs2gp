@@ -24,9 +24,9 @@ def forward_splits(dates, initial_frac: float, min_train: int, refit_every: int,
     validate_dates(dates)
     if not math.isfinite(initial_frac) or not 0 < initial_frac < 1:
         raise ValueError("initial_frac doit etre strictement entre 0 et 1")
-    if not isinstance(refit_every, Integral) or refit_every < 1:
+    if isinstance(refit_every, bool) or not isinstance(refit_every, Integral) or refit_every < 1:
         raise ValueError("refit_every doit etre un entier strictement positif")
-    if not isinstance(min_train, Integral) or min_train < 50:
+    if isinstance(min_train, bool) or not isinstance(min_train, Integral) or min_train < 50:
         raise ValueError("min_train doit etre un entier d'au moins 50")
     start = (max(min_train, int(len(dates) * initial_frac)) if evaluation_start is None
              else bisect_left(dates, evaluation_start))
