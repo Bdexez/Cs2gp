@@ -17,14 +17,13 @@ import datetime as dt
 import json
 import hashlib
 import math
-import os
 import pickle
-import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import numpy as np
 
+from .csvio import atomic_write_bytes
 from .metrics import log_loss
 from .temporal import calibration_boundary, validate_dates
 from .validation import (binary_labels, feature_matrix, finite_number,
@@ -404,22 +403,6 @@ class MatchPredictor:
 
     # -------------------------------------------------------------------- I/O
 
-    @staticmethod
-    def _atomic_write_bytes(path: Path, data: bytes) -> None:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        temporary = None
-        try:
-            with tempfile.NamedTemporaryFile(dir=path.parent, prefix=f".{path.name}.",
-                                             suffix=".tmp", delete=False) as fh:
-                temporary = Path(fh.name)
-                fh.write(data)
-                fh.flush()
-                os.fsync(fh.fileno())
-            os.replace(temporary, path)
-        finally:
-            if temporary is not None:
-                temporary.unlink(missing_ok=True)
-
     def save(self, path: str | Path) -> None:
         if self.logistic.weights is None or self.logistic.scales is None:
             raise RuntimeError("modele non entraine")
@@ -440,9 +423,9 @@ class MatchPredictor:
         }
         if self.gbdt is not None:
             blob = pickle.dumps(self.gbdt)
-            self._atomic_write_bytes(path.with_suffix(".gbdt.pkl"), blob)
+            atomic_write_bytes(path.with_suffix(".gbdt.pkl"), blob)
             payload["gbdt_sha256"] = hashlib.sha256(blob).hexdigest()
-        self._atomic_write_bytes(path, json.dumps(payload, indent=2).encode("utf-8"))
+        atomic_write_bytes(path, json.dumps(payload, indent=2).encode("utf-8"))
 
     @classmethod
     def load(cls, path: str | Path) -> "MatchPredictor":

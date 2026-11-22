@@ -100,6 +100,20 @@ class CsvStructureTests(unittest.TestCase):
         self.assertEqual(journal.load(self.path), [])
         self.assertEqual(journal.record([self.pick], self.path), 1)
 
+    def test_atomic_writes_preserve_existing_file_and_clean_temp_on_failure(self):
+        from unittest.mock import patch
+        from cs2gp.csvio import atomic_write_bytes, atomic_write_csv
+
+        self.path.write_bytes(b"original")
+        with patch("cs2gp.csvio.os.replace", side_effect=OSError("disk full")):
+            with self.assertRaises(OSError):
+                atomic_write_bytes(self.path, b"new")
+            with self.assertRaises(OSError):
+                atomic_write_csv(self.path, ["a"], [["1"]])
+        self.assertEqual(self.path.read_bytes(), b"original")
+        leftovers = [p for p in Path(self.tmp.name).iterdir() if p.suffix == ".tmp"]
+        self.assertEqual(leftovers, [])
+
 
 if __name__ == "__main__":
     unittest.main()

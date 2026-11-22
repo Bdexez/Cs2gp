@@ -3,18 +3,16 @@
 from __future__ import annotations
 
 import argparse
-import csv
 import datetime as dt
 import json
 import math
-import os
 import sys
-import tempfile
 from pathlib import Path
 
 from . import __version__
 from .audit import audit_history, format_audit
 from .backtest import bet_backtest, read_odds_csv, tune, walk_forward
+from .csvio import atomic_write_csv
 from .metrics import format_summary, summarize
 from .model import MatchPredictor
 from .odds import find_value, overround
@@ -226,33 +224,22 @@ def cmd_ratings(args) -> int:
     board = an.fx.elo.leaderboard(on=on, min_maps=args.min_maps)
     if args.export_csv:
         pool = list(an.fx.pool_on(on))
-        out_path = Path(args.export_csv)
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        temporary = None
-        try:
-            with tempfile.NamedTemporaryFile(mode="w", newline="", encoding="utf-8",
-                                             dir=out_path.parent, prefix=f".{out_path.name}.",
-                                             suffix=".tmp", delete=False) as fh:
-                temporary = Path(fh.name)
-                writer = csv.writer(fh, lineterminator="\n")
-                writer.writerow(["rank", "team", "rating", "deviation", "trajectory",
-                                 "maps_played", "last_date", *pool])
-                for rank, (team, rating, played) in enumerate(board[: args.top], 1):
-                    tr = an.fx.elo._read_team(team)
-                    writer.writerow([
-                        rank, team, f"{rating:.2f}",
-                        f"{an.fx.elo.deviation(team, on):.2f}",
-                        f"{an.fx.elo.trajectory(team, on):.2f}",
-                        played, tr.last_date.isoformat() if tr.last_date else "",
-                        *(f"{an.fx.elo.map_rating(team, mp, on):.2f}" for mp in pool),
-                    ])
-                fh.flush()
-                os.fsync(fh.fileno())
-            os.replace(temporary, out_path)
-        finally:
-            if temporary is not None:
-                temporary.unlink(missing_ok=True)
-        print(f"{min(len(board), args.top)} equipes exportees -> {out_path}", file=sys.stderr)
+        written = atomic_write_csv(
+            args.export_csv,
+            ["rank", "team", "rating", "deviation", "trajectory", "maps_played", "last_date", *pool],
+            (
+                [
+                    rank, team, f"{rating:.2f}",
+                    f"{an.fx.elo.deviation(team, on):.2f}",
+                    f"{an.fx.elo.trajectory(team, on):.2f}",
+                    played,
+                    tr.last_date.isoformat() if (tr := an.fx.elo._read_team(team)).last_date else "",
+                    *(f"{an.fx.elo.map_rating(team, mp, on):.2f}" for mp in pool),
+                ]
+                for rank, (team, rating, played) in enumerate(board[: args.top], 1)
+            ),
+        )
+        print(f"{written} equipes exportees -> {args.export_csv}", file=sys.stderr)
     if args.json:
         rows = []
         for rank, (team, rating, played) in enumerate(board[: args.top], 1):
@@ -524,51 +511,38 @@ def cmd_slate(args) -> int:
     card = _tipster(an, args).card(fixtures)
     added = journal_mod.record_card(card, args.record) if args.record else None
     if args.export_csv:
-        out_path = Path(args.export_csv)
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        temporary = None
-        written = 0
-        try:
-            with tempfile.NamedTemporaryFile(mode="w", newline="", encoding="utf-8",
-                                             dir=out_path.parent, prefix=f".{out_path.name}.",
-                                             suffix=".tmp", delete=False) as fh:
-                temporary = Path(fh.name)
-                writer = csv.writer(fh, lineterminator="\n")
-                writer.writerow([
-                    "date", "match_id", "team_a", "team_b", "best_of", "event",
-                    "market", "selection", "probability", "fair_odds", "tier",
-                    "verdict", "odds", "edge", "ev", "stake", "skipped",
+        csv_rows = []
+        for a in card:
+            fx = a.fixture
+            if a.picks:
+                for pk in a.picks:
+                    csv_rows.append([
+                        pk.date.isoformat(), pk.match_id, pk.team_a, pk.team_b,
+                        pk.best_of, pk.event, pk.market, pk.selection,
+                        f"{pk.probability:.6f}", f"{pk.fair_odds:.3f}", pk.tier,
+                        pk.verdict,
+                        "" if pk.odds is None else f"{pk.odds:.3f}",
+                        "" if pk.edge is None else f"{pk.edge:.6f}",
+                        "" if pk.ev is None else f"{pk.ev:.6f}",
+                        "" if pk.stake is None else f"{pk.stake:.6f}",
+                        "",
+                    ])
+            else:
+                csv_rows.append([
+                    fx.date.isoformat(), fx.match_id, fx.team_a, fx.team_b,
+                    fx.best_of, fx.event, "abstention", "", "", "", "",
+                    "ABSTENTION", "", "", "", "", a.skipped or "",
                 ])
-                for a in card:
-                    fx = a.fixture
-                    if a.picks:
-                        for pk in a.picks:
-                            writer.writerow([
-                                pk.date.isoformat(), pk.match_id, pk.team_a, pk.team_b,
-                                pk.best_of, pk.event, pk.market, pk.selection,
-                                f"{pk.probability:.6f}", f"{pk.fair_odds:.3f}", pk.tier,
-                                pk.verdict,
-                                "" if pk.odds is None else f"{pk.odds:.3f}",
-                                "" if pk.edge is None else f"{pk.edge:.6f}",
-                                "" if pk.ev is None else f"{pk.ev:.6f}",
-                                "" if pk.stake is None else f"{pk.stake:.6f}",
-                                "",
-                            ])
-                            written += 1
-                    else:
-                        writer.writerow([
-                            fx.date.isoformat(), fx.match_id, fx.team_a, fx.team_b,
-                            fx.best_of, fx.event, "abstention", "", "", "", "",
-                            "ABSTENTION", "", "", "", "", a.skipped or "",
-                        ])
-                        written += 1
-                fh.flush()
-                os.fsync(fh.fileno())
-            os.replace(temporary, out_path)
-        finally:
-            if temporary is not None:
-                temporary.unlink(missing_ok=True)
-        print(f"{written} ligne(s) de carte exportee(s) -> {out_path}", file=sys.stderr)
+        written = atomic_write_csv(
+            args.export_csv,
+            [
+                "date", "match_id", "team_a", "team_b", "best_of", "event",
+                "market", "selection", "probability", "fair_odds", "tier",
+                "verdict", "odds", "edge", "ev", "stake", "skipped",
+            ],
+            csv_rows,
+        )
+        print(f"{written} ligne(s) de carte exportee(s) -> {args.export_csv}", file=sys.stderr)
     if args.json:
         payload = {
             "analyses": [a.to_dict() for a in card],

@@ -4,8 +4,53 @@ from __future__ import annotations
 
 from collections import Counter
 import csv
+import os
 from pathlib import Path
-from typing import Iterable, Iterator
+import tempfile
+from typing import Iterable, Iterator, Sequence
+
+
+def atomic_write_bytes(path: str | Path, data: bytes) -> None:
+    """Ecrit atomiquement un fichier binaire (fichier temporaire + fsync + replace)."""
+    out_path = Path(path)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(dir=out_path.parent, prefix=f".{out_path.name}.",
+                                         suffix=".tmp", delete=False) as fh:
+            temporary = Path(fh.name)
+            fh.write(data)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(temporary, out_path)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+
+
+def atomic_write_csv(path: str | Path, header: Sequence[str], rows: Iterable[Sequence]) -> int:
+    """Ecrit atomiquement un CSV UTF-8 avec fin de ligne LF et retourne le nombre de lignes."""
+    out_path = Path(path)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = None
+    count = 0
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", newline="", encoding="utf-8",
+                                         dir=out_path.parent, prefix=f".{out_path.name}.",
+                                         suffix=".tmp", delete=False) as fh:
+            temporary = Path(fh.name)
+            writer = csv.writer(fh, lineterminator="\n")
+            writer.writerow(header)
+            for row in rows:
+                writer.writerow(row)
+                count += 1
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(temporary, out_path)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+    return count
 
 
 def read_rows(path: str | Path, required: Iterable[str]) -> Iterator[tuple[int, dict[str, str]]]:
