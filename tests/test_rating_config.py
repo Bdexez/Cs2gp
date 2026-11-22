@@ -30,6 +30,16 @@ class RatingConfigTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "objet JSON"):
                 EloConfig.load(p)
 
+    def test_save_creates_parent_directories_and_roundtrips_atomically(self):
+        from pathlib import Path
+        import tempfile
+
+        cfg = EloConfig(k_base=14.0, k_map=22.0)
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp) / "nested" / "dir" / "elo.json"
+            cfg.save(p)
+            self.assertEqual(EloConfig.load(p), cfg)
+
 
 if __name__ == "__main__":
     unittest.main()
