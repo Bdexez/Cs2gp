@@ -884,6 +884,10 @@ def cmd_journal(args) -> int:
         journal_mod.monthly_summary(args.journal, since=since, until=until)
         if getattr(args, "by_month", False) else None
     )
+    pending = (
+        journal_mod.pending_picks(args.journal, since=since, until=until)
+        if getattr(args, "pending", False) else None
+    )
     if getattr(args, "export_csv", None):
         written = journal_mod.export_filtered_csv(
             args.journal, args.export_csv, since=since, until=until
@@ -898,13 +902,24 @@ def cmd_journal(args) -> int:
             payload["risk"] = risk
         if getattr(args, "by_month", False):
             payload["by_month"] = by_month
+        if getattr(args, "pending", False):
+            payload["pending"] = pending
         print(json.dumps(payload, indent=2, ensure_ascii=False))
         return 0
-    if record is None:
+    if record is None and not pending:
         print("Aucun pronostic pointe pour le moment.")
         return 0
-    print()
-    print(record.report())
+    if record is not None:
+        print()
+        print(record.report())
+    if pending is not None:
+        print(f"\nPronostics en attente ({len(pending)}) :")
+        for p in pending:
+            odds_txt = f" @ {p['odds']:.2f}" if p["odds"] is not None else ""
+            print(
+                f"  {p['date']}  {p['team_a']} vs {p['team_b']}  "
+                f"{p['market']} : {p['selection']}  {p['probability']:.1%}{odds_txt}"
+            )
     if by_month:
         print("\nDetail mensuel :")
         print(f"  {'mois':<9}{'n':>5}{'annonce':>9}{'observe':>9}{'brier':>8}{'P&L u':>9}{'ROI':>8}")
@@ -1260,6 +1275,8 @@ def build_parser() -> argparse.ArgumentParser:
                    help="ajoute un bootstrap Monte Carlo de bankroll et drawdown p95")
     s.add_argument("--by-month", action="store_true",
                    help="ventile calibration et P&L mise fixe par mois (YYYY-MM)")
+    s.add_argument("--pending", action="store_true",
+                   help="liste les pronostics encore en attente de pointage")
     s.add_argument("--export-csv", help="exporte la tranche filtree du journal en CSV")
     s.add_argument("--json", action="store_true", help="sortie JSON structuree")
     s.set_defaults(func=cmd_journal)
