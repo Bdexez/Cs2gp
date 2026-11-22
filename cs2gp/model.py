@@ -475,6 +475,49 @@ def map_predictor(**kwargs) -> MatchPredictor:
     return MatchPredictor(**{**kwargs, "use_gbdt": False})
 
 
+def permutation_importance(
+    model: MatchPredictor,
+    X: np.ndarray,
+    y: np.ndarray,
+    *,
+    metric: str = "log_loss",
+    repeats: int = 10,
+    seed: int = 0,
+) -> list[dict]:
+    """Importance hors-echantillon par permutation (compatible logistique et GBDT).
+
+    Mesure la degradation moyenne de perte (log-loss ou Brier) lorsqu'on melange
+    aleatoirement une colonne : une valeur positive signale un vrai apport predictif.
+    """
+    from .metrics import brier
+
+    y = binary_labels(y)
+    X = feature_matrix(X, rows=len(y))
+    positive_integer("repeats", repeats)
+    if metric not in ("log_loss", "brier"):
+        raise ValueError(f"metrique non geree : {metric!r}")
+    loss_fn = log_loss if metric == "log_loss" else brier
+    base_loss = loss_fn(y, model.predict_proba(X))
+    names = model.feature_names or tuple(f"f{i}" for i in range(X.shape[1]))
+    rng = np.random.default_rng(seed)
+    X_work = np.array(X, dtype=float, copy=True)
+    rows = []
+    for j in range(X.shape[1]):
+        orig = X_work[:, j].copy()
+        deltas = []
+        for _ in range(repeats):
+            X_work[:, j] = rng.permutation(orig)
+            deltas.append(loss_fn(y, model.predict_proba(X_work)) - base_loss)
+        X_work[:, j] = orig
+        rows.append({
+            "feature": names[j],
+            "mean_delta": float(np.mean(deltas)),
+            "std_delta": float(np.std(deltas)),
+        })
+    rows.sort(key=lambda r: -r["mean_delta"])
+    return rows
+
+
 def series_win_probability(p_map: float, best_of: int) -> float:
     """Passe d'une proba par map a une proba de serie (maps supposees i.i.d.).
 

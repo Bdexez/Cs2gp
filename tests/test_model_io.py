@@ -71,6 +71,21 @@ class ModelIntegrityTests(unittest.TestCase):
         self.assertGreater(abs(diag[0]["z_score"]), 4.0)
         self.assertIsNotNone(diag[0]["se"])
 
+    def test_permutation_importance_ranks_informative_feature_first(self):
+        from cs2gp.model import permutation_importance
+
+        rng = np.random.default_rng(29)
+        X = rng.normal(size=(300, 3))
+        y = (rng.random(300) < 1 / (1 + np.exp(-1.8 * X[:, 0]))).astype(float)
+        mdl = MatchPredictor(use_gbdt=False, calibration_frac=0.0).fit(
+            X[:200], y[:200], feature_names=("signal", "noise_a", "noise_b")
+        )
+        imp = permutation_importance(mdl, X[200:], y[200:], repeats=8, seed=0)
+        self.assertEqual(imp[0]["feature"], "signal")
+        self.assertGreater(imp[0]["mean_delta"], 0.05)
+        with self.assertRaises(ValueError):
+            permutation_importance(mdl, X[200:], y[200:], metric="bad")
+
 
 if __name__ == "__main__":
     unittest.main()
