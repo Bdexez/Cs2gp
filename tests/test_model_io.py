@@ -58,6 +58,19 @@ class ModelIntegrityTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             small.predict_interval(x, z_score=0)
 
+    def test_feature_diagnostics_identifies_true_signal_via_wald_z_score(self):
+        rng = np.random.default_rng(21)
+        X = rng.normal(size=(400, 3))
+        y = (rng.random(400) < 1 / (1 + np.exp(-1.5 * X[:, 0]))).astype(float)
+        mdl = MatchPredictor(use_gbdt=False, calibration_frac=0.0).fit(
+            X, y, feature_names=("signal", "noise_a", "noise_b")
+        )
+        diag = mdl.logistic.feature_diagnostics()
+        self.assertEqual(diag[0]["feature"], "signal")
+        self.assertTrue(diag[0]["significant"])
+        self.assertGreater(abs(diag[0]["z_score"]), 4.0)
+        self.assertIsNotNone(diag[0]["se"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -166,6 +166,31 @@ class LogisticModel:
         names = self.feature_names or tuple(f"f{i}" for i in range(len(self.weights)))
         return sorted(zip(names, self.weights.tolist()), key=lambda kv: -abs(kv[1]))
 
+    def feature_diagnostics(self) -> list[dict]:
+        """Poids standardises, erreurs types de Fisher et z-scores de Wald par feature."""
+        if self.weights is None or self.scales is None:
+            raise RuntimeError("modele non entraine")
+        names = self.feature_names or tuple(f"f{i}" for i in range(len(self.weights)))
+        ses = (
+            np.sqrt(np.maximum(np.diag(self.cov), 0.0)).tolist()
+            if self.cov is not None else [None] * len(self.weights)
+        )
+        rows = []
+        for idx, (name, weight, scale, se) in enumerate(zip(names, self.weights.tolist(), self.scales.tolist(), ses)):
+            z = (weight / se) if (se is not None and se > 1e-12) else None
+            resid_proj = 0.0 if (idx == 0 or self.resid is None or idx - 1 >= len(self.resid)) else float(self.resid[idx - 1])
+            rows.append({
+                "feature": name,
+                "weight": float(weight),
+                "se": None if se is None else float(se),
+                "z_score": None if z is None else float(z),
+                "significant": bool(z is not None and abs(z) > 1.96),
+                "scale": float(scale),
+                "resid_proj": resid_proj,
+            })
+        rows.sort(key=lambda r: -(abs(r["z_score"]) if r["z_score"] is not None else abs(r["weight"])))
+        return rows
+
 
 def _fit_temperature(z: np.ndarray, y: np.ndarray) -> float:
     """Calibration par temperature : preserve l'ordre et la symetrie, 1 parametre."""
