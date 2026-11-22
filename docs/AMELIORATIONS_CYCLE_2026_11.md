@@ -212,3 +212,13 @@ outillage domaine CS2 et sortie structuree).
   calcule `clv_bets`, `avg_clv_prob` et `avg_clv_ev`.
 - **Alias personnalises** (`schema.py`) : `normalize_team(name, extra_aliases=...)`
   permet de resoudre des variantes de noms detectees par `cs2gp audit`.
+
+## Cycle 17 : Ratio de Sharpe, sortie cotes enrichie et `tune --json`
+
+- **Ratio de Sharpe par pari** (`odds.py`) : `roi_significance()` expose
+  `sharpe_ratio` (rendement moyen / ecart-type par pari).
+- **Sortie texte `backtest --odds-csv` enrichie** (`cli.py`) : affiche marge
+  moyenne, p-value du ROI, rendement/drawdown Kelly et CLV moyen lorsque des
+  cotes de cloture sont fournies.
+- **`cs2gp tune --json`** (`cli.py`) : exporte configuration retenue, statut
+  d'enregistrement et rapport de validation temporelle en JSON structure.
