@@ -2,7 +2,8 @@ import math
 import unittest
 
 from cs2gp.odds import (
-    closing_line_value, devig_power, expected_value, find_value, kelly_fraction, simulate_flat,
+    closing_line_value, devig_power, expected_value, find_value,
+    kelly_fraction, simulate_flat, simulate_kelly,
 )
 
 
@@ -72,6 +73,19 @@ class OddsValidationTests(unittest.TestCase):
         sim = simulate_flat(seq, stake=2.0)
         self.assertEqual(sim["max_drawdown"], 6.0)
         self.assertEqual(sim["max_losing_streak"], 3)
+
+    def test_simulate_kelly_compounds_bankroll_and_tracks_relative_drawdown(self):
+        empty = simulate_kelly([], initial_bankroll=100.0)
+        self.assertEqual(empty["final_bankroll"], 100.0)
+        self.assertEqual(empty["max_drawdown_pct"], 0.0)
+        # kelly_fraction(0.6, 2.0, cap=0.05, scale=0.25) == 0.05
+        res = simulate_kelly([(0.6, 2.0, 1), (0.6, 2.0, 0)], initial_bankroll=100.0)
+        # 100 -> 105 -> 99.75 (drawdown = 5.25 / 105 = 5%)
+        self.assertAlmostEqual(res["final_bankroll"], 99.75, places=10)
+        self.assertAlmostEqual(res["max_drawdown_pct"], 0.05, places=10)
+        self.assertEqual(res["max_losing_streak"], 1)
+        with self.assertRaises(ValueError):
+            simulate_kelly([(0.6, 2.0, 1)], initial_bankroll=0.0)
 
 
 if __name__ == "__main__":
