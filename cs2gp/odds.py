@@ -91,22 +91,24 @@ def roi_significance(results: list[tuple[float, float, int]]) -> dict:
     if n < 2:
         return {
             "n": n, "mean_return": 0.0 if n == 0 else float((results[0][1] - 1.0) if results[0][2] else -1.0),
-            "std_return": None, "t_stat": None, "p_value": None, "significant_5pct": False,
+            "std_return": None, "sharpe_ratio": None, "t_stat": None, "p_value": None, "significant_5pct": False,
         }
     returns = np.array([(odds - 1.0) if won else -1.0 for _p, odds, won in results], dtype=float)
     mean_ret = float(returns.mean())
     std_ret = float(returns.std(ddof=1))
     if std_ret < 1e-12:
         return {
-            "n": n, "mean_return": mean_ret, "std_return": 0.0,
+            "n": n, "mean_return": mean_ret, "std_return": 0.0, "sharpe_ratio": None,
             "t_stat": None, "p_value": None, "significant_5pct": False,
         }
-    t_stat = mean_ret / (std_ret / math.sqrt(n))
+    sharpe = mean_ret / std_ret
+    t_stat = sharpe * math.sqrt(n)
     p_value = math.erfc(abs(t_stat) / math.sqrt(2.0))
     return {
         "n": n,
         "mean_return": mean_ret,
         "std_return": std_ret,
+        "sharpe_ratio": float(sharpe),
         "t_stat": float(t_stat),
         "p_value": float(p_value),
         "significant_5pct": bool(n >= 30 and p_value < 0.05),

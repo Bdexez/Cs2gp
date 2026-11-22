@@ -100,6 +100,7 @@ class OddsValidationTests(unittest.TestCase):
         strong = roi_significance([(0.7, 2.0, 1)] * 35 + [(0.7, 2.0, 0)] * 5)
         self.assertTrue(strong["significant_5pct"])
         self.assertLess(strong["p_value"], 0.01)
+        self.assertGreater(strong["sharpe_ratio"], 0.5)
 
     def test_equity_curve_tracks_flat_and_kelly_trajectories(self):
         seq = [(0.6, 2.0, 1), (0.6, 2.0, 0)]
