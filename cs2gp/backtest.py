@@ -8,13 +8,18 @@ notes Elo d'un match donne encodent deja des matchs posterieurs.
 
 from __future__ import annotations
 
-import datetime as dt
-import math
 from bisect import bisect_left
-from dataclasses import dataclass
+import csv
+import datetime as dt
+from dataclasses import dataclass, field
+import math
+import os
+from pathlib import Path
+import tempfile
 
 import numpy as np
 
+from .csvio import read_rows
 from .features import Dataset
 from .metrics import (
     brier, brier_decomposition, calibration_slope_intercept, format_summary, log_loss,
@@ -45,6 +50,7 @@ class BacktestResult:
     blend: float = 0.5
     best_blend: float | None = None
     comparison: dict | None = None
+    fold_slices: list[tuple[int, int]] = field(default_factory=list)
 
     def report(self) -> str:
         lines = [
@@ -157,6 +163,78 @@ class BacktestResult:
         if self.blended_raw is not None:
             out["blended_raw_metrics"] = summarize(self.y, self.blended_raw)
         return out
+
+    def drift_report(self) -> list[dict]:
+        """Suivi par fold du log-loss, du gain vs Elo et de la pente de calibration."""
+        if not len(self.y):
+            return []
+        slices = self.fold_slices
+        if not slices:
+            k = max(1, self.folds)
+            bounds = np.linspace(0, len(self.y), k + 1, dtype=int)
+            slices = [(int(a), int(b)) for a, b in zip(bounds, bounds[1:]) if b > a]
+        rows: list[dict] = []
+        for idx, (a, b) in enumerate(slices, 1):
+            y_sub = self.y[a:b]
+            p_sub = self.predictions[a:b]
+            elo_sub = self.elo_only[a:b]
+            summary = summarize(y_sub, p_sub)
+            elo_ll = log_loss(y_sub, elo_sub)
+            cox = calibration_slope_intercept(y_sub, p_sub)
+            rows.append({
+                "fold": idx,
+                "date_start": self.dates[a].isoformat(),
+                "date_end": self.dates[b - 1].isoformat(),
+                "n": int(b - a),
+                "log_loss": summary["log_loss"],
+                "elo_log_loss": elo_ll,
+                "gain_vs_elo": float(elo_ll - summary["log_loss"]),
+                "brier": summary["brier"],
+                "ece": summary["ece"],
+                "calibration_slope": cox["slope"] if cox["converged"] else None,
+            })
+        return rows
+
+    def export_csv(self, path: str | Path) -> int:
+        """Exporte atomiquement les predictions hors-echantillon en CSV."""
+        path = Path(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        cols = [
+            "match_id", "date", "team_a", "team_b", "best_of", "lan", "tier", "event",
+            "y", "p_model", "p_elo", "p_match", "p_maps",
+        ]
+        temporary = None
+        try:
+            with tempfile.NamedTemporaryFile(mode="w", newline="", encoding="utf-8",
+                                             dir=path.parent, prefix=f".{path.name}.",
+                                             suffix=".tmp", delete=False) as fh:
+                temporary = Path(fh.name)
+                writer = csv.writer(fh, lineterminator="\n")
+                writer.writerow(cols)
+                for i in range(len(self.y)):
+                    m = self.meta[i]
+                    writer.writerow([
+                        m.get("match_id", ""),
+                        self.dates[i].isoformat(),
+                        m.get("team_a", ""),
+                        m.get("team_b", ""),
+                        m.get("best_of", ""),
+                        int(bool(m.get("lan", False))),
+                        m.get("tier", ""),
+                        m.get("event", ""),
+                        int(self.y[i]),
+                        f"{float(self.predictions[i]):.6f}",
+                        f"{float(self.elo_only[i]):.6f}",
+                        "" if self.match_only is None else f"{float(self.match_only[i]):.6f}",
+                        "" if self.maps_only is None else f"{float(self.maps_only[i]):.6f}",
+                    ])
+                fh.flush()
+                os.fsync(fh.fileno())
+            os.replace(temporary, path)
+        finally:
+            if temporary is not None:
+                temporary.unlink(missing_ok=True)
+        return int(len(self.y))
 
 
 def _elo_reference(ds: Dataset) -> np.ndarray:
@@ -288,7 +366,30 @@ def walk_forward(
         comparison=(paired_block_bootstrap(y, preds, elo_only, ds.dates[start:],
                                           samples=bootstrap_samples, block_days=block_days)
                     if bootstrap_samples else None),
+        fold_slices=[(i - start, j - start) for i, j in splits],
     )
+
+
+def read_odds_csv(path: str | Path) -> dict[str, tuple[float, float]]:
+    """Charge un CSV de cotes historiques : match_id,odds_a,odds_b."""
+    from .odds import implied
+
+    out: dict[str, tuple[float, float]] = {}
+    for line, row in read_rows(path, {"match_id", "odds_a", "odds_b"}):
+        mid = row["match_id"].strip()
+        if not mid:
+            raise ValueError(f"ligne {line} invalide dans {path}: match_id vide")
+        if mid in out:
+            raise ValueError(f"ligne {line} invalide dans {path}: match_id duplique ({mid})")
+        try:
+            oa = float(row["odds_a"])
+            ob = float(row["odds_b"])
+            implied(oa)
+            implied(ob)
+        except ValueError as exc:
+            raise ValueError(f"ligne {line} invalide dans {path}: {exc}") from exc
+        out[mid] = (oa, ob)
+    return out
 
 
 def bet_backtest(
