@@ -944,8 +944,9 @@ def cmd_journal(args) -> int:
         print(f"  Kelly     : {money['profit_kelly']:+.3f} pour "
               f"{money['mise_kelly_totale']:.2f} misees, ROI {money['roi_kelly']:+.1%}")
         if risk is not None:
+            basis = "mises archivees" if risk["stake_source"] == "recorded" else "mises Kelly estimees"
             print(
-                f"  Risque MC ({risk['horizon']} paris, {risk['samples']} tirages) : "
+                f"  Risque MC ({risk['horizon']} matchs, {risk['samples']} tirages, {basis}) : "
                 f"P(profit) {risk['prob_profit']:.1%} | "
                 f"bankroll p05={risk['p05_final']:.2f} / med={risk['median_final']:.2f} | "
                 f"drawdown p95={risk['p95_max_drawdown_pct']:.1%}"

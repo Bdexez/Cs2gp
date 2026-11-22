@@ -469,7 +469,11 @@ def bankroll_risk(
     samples: int = 500,
     seed: int = 0,
 ) -> dict | None:
-    """Estimation Monte Carlo du drawdown et du risque sur les paris cotes du journal."""
+    """Risque reechantillonne par rencontre ; horizon compte les rencontres.
+
+    Les fractions archivees sont utilisees si elles sont toutes disponibles.
+    Sinon, des mises Kelly sont estimees pour tout l'echantillon.
+    """
     from .odds import bootstrap_bankroll
 
     rows = [
@@ -482,7 +486,14 @@ def bankroll_risk(
         (float(r["probabilite"]), float(r["cote"]), int(r["resultat"] == "gagne"))
         for r in rows
     ]
-    return bootstrap_bankroll(plays, mode=mode, horizon=horizon, samples=samples, seed=seed)
+    fractions = ([float(r["mise"]) for r in rows]
+                 if mode == "kelly" and all(r.get("mise") for r in rows) else None)
+    out = bootstrap_bankroll(plays, mode=mode, horizon=horizon, samples=samples, seed=seed,
+                             groups=[_pick_from_row(r).fixture_key for r in rows],
+                             stake_fractions=fractions)
+    if fractions is not None:
+        out["stake_source"] = "recorded"
+    return out
 
 
 def monthly_summary(

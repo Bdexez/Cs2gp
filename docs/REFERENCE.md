@@ -260,6 +260,19 @@ of the mean return per bet. The two-sided p-value uses a normal approximation;
 `roi_significant_5pct` requires at least 30 fixtures. For Python callers,
 `roi_significance(results, groups=fixture_keys)` enables grouping explicitly.
 
+`journal --risk` resamples entire fixtures, settling their markets together on
+the same starting capital. Its horizon counts fixtures; JSON identifies this
+with `horizon_unit="fixture"`, alongside `n_bets` and `n_groups`. Recorded stake
+fractions are used when all are present (`stake_source="recorded"`). Otherwise
+Kelly fractions are estimated for the entire sample (`"estimated_kelly"`),
+with a combined cap per fixture. Drawdown is measured between fixture
+settlements, assuming independently resampled fixtures.
+
+Python callers can use `bootstrap_bankroll(results, groups=fixture_keys,
+stake_fractions=fractions)` to preserve supplied Kelly stakes. Omit `groups`
+for independent bet sampling and a horizon in bets; supplied fractions are
+optional, and their sum within a fixture must not exceed the bankroll.
+
 ### The tipster's track record
 
 `cs2gp tipster-backtest` replays the whole strategy over the history, using at

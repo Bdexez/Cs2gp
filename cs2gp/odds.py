@@ -131,6 +131,19 @@ def market_diagnostics(odds_a: float, odds_b: float) -> dict:
     }
 
 
+def _encode_groups(groups: Sequence[Hashable] | None, n: int) -> tuple[list[int] | None, int]:
+    if groups is None:
+        return None, n
+    if len(groups) != n:
+        raise ValueError("groups doit identifier le match de chaque pari")
+    labels = {}
+    try:
+        indices = [labels.setdefault(group, len(labels)) for group in groups]
+    except TypeError as exc:
+        raise ValueError("les identifiants de groups doivent etre hashables") from exc
+    return indices, len(labels)
+
+
 def roi_significance(results: list[tuple[float, float, int]], *,
                      groups: Sequence[Hashable] | None = None) -> dict:
     """ROI moyen par pari, erreur type eventuellement regroupee par match.
@@ -145,17 +158,7 @@ def roi_significance(results: list[tuple[float, float, int]], *,
         if won not in (0, 1):
             raise ValueError("le resultat d'un pari doit etre 0 ou 1")
     n = len(results)
-    group_indices = None
-    n_groups = n
-    if groups is not None:
-        if len(groups) != n:
-            raise ValueError("groups doit identifier le match de chaque pari")
-        labels = {}
-        try:
-            group_indices = [labels.setdefault(group, len(labels)) for group in groups]
-        except TypeError as exc:
-            raise ValueError("les identifiants de groups doivent etre hashables") from exc
-        n_groups = len(labels)
+    group_indices, n_groups = _encode_groups(groups, n)
     returns = np.array([(odds - 1.0) if won else -1.0 for _p, odds, won in results], dtype=float)
     mean_ret = float(returns.mean()) if n else 0.0
     std_ret = float(returns.std(ddof=1)) if n > 1 else None
@@ -418,11 +421,17 @@ def bootstrap_bankroll(
     cap: float = 0.05,
     scale: float = 0.25,
     seed: int = 0,
+    groups: Sequence[Hashable] | None = None,
+    stake_fractions: Sequence[float] | None = None,
 ) -> dict:
     """Reechantillonnage Monte Carlo de la bankroll, par lots de trajectoires.
 
     Seuls les capitaux finaux et drawdowns sont conserves pour les quantiles.
     La taille des lots limite la memoire sans changer l'ordre des tirages.
+    Avec groups, un tirage est une rencontre entiere et horizon compte les
+    rencontres. Les marches sont regles simultanement sur le meme capital.
+    En Kelly, stake_fractions preserve les mises fournies ; sinon la somme
+    des fractions Kelly d'une rencontre est ramenee au plafond cap.
     """
     from .validation import positive_integer
 
@@ -436,24 +445,52 @@ def bootstrap_bankroll(
         implied(odds)
         if won not in (0, 1):
             raise ValueError("le resultat d'un pari doit etre 0 ou 1")
-    h = len(results) if horizon is None else horizon
+    group_indices, n = _encode_groups(groups, len(results))
+    h = n if horizon is None else horizon
     positive_integer("horizon", h)
 
     rng = np.random.default_rng(seed)
-    n = len(results)
+    returns = np.array([(odds - 1.0) if won else -1.0 for _p, odds, won in results], dtype=float)
     if mode == "flat":
+        if stake_fractions is not None:
+            raise ValueError("stake_fractions requiert le mode kelly")
         finite_number("stake", stake, strict=True)
-        rets = np.array([(odds - 1.0) * stake if won else -stake for _p, odds, won in results], dtype=float)
+        rets = returns * stake
+        if group_indices is not None:
+            rets = np.bincount(group_indices, weights=rets, minlength=n)
         start_value = 0.0
         drawdown_suffix = ""
+        stake_source = "fixed"
     else:
         finite_number("initial_bankroll", initial_bankroll, strict=True)
         finite_number("cap", cap, maximum=1.0)
         finite_number("scale", scale, maximum=1.0)
-        mults = np.array([
-            1.0 + kelly_fraction(p, odds, cap=cap, scale=scale) * ((odds - 1.0) if won else -1.0)
-            for p, odds, won in results
-        ], dtype=float)
+        if stake_fractions is None:
+            fractions = np.array([kelly_fraction(p, odds, cap=cap, scale=scale)
+                                  for p, odds, _won in results])
+            if group_indices is not None:
+                totals = np.bincount(group_indices, weights=fractions, minlength=n)
+                factors = np.ones(n)
+                np.divide(cap, totals, out=factors, where=totals > cap)
+                fractions *= factors[group_indices]
+            stake_source = "estimated_kelly"
+        else:
+            try:
+                fractions = np.asarray(stake_fractions, dtype=float)
+            except (TypeError, OverflowError) as exc:
+                raise ValueError("stake_fractions doit contenir des fractions numeriques") from exc
+            if (fractions.shape != (len(results),) or not np.isfinite(fractions).all()
+                    or np.any((fractions < 0.0) | (fractions > 1.0))):
+                raise ValueError("stake_fractions doit contenir une fraction finie dans [0, 1] par pari")
+            stake_source = "provided"
+        profits = fractions * returns
+        if group_indices is not None:
+            totals = np.bincount(group_indices, weights=fractions, minlength=n)
+            if np.any(totals > 1.0 + 1e-12):
+                raise ValueError("la somme des mises d'une rencontre ne peut pas depasser le capital")
+            profits = np.bincount(group_indices, weights=profits, minlength=n)
+        # Tolerer l'arrondi lorsque tout le capital est engage puis perdu.
+        mults = np.maximum(1.0 + profits, 0.0)
         start_value = float(initial_bankroll)
         drawdown_suffix = "_pct"
 
@@ -480,6 +517,8 @@ def bootstrap_bankroll(
         max_dds[start:stop] = np.max(drawdowns, axis=1)
     return {
         "mode": mode, "horizon": h, "samples": samples,
+        "horizon_unit": "fixture" if groups is not None else "bet",
+        "n_bets": len(results), "n_groups": n, "stake_source": stake_source,
         "prob_profit": float(np.mean(finals > start_value)),
         "median_final": float(np.median(finals)),
         "p05_final": float(np.quantile(finals, 0.05)),
