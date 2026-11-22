@@ -372,3 +372,13 @@ outillage domaine CS2 et sortie structuree).
 - **Resume statistique Elo (`EloEngine.rating_summary`)** (`ratings.py`, `cli.py`) :
   calcule moyenne, ecart-type, quantiles (min/p25/mediane/p75/max) et RD moyen
   de l'ecosysteme, expose dans `cs2gp ratings` (texte et `--json`).
+
+## Cycle 34 : ROC-AUC en NumPy pur, exports CSV `maps`/`events` et dates passees en audit
+
+- **ROC-AUC exact (`roc_auc`)** (`metrics.py`) : statistique U de Mann-Whitney
+  avec gestion vectorisee des ex-aequo en NumPy pur, exposee dans `summarize()`
+  et affichee dans `format_summary()`.
+- **Exports CSV `maps` et `events`** (`cli_exports.py`, `cli.py`) : ajout de
+  `--export-csv` atomique sur `cs2gp maps` et `cs2gp events`.
+- **Detection des fixtures passees (`audit_fixtures`)** (`audit.py`) : signale
+  les affiches datees avant le dernier match connu de l'historique (`past_fixtures`).
