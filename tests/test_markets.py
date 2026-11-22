@@ -1,6 +1,9 @@
 import unittest
 
-from cs2gp.markets import SeriesDistribution, build_markets, enforce_margins, project_veto, series_distribution
+from cs2gp.markets import (
+    SeriesDistribution, build_markets, enforce_margins, project_veto,
+    series_distribution, stochastic_veto_distribution,
+)
 from cs2gp.pronostic import shape_series
 
 
@@ -90,6 +93,27 @@ class MarginReconciliationTests(unittest.TestCase):
         self.assertAlmostEqual(result.p_a, .8)
         with self.assertRaises(ValueError):
             enforce_margins(series_distribution([("a", .5)], 1), .5, .5)
+
+
+class StochasticVetoTests(unittest.TestCase):
+    def test_zero_temperature_matches_deterministic_veto_exactly(self):
+        pool = [(f"m{i}", 0.25 + i * 0.08) for i in range(7)]
+        for bo in (1, 3, 5):
+            det = series_distribution(project_veto(pool, bo).order, bo)
+            sto = stochastic_veto_distribution(pool, bo, temperature=0.0)
+            self.assertEqual(sto.scores, det.scores)
+
+    def test_positive_temperature_is_valid_reproducible_and_softens_extremes(self):
+        pool = [(f"m{i}", 0.20 + i * 0.10) for i in range(7)]
+        s1 = stochastic_veto_distribution(pool, 3, temperature=0.10, samples=200, seed=42)
+        s2 = stochastic_veto_distribution(pool, 3, temperature=0.10, samples=200, seed=42)
+        self.assertEqual(s1.scores, s2.scores)
+        self.assertAlmostEqual(sum(s1.scores.values()), 1.0, places=12)
+        self.assertTrue(all(p >= 0.0 for p in s1.scores.values()))
+        with self.assertRaises(ValueError):
+            stochastic_veto_distribution(pool, 3, temperature=-0.1)
+        with self.assertRaises(ValueError):
+            stochastic_veto_distribution(pool, 3, samples=0)
 
 
 if __name__ == "__main__":
