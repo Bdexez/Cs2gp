@@ -208,6 +208,15 @@ class CliJsonTests(unittest.TestCase):
             cmp_payload = json.loads(out.getvalue())
             self.assertEqual(cmp_payload["team_a"]["team"], teams[0])
             self.assertEqual(len(cmp_payload["map_edges"]), 7)
+            self.assertIn("elo_stakes", cmp_payload)
+
+            # doctor --json
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(main(["doctor", "--data", str(data), "--json"]), 0)
+            doc_payload = json.loads(out.getvalue())
+            self.assertTrue(doc_payload["data"]["readable"])
+            self.assertGreater(doc_payload["data"]["n_maps"], 0)
 
             # movers --json
             out = io.StringIO()
