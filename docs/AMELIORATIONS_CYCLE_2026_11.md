@@ -232,3 +232,13 @@ outillage domaine CS2 et sortie structuree).
   les equipes inconnues, historiques minces/anciens et collisions sans `match_id`.
 - **Courbe d'equite dans le journal** (`journal.py`) : `equity_curve_flat`
   exposee dans `financial_summary()` (et donc via `cs2gp journal --json`).
+
+## Cycle 19 : Audit fixtures CLI, colinearite des features et affichage MCE
+
+- **`cs2gp audit --fixtures`** (`cli.py`) : expose le controle pre-vol
+  `audit_fixtures()` en ligne de commande (texte et `--json`).
+- **Rapport de colinearite (`feature_correlation_report`)** (`features.py`) :
+  identifie les colonnes constantes et les paires de features fortement
+  correlees (`|r| >= threshold`) en NumPy pur.
+- **Affichage `mce` dans `format_summary()`** (`metrics.py`) : rend l'ecart
+  maximal de calibration visible a cote de `ece`.
