@@ -48,7 +48,10 @@ class RecordStatisticsTests(unittest.TestCase):
         self.assertIn("spiegelhalter", sc)
         self.assertIn("brier_decomposition", sc)
         self.assertIn("Qualite probabiliste", rec.report())
-        self.assertEqual(rec.to_dict()["scoring"]["n"], 5)
+        d = rec.to_dict()
+        self.assertEqual(d["scoring"]["n"], 5)
+        self.assertIn("bo3", d["by_format"])
+        self.assertIn("2026", d["by_year"])
 
 
 if __name__ == "__main__":
