@@ -470,3 +470,11 @@ outillage domaine CS2 et sortie structuree).
   methode choisie a la detection de valeur et au calcul de CLV.
 - **Sortie `--json` sur `cs2gp settle`** (`cli.py`) : rend l'ensemble complet
   des sous-commandes CLI 100 % exploitable en JSON pour l'automatisation.
+
+## Cycle 45 : `--devig` sur `Tipster`/`slate` et contrat `--json` global CLI
+
+- **Retrait de marge configurable dans `Tipster` / `cs2gp slate`** (`pronostic.py`,
+  `cli.py`) : `devig_method` / `--devig {power,shin,proportional}` unifie le
+  retrait de marge sur l'ensemble des commandes marche (`predict`, `backtest`, `slate`).
+- **Test de contrat `--json` global** (`tests/test_cli_json.py`) : garantit que
+  les 24 sous-commandes CLI exposent toutes `--json`.
