@@ -533,22 +533,42 @@ quarter) make the comparison honest — they do not promise a return.
 
 ```
 cs2gp/
-  schema.py     data model, name normalisation, CSV reading
-  sources.py    data inputs + history simulator
+  schema.py     data model, name normalisation, versioned Active Duty pool, CSV reading
+  csvio.py      strict CSV reader shared by history, fixtures, odds and journal
+  sources.py    data inputs + history simulator (optional rosters)
+  audit.py      dataset quality audit (MR12/MR15, rosters, gaps, collisions)
   ratings.py    global and per-map Elo (margin, tier, inactivity, roster)
   features.py   leak-free extraction, dataset construction
-  model.py      IRLS logistic regression, decorrelation, calibration, ensemble
-  metrics.py    log-loss, Brier, ECE, reliability curve
-  backtest.py   walk-forward, comparison of the estimators
-  odds.py       margin removal, expected value, Kelly
-  markets.py    veto, score distribution, derived markets, margin calibration
-  predict.py    orchestration and prediction report
-  snapshot.py   complete analyzer archive, schema and integrity checks
-  pronostic.py  selectivity, tiers, reasoning, tipster backtest
-  journal.py    archiving of calls, settling, track record
-  cli.py        command-line interface
-tests/          unittest suite, including 32 historical scenarios and optional GBDT tests
+  temporal.py   day-aligned chronological splits and calibration boundaries
+  validation.py shared numeric and array contracts
+  model.py      IRLS logistic regression, Fisher covariance, L2 selection, calibration, ensemble
+  calibration.py prequential out-of-sample map predictions for derived calibration
+  metrics.py    log-loss, Brier, Murphy decomposition, Cox calibration, block bootstrap
+  backtest.py   walk-forward, stratified breakdown, fold drift, CSV export, oracle benchmark
+  odds.py       margin removal, expected value, CLV, flat and Kelly simulations
+  markets.py    deterministic & stochastic veto, score distribution, derived markets
+  predict.py    orchestration, team profile, head-to-head and prediction report
+  snapshot.py   complete analyzer archive, schema/integrity checks and safe inspection
+  pronostic.py  selectivity, tiers, reasoning, proper scoring, tipster backtest
+  journal.py    archiving of calls, settling, track record and drawdown metrics
+  cli.py        command-line interface (text and --json)
+tests/          unittest suite covering core, reliability, diagnostics and CLI
 ```
+
+### Additional CLI commands and options
+
+```bash
+cs2gp audit [--json]                              # dataset quality check
+cs2gp team navi [--date YYYY-MM-DD] [--json]      # full team profile and map pool
+cs2gp h2h navi g2 [--date YYYY-MM-DD] [--json]    # head-to-head history
+cs2gp inspect models/analyzer.cs2gp [--json]      # verify and inspect a bundle safely
+cs2gp backtest --by-segment --by-fold --export-csv out.csv --odds-csv odds.csv [--json]
+cs2gp sample --regime realiste --with-rosters     # synthetic data with roster reshuffles
+```
+
+All analytical commands (`audit`, `ratings`, `team`, `h2h`, `inspect`, `predict`,
+`backtest`, `slate`, `journal`, `tipster-backtest`) accept `--json`. Pass
+`--versioned-pool` to align Active Duty map pools with historical CS2 rotations.
 
 The tipster's decision rules live in a **pure function**, called both by the live
 service and by its own backtest. Decision logic written in two copies always ends up

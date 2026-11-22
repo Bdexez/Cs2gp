@@ -110,3 +110,15 @@ outillage domaine CS2 et sortie structuree).
 - **Benchmark multi-graines** (`backtest.py`) : `benchmark_regimes` agrege
   moyenne et ecart-type des metriques modele / Elo / oracle sur plusieurs
   graines et regimes (`facile`, `realiste`).
+
+## Cycle 8 : Confrontations directes, z-scores de Wald et veto stochastique
+
+- **Confrontations directes (`cs2gp h2h`)** (`predict.py`, `cli.py`) :
+  `Analyzer.head_to_head(a, b)` et `cs2gp h2h <a_team> <b_team> [--json]`
+  resument series, maps, bilan par terrain et score pondere par recence.
+- **Diagnostics de features (`feature_diagnostics`)** (`model.py`) : poids
+  standardises, erreurs types de Fisher et z-scores de Wald par variable pour
+  identifier les variables statistiquement significatives.
+- **Veto stochastique** (`markets.py`) : `stochastic_veto_distribution`
+  moyenne la loi du score sur des vetos softmax (reduit exactement a
+  `project_veto` quand `temperature=0`) afin de quantifier la sensibilite au veto.
