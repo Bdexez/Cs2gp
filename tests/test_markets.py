@@ -115,6 +115,15 @@ class StochasticVetoTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             stochastic_veto_distribution(pool, 3, samples=0)
 
+    def test_stochastic_veto_is_exactly_antisymmetric_even_with_momentum(self):
+        pool = [(f"m{i}", 0.22 + i * 0.09) for i in range(7)]
+        rev = [(name, 1.0 - p) for name, p in pool]
+        for temp in (0.0, 0.08):
+            for bo in (1, 3, 5):
+                da = stochastic_veto_distribution(pool, bo, momentum=0.2, temperature=temp, samples=100, seed=5)
+                db = stochastic_veto_distribution(rev, bo, momentum=0.2, temperature=temp, samples=100, seed=5)
+                self.assertAlmostEqual(da.p_a + db.p_a, 1.0, places=10)
+
 
 if __name__ == "__main__":
     unittest.main()
