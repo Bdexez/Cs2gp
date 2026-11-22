@@ -307,3 +307,13 @@ outillage domaine CS2 et sortie structuree).
   identifie les N matchs les plus couteux en log-loss dans un backtest (texte et `--json`).
 - **Validation stricte de `EloConfig.from_dict` / `load`** (`ratings.py`) :
   rejette explicitement tout fichier JSON qui n'est pas un objet.
+
+## Cycle 27 : Risque Monte Carlo du journal, scouting `compare_teams` et garde `--errors`
+
+- **Risque Monte Carlo dans le journal (`cs2gp journal --risk`)** (`journal.py`,
+  `cli.py`) : `bankroll_risk()` applique `bootstrap_bankroll()` aux paris cotes
+  du journal (texte et `--json`).
+- **Scouting comparatif (`Analyzer.compare_teams`)** (`predict.py`) : compare
+  deux equipes (profils, avantage map par map, probabilite Elo, H2H) sans
+  necessiter d'entrainement.
+- **Validation `--errors < 0`** (`cli.py`) : echoue immediatement avant le backtest.
