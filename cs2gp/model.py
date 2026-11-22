@@ -190,6 +190,13 @@ class LogisticModel:
         rows.sort(key=lambda r: -(abs(r["z_score"]) if r["z_score"] is not None else abs(r["weight"])))
         return rows
 
+    def condition_number(self) -> float | None:
+        """Conditionnement numerique de la matrice de covariance de Fisher."""
+        if self.cov is None:
+            return None
+        val = float(np.linalg.cond(self.cov))
+        return val if math.isfinite(val) else None
+
 
 def _fit_temperature(z: np.ndarray, y: np.ndarray) -> float:
     """Calibration par temperature : preserve l'ordre et la symetrie, 1 parametre."""
