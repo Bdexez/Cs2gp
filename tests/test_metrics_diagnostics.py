@@ -118,6 +118,14 @@ class MetricsDiagnosticsTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             metrics.paired_loss_test(y, p, ref, metric="unknown")
 
+    def test_favorite_reliability_table_folds_symmetric_probabilities(self):
+        y = np.array([1, 0, 1, 0, 1, 0], dtype=float)
+        p = np.array([0.85, 0.15, 0.65, 0.35, 0.55, 0.45], dtype=float)
+        rows = metrics.favorite_reliability_table(y, p, bins=5)
+        self.assertEqual(sum(r["n"] for r in rows), 6)
+        self.assertTrue(all(0.5 <= r["predicted"] <= 1.0 for r in rows))
+        self.assertTrue(all(r["observed"] == 1.0 for r in rows))
+
 
 if __name__ == "__main__":
     unittest.main()
