@@ -134,6 +134,16 @@ class AuditTests(unittest.TestCase):
         self.assertEqual(len(res["incomplete_odds_pairs"]), 1)
         self.assertEqual(len(res["arbitrage_fixtures"]), 1)
 
+    def test_audit_detects_team_a_winner_orientation_bias(self):
+        day = dt.date(2026, 1, 1)
+        maps = [
+            MapResult(f"m{i}", day + dt.timedelta(days=i), "navi", "g2", "mirage", 13, 8, best_of=1)
+            for i in range(35)
+        ]
+        report = audit_history(maps)
+        self.assertEqual(report["team_a_win_rate"], 1.0)
+        self.assertTrue(any("orientation biaisee" in w for w in report["warnings"]))
+
 
 if __name__ == "__main__":
     unittest.main()
