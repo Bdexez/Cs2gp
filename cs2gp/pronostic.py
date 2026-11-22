@@ -719,10 +719,10 @@ class TipsterRecord:
         return out
 
     def scoring(self) -> dict | None:
-        """Scores propres (log-loss, Brier, ECE) sur les pronostics regles."""
+        """Scores propres (log-loss, Brier, ECE, Spiegelhalter, Murphy) sur les pronostics regles."""
         if not self.settled:
             return None
-        from .metrics import brier, expected_calibration_error, log_loss
+        from .metrics import brier, brier_decomposition, expected_calibration_error, log_loss, spiegelhalter_z
 
         y = [1.0 if s.won else 0.0 for s in self.settled]
         p = [s.pick.probability for s in self.settled]
@@ -733,6 +733,8 @@ class TipsterRecord:
             "ece": expected_calibration_error(y, p),
             "mean_predicted": float(sum(p) / len(p)),
             "mean_observed": float(sum(y) / len(y)),
+            "spiegelhalter": spiegelhalter_z(y, p),
+            "brier_decomposition": brier_decomposition(y, p),
         }
 
     def report(self) -> str:
@@ -769,11 +771,16 @@ class TipsterRecord:
             )
         scores = self.scoring()
         if scores is not None:
+            sp = scores["spiegelhalter"]
+            sp_txt = (
+                f"  Spiegelhalter Z={sp['z_stat']:+.2f} (p={sp['p_value']:.3f})"
+                if sp["z_stat"] is not None else ""
+            )
             lines += [
                 "",
                 f"Qualite probabiliste ({scores['n']} pronostics regles) : "
                 f"logloss={scores['log_loss']:.4f}  brier={scores['brier']:.4f}  "
-                f"ece={scores['ece']:.3f}",
+                f"ece={scores['ece']:.3f}{sp_txt}",
             ]
         if self.dispersions:
             lo, hi = min(self.dispersions), max(self.dispersions)

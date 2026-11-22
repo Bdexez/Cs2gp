@@ -43,6 +43,8 @@ class RecordStatisticsTests(unittest.TestCase):
         self.assertAlmostEqual(sc["mean_observed"], 0.8)
         self.assertAlmostEqual(sc["ece"], 0.0, places=10)
         self.assertAlmostEqual(sc["brier"], 0.16, places=10)
+        self.assertIn("spiegelhalter", sc)
+        self.assertIn("brier_decomposition", sc)
         self.assertIn("Qualite probabiliste", rec.report())
         self.assertEqual(rec.to_dict()["scoring"]["n"], 5)
 
