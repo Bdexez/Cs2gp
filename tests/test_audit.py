@@ -144,6 +144,19 @@ class AuditTests(unittest.TestCase):
         self.assertEqual(report["team_a_win_rate"], 1.0)
         self.assertTrue(any("orientation biaisee" in w for w in report["warnings"]))
 
+    def test_audit_fixtures_warns_on_past_dates(self):
+        from cs2gp.audit import audit_fixtures
+        from cs2gp.predict import Analyzer
+        from cs2gp.pronostic import Fixture
+
+        day = dt.date(2026, 4, 10)
+        an = Analyzer(warmup_maps=0).load_maps([
+            MapResult("m1", day, "navi", "g2", "mirage", 13, 8, best_of=1),
+        ])
+        res = audit_fixtures([Fixture(day - dt.timedelta(days=5), "navi", "g2", match_id="old")], an)
+        self.assertEqual(len(res["past_fixtures"]), 1)
+        self.assertTrue(any("avant le dernier match connu" in w for w in res["warnings"]))
+
 
 if __name__ == "__main__":
     unittest.main()
