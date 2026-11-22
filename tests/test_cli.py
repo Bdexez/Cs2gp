@@ -58,6 +58,7 @@ class CommonOptionsTests(unittest.TestCase):
         parser = build_parser()
         self.assertEqual(parser.parse_args(["settle", "--window-days", "5"]).window_days, 5)
         self.assertEqual(parser.parse_args(["tipster-backtest", "--refit-every", "80"]).refit_every, 80)
+        self.assertTrue(parser.parse_args(["tune", "--json"]).json)
 
 
 if __name__ == "__main__":

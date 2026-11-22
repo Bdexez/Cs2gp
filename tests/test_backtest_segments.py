@@ -117,7 +117,9 @@ class BacktestSegmentTests(unittest.TestCase):
             odds_path = Path(tmp) / "odds.csv"
             write_csv(str(data), rows)
             match_ids = sorted({m.match_id for m in rows})
-            odds_lines = ["match_id,odds_a,odds_b"] + [f"{mid},1.95,1.95" for mid in match_ids]
+            odds_lines = ["match_id,odds_a,odds_b,closing_odds_a,closing_odds_b"] + [
+                f"{mid},1.95,1.95,1.85,2.05" for mid in match_ids
+            ]
             odds_path.write_text("\n".join(odds_lines) + "\n", encoding="utf-8")
 
             out = io.StringIO()
@@ -133,6 +135,15 @@ class BacktestSegmentTests(unittest.TestCase):
             self.assertGreater(payload["bet_backtest"]["matches_with_odds"], 0)
             self.assertGreater(payload["bet_backtest"]["avg_overround"], 1.0)
             self.assertTrue(export_path.is_file())
+
+            text_out = io.StringIO()
+            with contextlib.redirect_stdout(text_out), contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(main([
+                    "backtest", "--data", str(data), "--no-gbdt", "--bootstrap-samples", "0",
+                    "--odds-csv", str(odds_path),
+                ]), 0)
+            self.assertIn("Confrontation aux cotes historiques", text_out.getvalue())
+            self.assertIn("CLV", text_out.getvalue())
 
     def test_benchmark_regimes_aggregates_multiple_seeds(self):
         report = benchmark_regimes(
