@@ -66,13 +66,18 @@ class CliJsonTests(unittest.TestCase):
             jpath = Path(tmp) / "journal.csv"
             journal.record([Pick(dt.date(2026, 1, 1), teams[0], teams[1], 3, "",
                                  "vainqueur", teams[0], 0.72, "solide", "PRONOSTIC")], jpath)
+            j_csv = Path(tmp) / "journal_export.csv"
             out = io.StringIO()
             with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
-                self.assertEqual(main(["journal", "--journal", str(jpath), "--by-month", "--json"]), 0)
+                self.assertEqual(main([
+                    "journal", "--journal", str(jpath), "--by-month",
+                    "--export-csv", str(j_csv), "--json",
+                ]), 0)
             j_payload = json.loads(out.getvalue())
             self.assertIn("scorecard", j_payload)
             self.assertIn("financial", j_payload)
             self.assertIn("by_month", j_payload)
+            self.assertTrue(j_csv.is_file())
 
             # slate --json + --export-csv
             fpath = Path(tmp) / "fixtures.csv"

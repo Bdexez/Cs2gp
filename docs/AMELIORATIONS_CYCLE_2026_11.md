@@ -382,3 +382,12 @@ outillage domaine CS2 et sortie structuree).
   `--export-csv` atomique sur `cs2gp maps` et `cs2gp events`.
 - **Detection des fixtures passees (`audit_fixtures`)** (`audit.py`) : signale
   les affiches datees avant le dernier match connu de l'historique (`past_fixtures`).
+
+## Cycle 35 : Retrait de marge de Shin (`devig_shin`) et export CSV filtre du journal
+
+- **Retrait de marge selon Shin (`devig_shin`)** (`odds.py`) : calcule la part
+  d'inities `shin_z` par dichotomie exacte et expose `shin_a`, `shin_b`,
+  `shin_z` dans `market_diagnostics()`.
+- **Export CSV filtre du journal** (`journal.py`, `cli.py`) :
+  `export_filtered_csv()` et `cs2gp journal --export-csv` exportent de maniere
+  atomique une tranche datee (ou reglee) du journal.
