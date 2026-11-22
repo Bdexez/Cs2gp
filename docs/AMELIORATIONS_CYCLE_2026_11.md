@@ -242,3 +242,12 @@ outillage domaine CS2 et sortie structuree).
   correlees (`|r| >= threshold`) en NumPy pur.
 - **Affichage `mce` dans `format_summary()`** (`metrics.py`) : rend l'ecart
   maximal de calibration visible a cote de `ece`.
+
+## Cycle 20 : Marches derives dans `predict`, colinearite en audit et API publique
+
+- **Colinearite dans `cs2gp audit`** (`cli.py`) : inclut `feature_correlation_report`
+  du dataset match (features constantes et fortes correlations).
+- **Grille complete des marches (`cs2gp predict --markets`)** (`cli.py`) :
+  affiche toutes les probabilites et cotes justes des marches derives (texte et `--json`).
+- **API publique stable** (`cs2gp/__init__.py`) : exporte `Analyzer`, `EloConfig`,
+  `Fixture`, `Tipster`, `audit_history`, `walk_forward` dans `__all__`.
