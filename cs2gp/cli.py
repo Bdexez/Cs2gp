@@ -16,12 +16,11 @@ from .cli_exports import export_history_csv, export_ratings_csv, export_slate_cs
 from .features import feature_correlation_report
 from .markets import build_markets, project_veto
 from .metrics import format_summary, summarize
-from .model import MatchPredictor
 from .odds import find_value, overround
 from .predict import MATCH_MODEL_WEIGHT, Analyzer
 from .ratings import EloConfig
 from .pronostic import (
-    Fixture, Tipster, fit_decider_temperature, format_card, read_fixtures,
+    Tipster, fit_decider_temperature, format_card, read_fixtures,
     shape_series, simulate_tipster,
 )
 from . import journal as journal_mod
@@ -270,6 +269,23 @@ def cmd_movers(args) -> int:
         return 0
     print()
     print(format_movers(mv))
+    return 0
+
+
+def cmd_maps(args) -> int:
+    an = _analyzer(args, train=False)
+    rows = an.map_stats()
+    if args.json:
+        print(json.dumps({"maps": rows}, indent=2, ensure_ascii=False))
+        return 0
+    print()
+    print(f"{'map':<12}{'jouees':>8}{'OT':>8}{'diff r.':>9}{'rounds':>8}{'fav Elo':>10}")
+    for r in rows:
+        fav = "n/a" if r["elo_favorite_win_rate"] is None else f"{r['elo_favorite_win_rate']:.1%}"
+        print(
+            f"{r['map']:<12}{r['played']:>8}{r['ot_rate']:>7.1%}"
+            f"{r['avg_round_diff']:>9.2f}{r['avg_total_rounds']:>8.1f}{fav:>10}"
+        )
     return 0
 
 
@@ -913,6 +929,10 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--top", type=int, default=5, help="nombre d'equipes par categorie (defaut 5)")
     s.add_argument("--json", action="store_true", help="sortie JSON structuree")
     s.set_defaults(func=cmd_movers)
+
+    s = sub.add_parser("maps", parents=[common], help="statistiques globales par map (OT, rounds, favori Elo)")
+    s.add_argument("--json", action="store_true", help="sortie JSON structuree")
+    s.set_defaults(func=cmd_maps)
 
     s = sub.add_parser("audit", parents=[common], help="controle la qualite des donnees chargees")
     s.add_argument("--fixtures", help="CSV de matchs a venir a verifier avant prediction")
