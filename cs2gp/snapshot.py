@@ -223,3 +223,32 @@ def inspect_analyzer(path: str | Path) -> dict:
         }
     except (BadZipFile, KeyError, TypeError, AttributeError, UnicodeError, EOFError) as exc:
         raise ValueError(f"instantane illisible ou incomplet : {exc}") from exc
+
+
+def diff_analyzers(path_a: str | Path, path_b: str | Path) -> dict:
+    """Compare deux instantanes .cs2gp sans unpickler le GBDT."""
+    a = inspect_analyzer(path_a)
+    b = inspect_analyzer(path_b)
+    elo_changes = {
+        k: {"before": a["elo"].get(k), "after": b["elo"].get(k)}
+        for k in sorted(set(a["elo"]) | set(b["elo"]))
+        if a["elo"].get(k) != b["elo"].get(k)
+    }
+    opt_changes = {
+        k: {"before": a["training_options"].get(k), "after": b["training_options"].get(k)}
+        for k in sorted(set(a["training_options"]) | set(b["training_options"]))
+        if a["training_options"].get(k) != b["training_options"].get(k)
+    }
+    return {
+        "delta_maps": b["n_maps"] - a["n_maps"],
+        "delta_matches": b["n_matches"] - a["n_matches"],
+        "date_range_a": [a["date_min"], a["date_max"]],
+        "date_range_b": [b["date_min"], b["date_max"]],
+        "match_temperature_delta": float(b["match_model"]["temperature"] - a["match_model"]["temperature"]),
+        "map_temperature_delta": float(b["map_model"]["temperature"] - a["map_model"]["temperature"]),
+        "momentum_delta": float(b["momentum"] - a["momentum"]),
+        "versioned_pool_changed": a["versioned_pool"] != b["versioned_pool"],
+        "has_gbdt_changed": a["has_gbdt"] != b["has_gbdt"],
+        "elo_changes": elo_changes,
+        "training_option_changes": opt_changes,
+    }
