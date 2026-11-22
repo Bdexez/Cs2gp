@@ -157,6 +157,20 @@ class BacktestSegmentTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             benchmark_regimes(regimes=(), seeds=(1,))
 
+    def test_walk_forward_importance_ranks_features_out_of_sample(self):
+        from cs2gp.backtest import walk_forward_importance
+        from cs2gp.features import build_datasets
+        from cs2gp.schema import group_matches
+
+        rows = simulate_history(n_teams=8, years=1.0, seed=13, start=dt.date(2025, 1, 1))
+        mds, _, _ = build_datasets(group_matches(rows))
+        imp = walk_forward_importance(
+            mds, initial_frac=0.6, refit_every=150, min_train=80, repeats=3, seed=0, use_gbdt=False
+        )
+        self.assertEqual(len(imp), len(mds.feature_names))
+        self.assertGreater(imp[0]["mean_delta"], 0.0)
+        self.assertGreaterEqual(imp[0]["folds"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()
