@@ -126,6 +126,16 @@ class MetricsDiagnosticsTests(unittest.TestCase):
         self.assertTrue(all(0.5 <= r["predicted"] <= 1.0 for r in rows))
         self.assertTrue(all(r["observed"] == 1.0 for r in rows))
 
+    def test_hosmer_lemeshow_grows_under_nonlinear_miscalibration(self):
+        rng = np.random.default_rng(33)
+        p = rng.uniform(0.1, 0.9, size=600)
+        y = (rng.random(600) < p).astype(float)
+        good = metrics.hosmer_lemeshow(y, p, bins=10)
+        bad = metrics.hosmer_lemeshow(y, 1.0 - p, bins=10)
+        self.assertEqual(good["groups"], 10)
+        self.assertEqual(good["df"], 8)
+        self.assertLess(good["statistic"], bad["statistic"] * 0.1)
+
 
 if __name__ == "__main__":
     unittest.main()
