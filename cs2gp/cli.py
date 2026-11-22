@@ -354,6 +354,9 @@ def cmd_ratings(args) -> int:
     board = an.fx.elo.leaderboard(
         on=on, min_maps=args.min_maps, active_within_days=args.active_within
     )
+    summary = an.fx.elo.rating_summary(
+        on=on, min_maps=args.min_maps, active_within_days=args.active_within
+    )
     if args.export_csv:
         written = export_ratings_csv(args.export_csv, an, board, on, args.top)
         print(f"{written} equipes exportees -> {args.export_csv}", file=sys.stderr)
@@ -372,8 +375,10 @@ def cmd_ratings(args) -> int:
                 "maps_played": played,
                 "best_maps": [{"map": m, "rating": r} for m, r in best],
             })
-        print(json.dumps({"as_of": on.isoformat(), "min_maps": args.min_maps, "ratings": rows},
-                         indent=2, ensure_ascii=False))
+        print(json.dumps(
+            {"as_of": on.isoformat(), "min_maps": args.min_maps, "summary": summary, "ratings": rows},
+            indent=2, ensure_ascii=False,
+        ))
         return 0
     print(f"Classement Elo au {on} (min {args.min_maps} maps)\n")
     print(f"{'#':<4}{'equipe':<20}{'elo':>8}{'maps':>7}   meilleures maps")
@@ -385,6 +390,12 @@ def cmd_ratings(args) -> int:
         )[:3]
         tail = ", ".join(f"{m} {r:.0f}" for m, r in best)
         print(f"{i:<4}{team:<20}{rating:>8.0f}{played:>7}   {tail}")
+    if summary["n_teams"]:
+        print(
+            f"\nResume : {summary['n_teams']} equipes | "
+            f"moyenne {summary['mean']:.0f} (+/-{summary['std']:.0f}) | "
+            f"mediane {summary['median']:.0f} | RD moyen {summary['mean_rd']:.0f}"
+        )
     return 0
 
 
@@ -743,6 +754,10 @@ def cmd_journal(args) -> int:
         journal_mod.bankroll_risk(args.journal, since=since, until=until)
         if getattr(args, "risk", False) else None
     )
+    by_month = (
+        journal_mod.monthly_summary(args.journal, since=since, until=until)
+        if getattr(args, "by_month", False) else None
+    )
     if getattr(args, "json", False):
         payload = {
             "scorecard": None if record is None else record.to_dict(),
@@ -750,6 +765,8 @@ def cmd_journal(args) -> int:
         }
         if getattr(args, "risk", False):
             payload["risk"] = risk
+        if getattr(args, "by_month", False):
+            payload["by_month"] = by_month
         print(json.dumps(payload, indent=2, ensure_ascii=False))
         return 0
     if record is None:
@@ -757,6 +774,16 @@ def cmd_journal(args) -> int:
         return 0
     print()
     print(record.report())
+    if by_month:
+        print("\nDetail mensuel :")
+        print(f"  {'mois':<9}{'n':>5}{'annonce':>9}{'observe':>9}{'brier':>8}{'P&L u':>9}{'ROI':>8}")
+        for m in by_month:
+            pnl = "n/a" if m["flat_profit"] is None else f"{m['flat_profit']:+.2f}"
+            roi = "n/a" if m["flat_roi"] is None else f"{m['flat_roi']:+.1%}"
+            print(
+                f"  {m['month']:<9}{m['n']:>5}{m['mean_prob']:>8.1%}"
+                f"{m['hit_rate']:>8.1%}{m['brier']:>8.4f}{pnl:>9}{roi:>8}"
+            )
     if money:
         print()
         print("Bilan financier (uniquement les lignes ou une cote a ete enregistree) :")
@@ -1080,6 +1107,8 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--until", type=parse_date, help="inclut uniquement les matchs jusqu'a cette date")
     s.add_argument("--risk", action="store_true",
                    help="ajoute un bootstrap Monte Carlo de bankroll et drawdown p95")
+    s.add_argument("--by-month", action="store_true",
+                   help="ventile calibration et P&L mise fixe par mois (YYYY-MM)")
     s.add_argument("--json", action="store_true", help="sortie JSON structuree")
     s.set_defaults(func=cmd_journal)
 

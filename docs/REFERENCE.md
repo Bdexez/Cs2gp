@@ -572,7 +572,7 @@ cs2gp merge part1.csv part2.csv --out all.csv     # deduplicate & merge CSV hist
 cs2gp ratings --active-within 60 --export-csv r.csv
 cs2gp predict navi g2 --markets [--json]
 cs2gp backtest --by-segment --by-fold --importance --errors 10 --export-csv out.csv --odds-csv odds.csv [--json]
-cs2gp journal --since 2026-01-01 --risk [--json]
+cs2gp journal --since 2026-01-01 --by-month --risk [--json]
 cs2gp sample --regime realiste --with-rosters     # synthetic data with roster reshuffles
 ```
 

@@ -30,6 +30,7 @@ class CliJsonTests(unittest.TestCase):
                 ]), 0)
             ratings_payload = json.loads(out.getvalue())
             self.assertEqual(len(ratings_payload["ratings"]), 5)
+            self.assertEqual(ratings_payload["summary"]["n_teams"], 8)
             self.assertTrue(ratings_csv.is_file())
             self.assertEqual(len(ratings_csv.read_text(encoding="utf-8").splitlines()), 6)
             teams = [r["team"] for r in ratings_payload["ratings"]]
@@ -67,10 +68,11 @@ class CliJsonTests(unittest.TestCase):
                                  "vainqueur", teams[0], 0.72, "solide", "PRONOSTIC")], jpath)
             out = io.StringIO()
             with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
-                self.assertEqual(main(["journal", "--journal", str(jpath), "--json"]), 0)
+                self.assertEqual(main(["journal", "--journal", str(jpath), "--by-month", "--json"]), 0)
             j_payload = json.loads(out.getvalue())
             self.assertIn("scorecard", j_payload)
             self.assertIn("financial", j_payload)
+            self.assertIn("by_month", j_payload)
 
             # slate --json + --export-csv
             fpath = Path(tmp) / "fixtures.csv"
