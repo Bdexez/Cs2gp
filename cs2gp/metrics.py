@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import math
 
 import numpy as np
 
@@ -166,6 +167,27 @@ def calibration_slope_intercept(y: np.ndarray, p: np.ndarray) -> dict:
         "intercept": float(beta[0]),
         "slope": float(beta[1]),
         "converged": converged,
+    }
+
+
+def spiegelhalter_z(y: np.ndarray, p: np.ndarray) -> dict:
+    """Test analytique de calibration de Spiegelhalter (1986) sur le score de Brier.
+
+    Sous H0 (probabilites parfaitement calibrees), Z suit asymptotiquement N(0, 1).
+    |Z| > 1.96 (p < 0.05) signale un defaut de calibration statistiquement significatif.
+    """
+    y, p = probability_pair(y, p)
+    w = 1.0 - 2.0 * p
+    num = float(np.sum((y - p) * w))
+    var = float(np.sum((w ** 2) * p * (1.0 - p)))
+    if var < 1e-12:
+        return {"z_stat": None, "p_value": None, "miscalibrated_5pct": False}
+    z = num / math.sqrt(var)
+    p_value = math.erfc(abs(z) / math.sqrt(2.0))
+    return {
+        "z_stat": float(z),
+        "p_value": float(p_value),
+        "miscalibrated_5pct": bool(p_value < 0.05),
     }
 
 
