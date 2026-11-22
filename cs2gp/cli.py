@@ -23,6 +23,7 @@ from .pronostic import (
 )
 from . import journal as journal_mod
 from .schema import group_matches, parse_date, write_csv
+from .snapshot import inspect_analyzer
 from .sources import simulate_history
 from .validation import positive_integer
 
@@ -84,6 +85,61 @@ def cmd_teams(args) -> int:
     an = _analyzer(args, train=False)
     for t in an.known_teams():
         print(f"{t:<20} {an.fx.elo.maps_played(t):>5} maps")
+    return 0
+
+
+def cmd_team(args) -> int:
+    an = _analyzer(args, train=False)
+    on = parse_date(args.date) if args.date else None
+    prof = an.team_profile(args.team, on=on)
+    if args.json:
+        print(json.dumps(prof, indent=2, ensure_ascii=False))
+        return 0
+    print()
+    print(f"{prof['team']}   [au {prof['as_of']}]")
+    print(
+        f"  Elo {prof['rating']:.0f} (+/-{prof['deviation']:.0f} RD) | "
+        f"trajectoire {prof['trajectory']:+.1f} | {prof['maps_played']} maps"
+    )
+    print(
+        f"  Forme recente : {prof['recent_win_rate']:.1%} "
+        f"({prof['recent_round_diff']:+.1f} rounds, residu {prof['perf_residual']:+.1f}) | "
+        f"SOS {prof['sos']:.0f} | charge 21j {prof['workload_21d']} maps | serie {prof['streak']:+d}"
+    )
+    if prof["roster"]:
+        print(f"  Roster ({prof['maps_with_roster']} maps) : {', '.join(prof['roster'])}")
+    print("\n  Pool de maps :")
+    for row in prof["map_pool"]:
+        print(
+            f"    {row['map']:<10} Elo {row['rating']:>6.0f}   "
+            f"{row['maps_played']:>3} maps   forme {row['recent_win_rate']:.0%}"
+        )
+    return 0
+
+
+def cmd_inspect(args) -> int:
+    info = inspect_analyzer(args.bundle)
+    if args.json:
+        print(json.dumps(info, indent=2, ensure_ascii=False))
+        return 0
+    print()
+    print(f"Instantane {info['format']} v{info['version']} (cs2gp {info['package_version']})")
+    print(
+        f"  Historique : {info['n_maps']} maps, {info['n_matches']} matchs "
+        f"({info['date_min']} -> {info['date_max']})"
+    )
+    print(
+        f"  Modele match : n={info['match_model']['trained_on']}, "
+        f"T={info['match_model']['temperature']:.3f}, GBDT={info['has_gbdt']}"
+    )
+    print(
+        f"  Modele map   : n={info['map_model']['trained_on']}, "
+        f"T={info['map_model']['temperature']:.3f}, calibration_cache={info['has_calibration_history']}"
+    )
+    print(
+        f"  Options : warmup={info['warmup_maps']}, versioned_pool={info['versioned_pool']}, "
+        f"momentum={info['momentum']:+.3f} (auto={info['momentum_auto']})"
+    )
     return 0
 
 
@@ -544,6 +600,17 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser("teams", parents=[common], help="liste les equipes connues")
     s.set_defaults(func=cmd_teams)
+
+    s = sub.add_parser("team", parents=[common], help="profil detaille d'une equipe")
+    s.add_argument("team")
+    s.add_argument("--date", help="date de reference (defaut : dernier match connu)")
+    s.add_argument("--json", action="store_true", help="sortie JSON structuree")
+    s.set_defaults(func=cmd_team)
+
+    s = sub.add_parser("inspect", help="verifie et affiche les metadonnees d'un instantane .cs2gp")
+    s.add_argument("bundle", help="chemin vers l'archive .cs2gp")
+    s.add_argument("--json", action="store_true", help="sortie JSON structuree")
+    s.set_defaults(func=cmd_inspect)
 
     s = sub.add_parser("audit", parents=[common], help="controle la qualite des donnees chargees")
     s.add_argument("--json", action="store_true", help="sortie JSON structuree")

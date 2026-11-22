@@ -322,6 +322,46 @@ class Analyzer:
     def known_teams(self) -> list[str]:
         return sorted(self.fx.elo.teams) if self.fx else []
 
+    def team_profile(self, name: str, on: dt.date | None = None) -> dict:
+        """Profil complet d'une equipe : Elo, incertitude, forme, charge et pool de maps."""
+        if self.fx is None or not self.matches:
+            raise RuntimeError("charger des donnees avant de consulter un profil")
+        team = self.resolve_team(name)
+        as_of = on or max(m.date for m in self.matches)
+        tr = self.fx.elo._read_team(team)
+        win_rate, round_diff = self.fx._form(team, as_of)
+        rec = self.fx.recent.get(team)
+        pool_rows = []
+        for mp in self.fx.pool_on(as_of):
+            m_wr, m_recent_n = self.fx._map_form(team, mp, as_of)
+            pool_rows.append({
+                "map": mp,
+                "rating": float(self.fx.elo.map_rating(team, mp, as_of)),
+                "maps_played": int(tr.map_counts.get(mp, 0)),
+                "recent_win_rate": float(m_wr),
+                "recent_maps": int(m_recent_n),
+            })
+        pool_rows.sort(key=lambda row: -row["rating"])
+        return {
+            "team": team,
+            "as_of": as_of.isoformat(),
+            "rating": float(self.fx.elo.rating(team, as_of)),
+            "deviation": float(self.fx.elo.deviation(team, as_of)),
+            "trajectory": float(self.fx.elo.trajectory(team, as_of)),
+            "maps_played": int(tr.maps_played),
+            "last_match_date": tr.last_date.isoformat() if tr.last_date else None,
+            "days_idle": int(max(0, (as_of - tr.last_date).days)) if tr.last_date else None,
+            "recent_win_rate": float(win_rate),
+            "recent_round_diff": float(round_diff),
+            "perf_residual": float(self.fx._perf_residual(team, as_of)),
+            "sos": float(self.fx._sos(team, as_of)),
+            "workload_21d": int(self.fx._workload(team, as_of)),
+            "streak": int(rec.streak) if rec else 0,
+            "roster": list(tr.roster),
+            "maps_with_roster": int(self.fx._roster_tenure(team)),
+            "map_pool": pool_rows,
+        }
+
     def calibration_history(self):
         """Historique hors entrainement partage par les calibrations et mis en cache."""
         from .calibration import prequential_maps

@@ -163,3 +163,63 @@ def load_analyzer(path: str | Path):
         return an
     except (BadZipFile, KeyError, TypeError, AttributeError, UnicodeError, EOFError) as exc:
         raise ValueError(f"instantane illisible ou incomplet : {exc}") from exc
+
+
+def inspect_analyzer(path: str | Path) -> dict:
+    """Verifie l'integrite d'un instantane et retourne ses metadonnees sans unpickler le GBDT."""
+    try:
+        with ZipFile(path) as archive:
+            names = archive.namelist()
+            files = set(names) - {"manifest.json"}
+            if (len(names) != len(set(names)) or "manifest.json" not in names
+                    or not _REQUIRED <= files or not files <= _ALLOWED):
+                raise ValueError("contenu d'instantane incomplet ou inconnu")
+            manifest = json.loads(archive.read("manifest.json"))
+            if (manifest.get("format") != "cs2gp.analyzer" or manifest.get("version") not in (1, 2)
+                    or manifest.get("feature_pipeline") != 1 or manifest.get("schemas") != _schemas()):
+                raise ValueError("version ou schema d'instantane incompatible")
+            if (manifest["version"] == 2) != ("calibration.json" in files):
+                raise ValueError("historique de calibration incompatible avec la version d'instantane")
+            if set(manifest.get("sha256", {})) != files:
+                raise ValueError("inventaire d'instantane incoherent")
+            blobs = {name: archive.read(name) for name in files}
+        for name, blob in blobs.items():
+            if hashlib.sha256(blob).hexdigest() != manifest["sha256"][name]:
+                raise ValueError(f"somme de controle invalide : {name}")
+        history = json.loads(blobs["history.json"])
+        match_meta = json.loads(blobs["match.json"])
+        map_meta = json.loads(blobs["map.json"])
+        dates = [row["date"] for row in history]
+        return {
+            "format": manifest["format"],
+            "version": manifest["version"],
+            "created_at": manifest.get("created_at"),
+            "package_version": manifest.get("package_version"),
+            "sklearn_version": manifest.get("sklearn_version"),
+            "has_gbdt": bool(match_meta.get("has_gbdt")),
+            "has_calibration_history": "calibration.json" in blobs,
+            "n_maps": len(history),
+            "n_matches": len({row["match_id"] for row in history}),
+            "date_min": min(dates) if dates else None,
+            "date_max": max(dates) if dates else None,
+            "warmup_maps": manifest["warmup_maps"],
+            "versioned_pool": manifest.get("versioned_pool", False),
+            "momentum": manifest["momentum"],
+            "momentum_auto": manifest["momentum_auto"],
+            "elo": manifest["elo"],
+            "training_options": manifest["training_options"],
+            "match_model": {
+                "trained_on": match_meta.get("trained_on"),
+                "last_date": match_meta.get("last_date"),
+                "temperature": match_meta.get("temperature"),
+                "n_features": len(match_meta.get("weights") or []),
+            },
+            "map_model": {
+                "trained_on": map_meta.get("trained_on"),
+                "last_date": map_meta.get("last_date"),
+                "temperature": map_meta.get("temperature"),
+                "n_features": len(map_meta.get("weights") or []),
+            },
+        }
+    except (BadZipFile, KeyError, TypeError, AttributeError, UnicodeError, EOFError) as exc:
+        raise ValueError(f"instantane illisible ou incomplet : {exc}") from exc

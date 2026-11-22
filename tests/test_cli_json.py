@@ -87,6 +87,28 @@ class CliJsonTests(unittest.TestCase):
             self.assertIn("by_tier", tb_payload)
             self.assertIn("by_market", tb_payload)
 
+            # team --json
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(main(["team", teams[0], "--data", str(data), "--json"]), 0)
+            team_payload = json.loads(out.getvalue())
+            self.assertEqual(team_payload["team"], teams[0])
+            self.assertEqual(len(team_payload["map_pool"]), 7)
+
+            # train --bundle + inspect --json
+            bundle = Path(tmp) / "analyzer.cs2gp"
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(main([
+                    "train", "--data", str(data), "--no-gbdt", "--bundle", str(bundle),
+                ]), 0)
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(main(["inspect", str(bundle), "--json"]), 0)
+            inspect_payload = json.loads(out.getvalue())
+            self.assertEqual(inspect_payload["version"], 2)
+            self.assertTrue(inspect_payload["has_calibration_history"])
+            self.assertFalse(inspect_payload["has_gbdt"])
+
 
 if __name__ == "__main__":
     unittest.main()
