@@ -506,6 +506,8 @@ def bet_backtest(
     result: BacktestResult,
     odds_lookup: dict[str, tuple],
     min_edge: float = 0.04,
+    *,
+    devig_method: str = "power",
 ) -> dict:
     """Rejoue le backtest contre des cotes historiques, si on en dispose.
 
@@ -527,17 +529,21 @@ def bet_backtest(
         if not odds:
             continue
         overrounds.append(overround(odds[0], odds[1]))
-        bet = find_value(float(p), odds[0], odds[1], meta["team_a"], meta["team_b"], min_edge)
+        bet = find_value(
+            float(p), odds[0], odds[1], meta["team_a"], meta["team_b"],
+            min_edge, devig_method=devig_method,
+        )
         if bet is None:
             continue
         won = int((bet.side == meta["team_a"] and y == 1) or (bet.side == meta["team_b"] and y == 0))
         plays.append((bet.model_p, bet.odds, won))
         if len(odds) == 4:
             side = "a" if bet.side == meta["team_a"] else "b"
-            clv = closing_line_value(bet.odds, odds[2], odds[3], side=side)
+            clv = closing_line_value(bet.odds, odds[2], odds[3], side=side, devig_method=devig_method)
             clv_probs.append(clv["clv_prob"])
             clv_evs.append(clv["clv_ev"])
     out = simulate_flat(plays)
+    out["devig_method"] = devig_method
     out["kelly"] = simulate_kelly(plays)
     out["significance"] = roi_significance(plays)
     out["matches_with_odds"] = len(overrounds)
