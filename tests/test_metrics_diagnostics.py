@@ -96,6 +96,15 @@ class MetricsDiagnosticsTests(unittest.TestCase):
         deg = metrics.spiegelhalter_z([1, 0, 1, 0], [0.5, 0.5, 0.5, 0.5])
         self.assertIsNone(deg["z_stat"])
 
+    def test_max_calibration_error_bounds_ece_and_exposes_in_summarize(self):
+        y = np.array([1, 1, 1, 1, 0, 0, 0, 0], dtype=float)
+        p = np.array([0.8, 0.8, 0.8, 0.8, 0.5, 0.5, 0.5, 0.5], dtype=float)
+        ece = metrics.expected_calibration_error(y, p, bins=10)
+        mce = metrics.max_calibration_error(y, p, bins=10)
+        self.assertGreaterEqual(mce, ece)
+        self.assertAlmostEqual(mce, 0.5, places=10)
+        self.assertAlmostEqual(metrics.summarize(y, p)["mce"], mce, places=10)
+
 
 if __name__ == "__main__":
     unittest.main()
