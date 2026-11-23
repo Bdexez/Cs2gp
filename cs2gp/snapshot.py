@@ -20,7 +20,7 @@ from zipfile import BadZipFile, ZIP_DEFLATED, ZipFile
 from . import __version__
 from .calibration import CalibrationHistory
 from .features import FeatureExtractor
-from .model import MatchPredictor, _MODEL_OPTIONS
+from .model import MatchPredictor, _GBDT_NAME, _MODEL_OPTIONS
 from .ratings import EloConfig
 from .schema import ACTIVE_DUTY, MapResult, parse_date
 from .validation import finite_number
@@ -96,7 +96,8 @@ def _read_verified_archive(path: str | Path) -> tuple[dict, dict[str, bytes]]:
         names = archive.namelist()
         files = set(names) - {"manifest.json"}
         if (len(names) != len(set(names)) or "manifest.json" not in names
-                or not _REQUIRED <= files or not files <= _ALLOWED):
+                or not _REQUIRED <= files
+                or any(name not in _ALLOWED and _GBDT_NAME.fullmatch(name) is None for name in files)):
             raise ValueError("contenu d'instantane incomplet ou inconnu")
         manifest = json.loads(archive.read("manifest.json"))
         if (manifest.get("format") != "cs2gp.analyzer" or manifest.get("version") not in (1, 2)

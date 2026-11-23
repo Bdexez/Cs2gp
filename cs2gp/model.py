@@ -19,6 +19,7 @@ import json
 import hashlib
 import math
 import pickle
+import re
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 
@@ -32,6 +33,7 @@ from .validation import (binary_labels, feature_matrix, finite_number,
 
 RECENCY_HALFLIFE_DAYS = 540.0
 _MODEL_OPTIONS = ("l2", "use_gbdt", "gbdt_weight", "calibration_frac", "recency_halflife", "l2_grid")
+_GBDT_NAME = re.compile(r"gbdt-[0-9a-f]{64}\.pkl")
 
 
 def sigmoid(z: np.ndarray) -> np.ndarray:
@@ -460,7 +462,7 @@ class MatchPredictor:
         self.validate_config()
         path = Path(path)
         payload = {
-            "version": 1,
+            "version": 2,
             **{name: getattr(self, name) for name in _MODEL_OPTIONS},
             "temperature": self.temperature,
             "feature_names": list(self.feature_names),
@@ -476,9 +478,12 @@ class MatchPredictor:
         if self.gbdt is not None:
             blob = pickle.dumps(self.gbdt)
             payload["gbdt_sha256"] = hashlib.sha256(blob).hexdigest()
+            payload["gbdt_file"] = f"gbdt-{payload['gbdt_sha256']}.pkl"
         data = json.dumps(payload, indent=2, allow_nan=False).encode("utf-8")
         if blob is not None:
-            atomic_write_bytes(path.with_suffix(".gbdt.pkl"), blob)
+            # Un composant adresse par contenu n'invalide jamais une generation
+            # precedente. Le JSON est le point de publication atomique.
+            atomic_write_bytes(path.parent / payload["gbdt_file"], blob)
         atomic_write_bytes(path, data)
 
     @classmethod
@@ -487,7 +492,7 @@ class MatchPredictor:
         payload = json.loads(path.read_text(encoding="utf-8"))
         if not isinstance(payload, dict):
             raise ValueError("le fichier de modele doit contenir un objet JSON")
-        if type(payload.get("version")) is not int or payload["version"] != 1:
+        if type(payload.get("version")) is not int or payload["version"] not in (1, 2):
             raise ValueError("version de modele non prise en charge")
         required = {"weights", "scales", "feature_names", "temperature", "l2", "gbdt_weight"}
         if not required <= payload.keys():
@@ -548,8 +553,15 @@ class MatchPredictor:
             if float(eigenvalues.min()) < -1e-10:
                 raise ValueError("matrice de covariance non positive")
             m.logistic.cov = cov
-        blob = path.with_suffix(".gbdt.pkl")
         if has_gbdt:
+            if payload["version"] == 2:
+                filename = payload.get("gbdt_file")
+                if (not isinstance(filename, str) or _GBDT_NAME.fullmatch(filename) is None
+                        or filename != f"gbdt-{payload.get('gbdt_sha256')}.pkl"):
+                    raise ValueError("reference de composant GBDT invalide")
+                blob = path.parent / filename
+            else:
+                blob = path.with_suffix(".gbdt.pkl")
             if not blob.is_file():
                 raise ValueError(f"composant GBDT manquant : {blob}")
             data = blob.read_bytes()

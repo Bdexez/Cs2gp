@@ -703,3 +703,21 @@ outillage domaine CS2 et sortie structuree).
   le GBDT et la temperature ; metadonnees invalides ; echec du premier fit ;
   refit reussi equivalent a un modele neuf. References des composants et
   predictions anterieures preservees en cas d'echec.
+
+## Cycle 60 : Publication coherente des modeles JSON et composants GBDT
+
+- **Modele JSON v2** (`model.py`) : le composant GBDT est nomme
+  `gbdt-<sha256>.pkl` et reference explicitement par `gbdt_file`. Il est ecrit
+  avant le remplacement atomique du JSON. Un echec de publication ou une
+  lecture pendant cette ecriture laisse l'ancienne generation exploitable,
+  contrairement au remplacement de l'unique fichier `.gbdt.pkl` precedent.
+- **Generations et compatibilite** : les composants precedents sont conserves
+  afin de ne pas interrompre les lecteurs ayant deja ouvert un ancien JSON.
+  Un contenu identique reutilise le meme nom. Le chargement v1 avec un fichier
+  fixe `<modele>.gbdt.pkl` reste accepte. Les archives `.cs2gp` incluent le
+  composant reference et n'autorisent que les noms historiques ou les noms
+  adresses par contenu, sans chemin arbitraire.
+- **Tests GBDT reels** : interruption avant publication du JSON, lecture de
+  l'ancienne generation entre les deux ecritures, rechargement de la nouvelle
+  generation, reutilisation d'un composant identique, renommage du JSON,
+  ancien format et rejet de references invalides avant deserialisation.
