@@ -6,7 +6,7 @@ import unittest
 
 import numpy as np
 
-from cs2gp.model import MatchPredictor
+from cs2gp.model import LogisticModel, MatchPredictor
 
 
 class ModelIntegrityTests(unittest.TestCase):
@@ -150,6 +150,24 @@ class ModelIntegrityTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 model.save(path)
             self.assertEqual(path.read_bytes(), previous)
+
+    def test_feature_names_are_snapshotted_and_round_trip_without_external_mutation(self):
+        rng = np.random.default_rng(11)
+        X = rng.normal(size=(60, 2))
+        y = (X[:, 0] > 0).astype(float)
+        names = ["elo", "form"]
+        logistic = LogisticModel(feature_names=names).fit(X, y)
+        model = MatchPredictor(use_gbdt=False).fit(X, y, feature_names=names)
+        names[0] = "changed outside the model"
+        self.assertEqual(logistic.feature_names, ("elo", "form"))
+        self.assertEqual(model.feature_names, ("elo", "form"))
+        self.assertEqual(model.logistic.feature_names, ("elo", "form"))
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "model.json"
+            model.save(path)
+            restored = MatchPredictor.load(path)
+            self.assertEqual(restored.feature_names, ("elo", "form"))
+            np.testing.assert_array_equal(restored.predict_proba(X), model.predict_proba(X))
 
     def test_feature_diagnostics_identifies_true_signal_via_wald_z_score(self):
         rng = np.random.default_rng(21)

@@ -8,8 +8,14 @@ import math
 from numbers import Integral
 
 
-def validate_dates(dates) -> None:
-    if any(a > b for a, b in zip(dates, dates[1:])):
+def validate_dates(dates, *, require_sorted: bool = True) -> None:
+    try:
+        for i, day in enumerate(dates):
+            if type(day) is not dt.date:
+                raise ValueError(f"dates[{i}] doit etre une date calendaire (datetime.date, sans heure)")
+    except TypeError as exc:
+        raise ValueError("dates doit etre une sequence de dates calendaires") from exc
+    if require_sorted and any(a > b for a, b in zip(dates, dates[1:])):
         raise ValueError("les dates doivent etre triees chronologiquement")
 
 
@@ -22,6 +28,8 @@ def day_end(dates, index: int) -> int:
 def forward_splits(dates, initial_frac: float, min_train: int, refit_every: int,
                    evaluation_start: dt.date | None = None) -> list[tuple[int, int]]:
     validate_dates(dates)
+    if evaluation_start is not None and type(evaluation_start) is not dt.date:
+        raise ValueError("evaluation_start doit etre une date calendaire")
     if not math.isfinite(initial_frac) or not 0 < initial_frac < 1:
         raise ValueError("initial_frac doit etre strictement entre 0 et 1")
     if isinstance(refit_every, bool) or not isinstance(refit_every, Integral) or refit_every < 1:

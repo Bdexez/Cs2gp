@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 
 from cs2gp import metrics
-from cs2gp.model import LogisticModel, MatchPredictor, recency_weights, series_win_probability
+from cs2gp.model import LogisticModel, MatchPredictor, recency_weights, select_l2, series_win_probability
 
 
 class NumericContractsTests(unittest.TestCase):
@@ -54,6 +54,19 @@ class NumericContractsTests(unittest.TestCase):
                 LogisticModel(**options).fit(X, y)
         with self.assertRaises(ValueError):
             recency_weights([], halflife=0)
+
+    def test_feature_name_contract_is_shared_by_training_and_l2_fallback(self):
+        rng = np.random.default_rng(11)
+        X = rng.normal(size=(60, 3))
+        y = (X[:, 0] > 0).astype(float)
+        cases = [("elo", "elo", "form"), ("", "x", "y"), ("  ", "x", "y"),
+                 (None, "x", "y"), ("one",), "abc", {"a": 1, "b": 2, "c": 3}, None]
+        for names in cases:
+            for train in (lambda: LogisticModel(feature_names=names).fit(X, y),
+                          lambda: MatchPredictor(use_gbdt=False).fit(X, y, feature_names=names),
+                          lambda: select_l2(X, y, feature_names=names)):
+                with self.subTest(names=names), self.assertRaisesRegex(ValueError, "feature_names"):
+                    train()
 
     def test_zero_weight_rows_do_not_affect_residualization_or_scaling(self):
         rng = np.random.default_rng(11)

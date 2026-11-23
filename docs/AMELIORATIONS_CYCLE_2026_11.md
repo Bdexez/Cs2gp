@@ -721,3 +721,21 @@ outillage domaine CS2 et sortie structuree).
   l'ancienne generation entre les deux ecritures, rechargement de la nouvelle
   generation, reutilisation d'un composant identique, renommage du JSON,
   ancien format et rejet de references invalides avant deserialisation.
+
+## Cycle 61 : Metadonnees d'entrainement coherentes avec le rechargement
+
+- **Noms de features** (`validation.py`, `model.py`) : contrat commun entre
+  regression logistique, predicteur d'ensemble, selection L2 et chargement JSON.
+  Les noms doivent etre uniques, non vides et correspondre aux colonnes ;
+  un tuple vide garde le mode anonyme. Les listes sont copiees en tuples,
+  pour qu'une mutation exterieure ne change pas les metadonnees apprises.
+  Des noms dupliques etaient auparavant acceptes au fit puis rejetes au load.
+- **Dates calendaires** (`temporal.py`, `model.py`) : les entrees d'entrainement,
+  les folds et les poids de recence exigent des `datetime.date` sans heure.
+  Des `datetime.datetime` tries etaient acceptes puis sauvegardes dans
+  `last_date` sous une forme que le chargeur ne pouvait pas relire. Les dates
+  invalides sont rejetees avant ajustement et `evaluation_start` suit le meme
+  contrat. Les poids de recence conservent leur support des dates non triees.
+- **Tests** : types/noms invalides, absence d'ajustement sur dates invalides,
+  validation lors du repli L2 court, listes de noms mutables et aller-retour
+  du modele, poids de recence dans l'ordre d'origine.
