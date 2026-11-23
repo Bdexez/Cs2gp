@@ -350,12 +350,29 @@ class Dataset:
         return len(self.y)
 
     def slice(self, idx) -> "Dataset":
-        idx = np.asarray(idx)
+        """Selectionne les memes lignes partout, en conservant une dimension ligne."""
+        if isinstance(idx, slice):
+            idx = np.arange(*idx.indices(len(self)), dtype=np.intp)
+        else:
+            idx = np.asarray(idx)
+            if idx.dtype.kind == "b":
+                if idx.ndim != 1 or len(idx) != len(self):
+                    raise ValueError("le masque doit avoir une valeur booleenne par ligne")
+                idx = np.flatnonzero(idx)
+            else:
+                if idx.ndim == 0:
+                    idx = idx.reshape(1)
+                if idx.ndim != 1 or (idx.size and idx.dtype.kind not in "iu"):
+                    raise ValueError("les indices doivent etre des entiers dans un vecteur")
+                if idx.size == 0:
+                    idx = np.empty(0, dtype=np.intp)
+                if np.any(idx >= len(self)) or (idx.dtype.kind == "i" and np.any(idx < -len(self))):
+                    raise IndexError("indice de ligne hors du dataset")
         return Dataset(
             X=self.X[idx],
             y=self.y[idx],
-            dates=[self.dates[i] for i in idx],
-            meta=[self.meta[i] for i in idx],
+            dates=[self.dates[int(i)] for i in idx],
+            meta=[self.meta[int(i)] for i in idx],
             feature_names=self.feature_names,
             pool_X=None if self.pool_X is None else self.pool_X[idx],
             versioned_pool=self.versioned_pool,
