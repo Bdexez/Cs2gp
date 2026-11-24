@@ -771,3 +771,19 @@ outillage domaine CS2 et sortie structuree).
 - **Tests** : conflits dans les deux ordres de sources, rosters et orientation,
   enrichissement d'une serie a plusieurs maps et preservation d'un fichier
   de sortie existant lorsque la commande `merge` echoue.
+
+## Cycle 64 : Diagnostic de correlation stable et entrees controlees
+
+- **Variance sans debordement** (`features.py`) : le diagnostic soustrait une
+  reference puis normalise chaque colonne avant le calcul de variance. Si
+  la soustraction elle-meme deborde, il normalise avant cette soustraction.
+  Deux colonnes parfaitement correlees a l'echelle 1e200 etaient auparavant
+  silencieusement absentes du rapport apres un debordement de variance.
+- **Precision et bornes** : le centrage sur une reference conserve les petits
+  ecarts autour d'un grand decalage. Le seuil absolu de quasi-constance de
+  1e-12 est conserve ; les correlations sont bornees dans [-1, 1] pour les
+  arrondis. Les donnees sources restent intactes.
+- **Contrat et tests** : rejet explicite des matrices mal formees, complexes
+  ou non finies, des noms invalides et des seuils hors limites. Tests des
+  grandes amplitudes, offsets, signes opposes pres des limites float64,
+  constantes et donnees insuffisantes ; rapports JSON sans valeurs NaN/Inf.

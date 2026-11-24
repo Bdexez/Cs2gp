@@ -21,6 +21,7 @@ import numpy as np
 
 from .ratings import EloConfig, EloEngine
 from .schema import ACTIVE_DUTY, Match, MapResult, active_duty_on
+from .validation import finite_number, validate_feature_names
 
 FORM_HALFLIFE_DAYS = 75.0
 FORM_WINDOW = 30
@@ -449,21 +450,40 @@ def build_datasets(
 
 def feature_correlation_report(ds: Dataset, *, threshold: float = 0.80) -> dict:
     """Detecte les features constantes et les paires fortement correlees (|r| >= threshold)."""
-    if not math.isfinite(threshold) or not 0.0 <= threshold <= 1.0:
-        raise ValueError("threshold doit etre dans [0, 1]")
-    X = np.asarray(ds.X, dtype=float)
-    names = ds.feature_names or tuple(f"f{i}" for i in range(X.shape[1]))
-    n_samples, n_features = X.shape if X.ndim == 2 else (0, 0)
+    finite_number("threshold", threshold, maximum=1.0)
+    if np.iscomplexobj(ds.X):
+        raise ValueError("X doit etre une matrice reelle finie")
+    try:
+        X = np.asarray(ds.X, dtype=float)
+    except (TypeError, OverflowError) as exc:
+        raise ValueError("X doit etre une matrice reelle finie") from exc
+    if X.ndim != 2 or not np.isfinite(X).all():
+        raise ValueError("X doit etre une matrice reelle finie")
+    n_samples, n_features = X.shape
+    names = (validate_feature_names(ds.feature_names, columns=n_features)
+             or tuple(f"f{i}" for i in range(n_features)))
     if n_samples < 2 or n_features == 0:
         return {"n_samples": n_samples, "n_features": n_features, "constant_features": [], "high_pairs": []}
-    stds = X.std(axis=0)
-    constant = [names[i] for i, s in enumerate(stds) if s < 1e-12]
-    active = [i for i, s in enumerate(stds) if s >= 1e-12]
+    # Retirer d'abord une reference conserve les petites variations d'une
+    # colonne a fort decalage. Si cette difference deborde, normaliser avant.
+    with np.errstate(over="ignore"):
+        centered = X - X[0]
+    overflow = ~np.isfinite(centered).all(axis=0)
+    scales = np.maximum(np.max(np.abs(centered), axis=0), 1.0)
+    if overflow.any():
+        scales[overflow] = np.maximum(np.max(np.abs(X[:, overflow]), axis=0), 1.0)
+        centered[:, overflow] = X[:, overflow] / scales[overflow] - X[0, overflow] / scales[overflow]
+    centered[:, ~overflow] /= scales[~overflow]
+    centered -= centered.mean(axis=0)
+    stds = np.sqrt(np.mean(centered**2, axis=0))
+    # Meme seuil absolu qu'avant, sans reconstruire des variances hors plage.
+    is_active = stds >= 1e-12 / scales
+    constant = [names[i] for i in np.flatnonzero(~is_active)]
+    active = np.flatnonzero(is_active)
     high_pairs = []
     if len(active) >= 2:
-        Xc = X[:, active] - X[:, active].mean(axis=0)
-        Xn = Xc / stds[active]
-        corr = (Xn.T @ Xn) / n_samples
+        Xn = centered[:, active] / stds[active]
+        corr = np.clip((Xn.T @ Xn) / n_samples, -1.0, 1.0)
         for a_pos in range(len(active)):
             for b_pos in range(a_pos + 1, len(active)):
                 r = float(corr[a_pos, b_pos])
