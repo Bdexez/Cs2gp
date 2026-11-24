@@ -1099,7 +1099,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser("team", parents=[common], help="profil detaille d'une equipe")
     s.add_argument("team")
-    s.add_argument("--date", help="date de reference (defaut : dernier match connu)")
+    s.add_argument("--date", help="exclut les resultats a partir de cette date (defaut : dernier etat connu)")
     s.add_argument("--json", action="store_true", help="sortie JSON structuree")
     s.set_defaults(func=cmd_team)
 
@@ -1131,7 +1131,7 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("compare", parents=[common], help="scouting comparatif rapide entre deux equipes")
     s.add_argument("team_a")
     s.add_argument("team_b")
-    s.add_argument("--date", help="date de reference (defaut : dernier match connu)")
+    s.add_argument("--date", help="exclut les resultats a partir de cette date (defaut : dernier etat connu)")
     s.add_argument("--json", action="store_true", help="sortie JSON structuree")
     s.set_defaults(func=cmd_compare)
 

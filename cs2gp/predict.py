@@ -238,6 +238,7 @@ class Analyzer:
         self._training_options: dict = {}
         self._momentum_auto = False
         self._snapshots: dict = {}
+        self._scouting_snapshots: dict[dt.date, FeatureExtractor] = {}
         self._calibration_history = None
 
     # ------------------------------------------------------------------ setup
@@ -270,6 +271,7 @@ class Analyzer:
         self.match_model = self.map_model = None
         self._training_options = {}
         self._snapshots.clear()
+        self._scouting_snapshots.clear()
         self._calibration_history = None
         if self._momentum_auto:
             self.momentum = 0.0
@@ -328,21 +330,45 @@ class Analyzer:
     def known_teams(self) -> list[str]:
         return sorted(self.fx.elo.teams) if self.fx else []
 
+    def _scouting_state(self, on: dt.date | None) -> FeatureExtractor:
+        """Etat de lecture avant on, sans construire de datasets ni entrainer."""
+        if self.fx is None or not self.matches:
+            raise RuntimeError("charger des donnees avant de consulter l'etat historique")
+        if on is None:
+            return self.fx
+        if type(on) is not dt.date:
+            raise ValueError("on doit etre une date calendaire")
+        if self.matches[-1].date < on:
+            return self.fx
+        if on not in self._scouting_snapshots:
+            if self.matches[0].date >= on:
+                raise ValueError(f"aucun resultat anterieur au {on}")
+            fx = FeatureExtractor(self.elo_config, versioned_pool=self.versioned_pool)
+            for match in self.matches:
+                if match.date >= on:
+                    break
+                fx.observe_match(match)
+            if len(self._scouting_snapshots) >= 8:
+                self._scouting_snapshots.pop(next(iter(self._scouting_snapshots)))
+            self._scouting_snapshots[on] = fx
+        return self._scouting_snapshots[on]
+
     def team_profile(self, name: str, on: dt.date | None = None) -> dict:
         """Profil complet d'une equipe : Elo, incertitude, forme, charge et pool de maps."""
         if self.fx is None or not self.matches:
             raise RuntimeError("charger des donnees avant de consulter un profil")
-        team = self.resolve_team(name)
+        fx = self._scouting_state(on)
+        team = self._resolve_team(name, fx)
         as_of = on or max(m.date for m in self.matches)
-        tr = self.fx.elo._read_team(team)
-        win_rate, round_diff = self.fx._form(team, as_of)
-        rec = self.fx.recent.get(team)
+        tr = fx.elo._read_team(team)
+        win_rate, round_diff = fx._form(team, as_of)
+        rec = fx.recent.get(team)
         pool_rows = []
-        for mp in self.fx.pool_on(as_of):
-            m_wr, m_recent_n = self.fx._map_form(team, mp, as_of)
+        for mp in fx.pool_on(as_of):
+            m_wr, m_recent_n = fx._map_form(team, mp, as_of)
             pool_rows.append({
                 "map": mp,
-                "rating": float(self.fx.elo.map_rating(team, mp, as_of)),
+                "rating": float(fx.elo.map_rating(team, mp, as_of)),
                 "maps_played": int(tr.map_counts.get(mp, 0)),
                 "recent_win_rate": float(m_wr),
                 "recent_maps": int(m_recent_n),
@@ -351,20 +377,20 @@ class Analyzer:
         return {
             "team": team,
             "as_of": as_of.isoformat(),
-            "rating": float(self.fx.elo.rating(team, as_of)),
-            "deviation": float(self.fx.elo.deviation(team, as_of)),
-            "trajectory": float(self.fx.elo.trajectory(team, as_of)),
+            "rating": float(fx.elo.rating(team, as_of)),
+            "deviation": float(fx.elo.deviation(team, as_of)),
+            "trajectory": float(fx.elo.trajectory(team, as_of)),
             "maps_played": int(tr.maps_played),
             "last_match_date": tr.last_date.isoformat() if tr.last_date else None,
             "days_idle": int(max(0, (as_of - tr.last_date).days)) if tr.last_date else None,
             "recent_win_rate": float(win_rate),
             "recent_round_diff": float(round_diff),
-            "perf_residual": float(self.fx._perf_residual(team, as_of)),
-            "sos": float(self.fx._sos(team, as_of)),
-            "workload_21d": int(self.fx._workload(team, as_of)),
+            "perf_residual": float(fx._perf_residual(team, as_of)),
+            "sos": float(fx._sos(team, as_of)),
+            "workload_21d": int(fx._workload(team, as_of)),
             "streak": int(rec.streak) if rec else 0,
             "roster": list(tr.roster),
-            "maps_with_roster": int(self.fx._roster_tenure(team)),
+            "maps_with_roster": int(fx._roster_tenure(team)),
             "map_pool": pool_rows,
         }
 
@@ -372,7 +398,8 @@ class Analyzer:
         """Historique direct entre deux equipes (series, maps et bilan par terrain)."""
         if self.fx is None or not self.matches:
             raise RuntimeError("charger des donnees avant de consulter l'historique direct")
-        a, b = self.resolve_team(team_a), self.resolve_team(team_b)
+        fx = self._scouting_state(on)
+        a, b = self._resolve_team(team_a, fx), self._resolve_team(team_b, fx)
         if a == b:
             raise ValueError("une equipe ne joue pas contre elle-meme")
         as_of = on or max(m.date for m in self.matches)
@@ -420,7 +447,7 @@ class Analyzer:
             "maps_total": maps_a + maps_b,
             "maps_a_wins": maps_a,
             "maps_b_wins": maps_b,
-            "weighted_h2h_score": float(self.fx._h2h(a, b, as_of)),
+            "weighted_h2h_score": float(fx._h2h(a, b, as_of)),
             "by_map": dict(sorted(by_map.items())),
             "recent_matches": recent[-10:],
         }
@@ -462,22 +489,23 @@ class Analyzer:
         """Comparaison directe de deux equipes (profils, pool de maps et H2H) sans entrainement."""
         if self.fx is None or not self.matches:
             raise RuntimeError("charger des donnees avant de comparer deux equipes")
-        a, b = self.resolve_team(team_a), self.resolve_team(team_b)
+        fx = self._scouting_state(on)
+        a, b = self._resolve_team(team_a, fx), self._resolve_team(team_b, fx)
         if a == b:
             raise ValueError("une equipe ne joue pas contre elle-meme")
         as_of = on or max(m.date for m in self.matches)
-        prof_a = self.team_profile(a, on=as_of)
-        prof_b = self.team_profile(b, on=as_of)
-        edges = self.fx.map_pool_edges(a, b, as_of)
-        pool = self.fx.pool_on(as_of)
-        stakes = self.fx.elo.simulate_outcome(a, b, pool[0], as_of)
+        prof_a = self.team_profile(a, on=on)
+        prof_b = self.team_profile(b, on=on)
+        edges = fx.map_pool_edges(a, b, as_of)
+        pool = fx.pool_on(as_of)
+        stakes = fx.elo.simulate_outcome(a, b, pool[0], as_of)
         return {
             "as_of": as_of.isoformat(),
             "team_a": prof_a,
             "team_b": prof_b,
             "elo_diff": float(prof_a["rating"] - prof_b["rating"]),
-            "elo_win_prob_a": float(self.fx.elo.win_probability(a, b, as_of)),
-            "certainty": float(self.fx.elo.certainty(a, b, as_of)),
+            "elo_win_prob_a": float(fx.elo.win_probability(a, b, as_of)),
+            "certainty": float(fx.elo.certainty(a, b, as_of)),
             "elo_stakes": {
                 "a_win_delta_a": stakes["if_a_wins"]["delta_a"],
                 "a_loss_delta_a": stakes["if_b_wins"]["delta_a"],
@@ -664,10 +692,14 @@ class Analyzer:
         return diag
 
     def resolve_team(self, name: str) -> str:
+        return self._resolve_team(name, self.fx)
+
+    def _resolve_team(self, name: str, fx: FeatureExtractor | None) -> str:
         canonical = normalize_team(name)
-        if self.fx and canonical in self.fx.elo.teams:
+        if fx and canonical in fx.elo.teams:
             return canonical
-        candidates = [t for t in self.known_teams()
+        teams = sorted(fx.elo.teams) if fx is not None else []
+        candidates = [t for t in teams
                       if normalize_team(t) == canonical or canonical in t or t in canonical]
         if len(candidates) == 1:
             return candidates[0]

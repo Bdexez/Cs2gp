@@ -461,6 +461,12 @@ returns a one-row dataset; empty selections keep consistent array dimensions.
 Order and repeated indices are preserved, so callers remain responsible for
 chronological ordering before training.
 
+For `team`, `h2h` and `compare`, an explicit `--date` excludes that entire day
+and later results from every statistic and from team-name resolution. Scouting
+replays only prior matches without fitting classifiers or building training
+datasets. Up to eight historical feature states are cached and cleared on
+history replacement. Without a date, reports use the complete loaded history.
+
 ```bash
 cs2gp train --no-gbdt --bundle models/analyzer.cs2gp
 cs2gp predict navi g2 --model models/analyzer.cs2gp

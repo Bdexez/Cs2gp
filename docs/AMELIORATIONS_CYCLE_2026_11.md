@@ -787,3 +787,19 @@ outillage domaine CS2 et sortie structuree).
   ou non finies, des noms invalides et des seuils hors limites. Tests des
   grandes amplitudes, offsets, signes opposes pres des limites float64,
   constantes et donnees insuffisantes ; rapports JSON sans valeurs NaN/Inf.
+
+## Cycle 65 : Scouting historique sans resultats futurs
+
+- **Etat avant la date demandee** (`predict.py`) : profils, H2H pondere et
+  comparaison utilisent un etat reconstruit avec les seuls matchs anterieurs
+  au jour explicite, y compris pour resoudre les noms d'equipes. Un profil
+  demande au 2 janvier pouvait auparavant afficher les maps du 3 janvier ;
+  le H2H filtrait ses compteurs tout en conservant un score pondere futur.
+- **Sans entrainement** : relecture des matchs dans un `FeatureExtractor`,
+  sans creer de datasets ni ajuster les modeles. Cache borne a huit etats,
+  invalide lors du remplacement de l'historique. Les consultations sans date
+  gardent l'etat complet au dernier resultat charge.
+- **Tests API et CLI** : egalite avec un historique tronque, invariance aux
+  resultats et rosters futurs, exclusion de tout le jour cible, resolution
+  des alias sur les seules equipes anterieures, lectures pures, invalidation
+  et bornes du cache, erreurs sur dates invalides et sorties JSON des trois commandes.
