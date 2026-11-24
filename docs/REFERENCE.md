@@ -649,6 +649,12 @@ cs2gp journal --since 2026-01-01 --by-month --pending --risk --export-csv j.csv 
 cs2gp sample --regime realiste --with-rosters     # synthetic data with roster reshuffles
 ```
 
+History merging rejects disagreements in scores, format, tier, LAN status or
+map index, and conflicting non-empty event/roster values. Empty event/roster
+fields can be enriched; an unambiguous event is shared across a match's maps.
+LAN, tier and map-index defaults count as values because the schema does not
+track whether those fields were omitted by a source.
+
 `backtest --json` includes a `confusion` object at threshold 0.5 (`p >= 0.5`
 predicts team A): counts `tp`, `fp`, `tn`, `fn`, precision, recall, specificity,
 F1 and balanced accuracy. Ratios with a zero denominator are `null`; F1 is
