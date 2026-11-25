@@ -689,3 +689,17 @@ outillage domaine CS2 et sortie structuree).
   avec selection L2, double aller-retour d'un instantane, ancien JSON et ancien
   manifeste, rejet des nouvelles metadonnees invalides et sauvegarde NaN sans
   remplacement du fichier existant.
+
+## Cycle 59 : Reentrainement transactionnel du predicteur d'ensemble
+
+- **Candidat prive** (`model.py`) : `MatchPredictor.fit()` prepare un candidat
+  distinct avant de publier ensemble le L2 choisi, les modeles logistique et
+  GBDT, la temperature et les metadonnees. Un echec ne laisse plus une nouvelle
+  regression logistique combinee avec l'ancien GBDT ou l'ancienne temperature.
+- **Reproduction** : un echec GBDT sur un refit aux cibles inversees modifiait
+  auparavant les probabilites jusqu'a environ 1, ainsi que les noms de features,
+  alors que l'appel avait echoue. Le predicteur garde maintenant son etat appris.
+- **Tests** : erreurs injectees dans la selection L2, l'ajustement logistique,
+  le GBDT et la temperature ; metadonnees invalides ; echec du premier fit ;
+  refit reussi equivalent a un modele neuf. References des composants et
+  predictions anterieures preservees en cas d'echec.
