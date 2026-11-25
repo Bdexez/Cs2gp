@@ -852,3 +852,21 @@ outillage domaine CS2 et sortie structuree).
 - **Tests** : rejet sans aucune mutation, roster modifie ou nouvelles equipes,
   dates invalides, cartes du meme jour, copies, simulations et preservation
   des historiques de forme et H2H du `FeatureExtractor`.
+
+## Cycle 69 : Probabilites Elo et Glicko sans debordement exponentiel
+
+- **Logistique stable** (`ratings.py`) : seul le terme exponentiel inferieur
+  ou egal a un est calcule. Une note inferieure de 130 000 points levait une
+  `OverflowError` ; une configuration valide avec `k_base=200000` pouvait
+  aussi echouer des la deuxieme observation Glicko.
+- **Calcul partage** : les attentes Elo, les notes de map et les deux attentes
+  Glicko utilisent la meme formule stable, en conservant l'incertitude propre
+  a chaque adversaire et l'independance a l'ordre des equipes.
+- **Precision** : soustraction avant normalisation pour conserver les petits
+  ecarts autour d'un grand offset, avec normalisation prealable uniquement
+  si la soustraction deborde. Les faibles probabilites representables restent
+  positives, sans seuil artificiel de saturation.
+- **Tests** : formule usuelle, notes opposees proches des limites flottantes,
+  scalaires NumPy sans avertissement, faible probabilite 1e-300, offsets,
+  mises a jour dans les deux orientations avec ou sans Glicko/marge de victoire,
+  grands K et simulations qui preservent le moteur d'origine.
