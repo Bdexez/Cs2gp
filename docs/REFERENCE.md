@@ -655,6 +655,12 @@ fields can be enriched; an unambiguous event is shared across a match's maps.
 LAN, tier and map-index defaults count as values because the schema does not
 track whether those fields were omitted by a source.
 
+The feature correlation audit validates a finite real matrix and consistent
+feature names. Reference centering and column scaling keep the diagnostic
+usable at large amplitudes and offsets. Near-constant columns retain the
+absolute standard-deviation threshold of `1e-12`; reported correlations stay
+within `[-1, 1]`. Empty or insufficient data returns no correlation pairs.
+
 `backtest --json` includes a `confusion` object at threshold 0.5 (`p >= 0.5`
 predicts team A): counts `tp`, `fp`, `tn`, `fn`, precision, recall, specificity,
 F1 and balanced accuracy. Ratios with a zero denominator are `null`; F1 is
