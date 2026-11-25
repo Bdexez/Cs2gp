@@ -16,6 +16,7 @@ from __future__ import annotations
 import csv
 import datetime as dt
 import hashlib
+import math
 import os
 import tempfile
 from contextlib import contextmanager
@@ -26,6 +27,7 @@ from .pronostic import Analysis, Pick, SettledPick, TipsterRecord, _settle
 from . import __version__
 from .csvio import read_rows
 from .schema import Match, normalize_team, parse_date
+from .validation import finite_number
 
 COLUMNS = [
     "pick_id", "emis_le", "date", "team_a", "team_b", "best_of", "event",
@@ -58,12 +60,12 @@ def _row(pick: Pick, issued: dt.date, complete_card: bool = False) -> dict:
         "event": pick.event,
         "marche": pick.market,
         "selection": pick.selection,
-        "probabilite": f"{pick.probability:.6f}",
+        "probabilite": repr(float(pick.probability)),
         "palier": pick.tier,
         "verdict": pick.verdict,
-        "cote": "" if pick.odds is None else f"{pick.odds:.3f}",
-        "edge": "" if pick.edge is None else f"{pick.edge:.6f}",
-        "mise": "" if pick.stake is None else f"{pick.stake:.6f}",
+        "cote": "" if pick.odds is None else repr(float(pick.odds)),
+        "edge": "" if pick.edge is None else repr(float(pick.edge)),
+        "mise": "" if pick.stake is None else repr(float(pick.stake)),
         "score": "",
         "resultat": "",
         "match_id": pick.match_id,
@@ -80,7 +82,25 @@ def load(path: str | Path) -> list[dict]:
     if not path.exists():
         return []
     # Les 17 colonnes du format initial restent requises ; les ajouts sont optionnels.
-    return [row for _, row in read_rows(path, COLUMNS[:17])]
+    rows = []
+    for line, row in read_rows(path, COLUMNS[:17]):
+        try:
+            pick = _pick_from_row(row)
+            if not row["pick_id"].strip():
+                raise ValueError("pick_id doit etre renseigne")
+            if row["resultat"] not in ("", "gagne", "perdu"):
+                raise ValueError("resultat doit etre vide, gagne ou perdu")
+            if row["resultat"] and not pick.is_actionable:
+                raise ValueError("un pronostic non actionnable ne peut pas etre pointe")
+            if row.get("carte_complete", "") not in ("", "0", "1"):
+                raise ValueError("carte_complete doit etre vide, 0 ou 1")
+            if row["emis_le"]:
+                parse_date(row["emis_le"])
+            _chronological_key(row)
+        except (ValueError, KeyError, TypeError, OverflowError) as exc:
+            raise ValueError(f"ligne {line} invalide dans {path}: {exc}") from exc
+        rows.append(row)
+    return rows
 
 
 def _write(path: Path, rows: Sequence[dict]) -> None:
@@ -125,8 +145,41 @@ def _locked(path: Path):
                 fcntl.flock(fh, fcntl.LOCK_UN)
 
 
+def _validate_pick(pick: Pick) -> None:
+    if type(pick.date) is not dt.date:
+        raise ValueError("date doit etre une date calendaire")
+    for field in ("team_a", "team_b", "market", "verdict"):
+        if not isinstance(getattr(pick, field), str) or not getattr(pick, field).strip():
+            raise ValueError(f"{field} doit etre renseigne")
+    for field in ("selection", "event", "tier", "match_id", "data_through"):
+        if not isinstance(getattr(pick, field), str):
+            raise ValueError(f"{field} doit etre une chaine")
+    teams = normalize_team(pick.team_a), normalize_team(pick.team_b)
+    if teams[0] == teams[1]:
+        raise ValueError("deux equipes distinctes sont requises")
+    if type(pick.best_of) is not int or pick.best_of not in (1, 3, 5):
+        raise ValueError("best_of doit etre 1, 3 ou 5")
+    if pick.verdict not in ("PRONOSTIC", "VALEUR", "SUSPECT", "ABSTENTION"):
+        raise ValueError("verdict inconnu")
+    finite_number("probabilite", pick.probability, maximum=1.0)
+    if pick.odds is not None:
+        finite_number("cote", pick.odds, minimum=1.0, strict=True)
+    if pick.stake is not None:
+        finite_number("mise", pick.stake, maximum=1.0)
+    if pick.edge is not None:
+        finite_number("edge", pick.edge, minimum=-math.inf)
+    if pick.data_through:
+        parse_date(pick.data_through)
+    if pick.is_actionable or pick.verdict == "SUSPECT":
+        if not pick.selection.strip():
+            raise ValueError("selection doit etre renseignee")
+        if (pick.market == "vainqueur" or pick.market.startswith("handicap")):
+            if normalize_team(pick.selection) not in teams:
+                raise ValueError("selection doit identifier une des deux equipes")
+
+
 def _pick_from_row(row: dict) -> Pick:
-    return Pick(
+    pick = Pick(
         date=parse_date(row["date"]), team_a=row["team_a"], team_b=row["team_b"],
         best_of=int(row["best_of"] or 3), event=row.get("event", ""),
         market=row["marche"], selection=row["selection"],
@@ -136,6 +189,8 @@ def _pick_from_row(row: dict) -> Pick:
         stake=float(row["mise"]) if row.get("mise") else None,
         match_id=row.get("match_id", ""), data_through=row.get("donnees_jusquau", ""),
     )
+    _validate_pick(pick)
+    return pick
 
 
 def record(picks: Iterable[Pick], path: str | Path, issued: dt.date | None = None,
@@ -148,12 +203,15 @@ def record(picks: Iterable[Pick], path: str | Path, issued: dt.date | None = Non
     """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    issued = issued or dt.date.today()
+    issued = dt.date.today() if issued is None else issued
+    if type(issued) is not dt.date:
+        raise ValueError("issued doit etre une date calendaire")
     with _locked(path):
         existing = load(path)
         known = {pick_id(_pick_from_row(r)) for r in existing}
         added = []
         for pick in picks:
+            _validate_pick(pick)
             identity = pick_id(pick)
             if identity not in known:
                 added.append(_row(pick, issued, complete_card))
@@ -397,7 +455,7 @@ def financial_summary(
         "equity_curve_flat": equity_curve_flat,
         "profit_kelly": kelly_profit,
         "mise_kelly_totale": kelly_staked,
-        "roi_kelly": kelly_profit / kelly_staked if kelly_staked > 1e-9 else 0.0,
+        "roi_kelly": kelly_profit / kelly_staked if kelly_staked > 0.0 else 0.0,
     }
 
 
