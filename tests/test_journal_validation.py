@@ -60,6 +60,43 @@ class JournalValidationTests(unittest.TestCase):
                     operation()
                 self.assertEqual(self.path.read_bytes(), archived)
 
+    def test_conflicting_fixture_id_rejects_entire_batch_before_deduplication(self):
+        pick = replace(self.pick, match_id="stable")
+        for changes in (dict(team_b="c"), dict(best_of=3),
+                        dict(team_b="c", market="total", selection="over")):
+            with self.subTest(changes=changes):
+                with self.assertRaisesRegex(ValueError, "stable.*contradictoires"):
+                    journal.record([pick, replace(pick, **changes)], self.path)
+                self.assertFalse(self.path.exists())
+        journal.record([pick], self.path)
+        archived = self.path.read_bytes()
+        with self.assertRaisesRegex(ValueError, "stable.*contradictoires"):
+            journal.record([replace(pick, match_id="new"), replace(pick, team_b="c")], self.path)
+        self.assertEqual(self.path.read_bytes(), archived)
+
+    def test_conflicting_archived_fixture_id_is_localized_and_preserved(self):
+        pick = replace(self.pick, match_id="stable", event="LAN\nParis")
+        journal._write(self.path, [journal._row(pick, self.day),
+                                  journal._row(replace(pick, best_of=3, event=""), self.day)])
+        archived = self.path.read_bytes()
+        for operation in (lambda: journal.load(self.path),
+                          lambda: journal.record([self.pick], self.path),
+                          lambda: journal.settle(self.path, []),
+                          lambda: journal.financial_summary(self.path)):
+            with self.assertRaisesRegex(ValueError, "ligne 4.*stable.*contradictoires"):
+                operation()
+            self.assertEqual(self.path.read_bytes(), archived)
+
+    def test_fixture_identity_allows_rescheduling_aliases_orientation_and_markets(self):
+        pick = replace(self.pick, team_a="mouz", selection="mouz", match_id="stable")
+        postponed = replace(pick, date=self.day + dt.timedelta(days=7),
+                            team_a="b", team_b="mousesports", selection="mousesports",
+                            event="updated event")
+        self.assertEqual(journal.record([pick, postponed], self.path), 1)
+        total = replace(postponed, market="total", selection="over")
+        self.assertEqual(journal.record([postponed, total], self.path), 1)
+        self.assertEqual(len(journal.load(self.path)), 2)
+
     def test_invalid_journal_cli_returns_error_without_emitting_nan_json(self):
         row = journal._row(self.pick, self.day)
         journal._write(self.path, [{**row, "probabilite": "nan", "resultat": "gagne"}])
