@@ -1,8 +1,9 @@
 """Modele de prediction.
 
 Coeur : regression logistique sans constante, entrainee par IRLS avec ridge,
-sur des features antisymetriques. Sans constante et avec augmentation miroir
-(X, y) -> (-X, 1-y), le modele verifie exactement p(A|B) = 1 - p(B|A) : aucun
+sur des features antisymetriques. L'effet de l'augmentation miroir
+(X, y) -> (-X, 1-y) est calcule sans copier les donnees. Sans constante,
+le modele verifie exactement p(A|B) = 1 - p(B|A) : aucun
 biais d'ordre des equipes, ce qui est la premiere source d'erreur silencieuse
 dans ce genre de systeme.
 
@@ -110,17 +111,16 @@ class LogisticModel:
         self.scales = np.maximum(np.sqrt(np.average(X**2, axis=0, weights=w)), 1e-6)
         Xs = X / self.scales
 
-        # Augmentation miroir : impose la symetrie et double l'echantillon.
-        Xa = np.vstack([Xs, -Xs])
-        ya = np.concatenate([y, 1.0 - y])
-        wa = np.concatenate([w, w])
-
-        beta = np.zeros(Xa.shape[1])
+        # sigmoid(-z) = 1 - sigmoid(z) : chaque ligne miroir apporte les
+        # memes gradient et Hessienne. Le facteur 2 preserve la penalite L2
+        # historique sans materialiser un second exemplaire du dataset.
+        beta = np.zeros(Xs.shape[1])
+        ridge = self.l2 * np.eye(Xs.shape[1])
         for _ in range(self.max_iter):
-            p = sigmoid(Xa @ beta)
-            s = wa * np.clip(p * (1 - p), 1e-9, None)
-            grad = Xa.T @ (wa * (ya - p)) - self.l2 * beta
-            hess = (Xa.T * s) @ Xa + self.l2 * np.eye(Xa.shape[1])
+            p = sigmoid(Xs @ beta)
+            s = w * np.clip(p * (1 - p), 1e-9, None)
+            grad = 2.0 * (Xs.T @ (w * (y - p))) - self.l2 * beta
+            hess = 2.0 * ((Xs.T * s) @ Xs) + ridge
             try:
                 step = np.linalg.solve(hess, grad)
             except np.linalg.LinAlgError:
@@ -132,7 +132,7 @@ class LogisticModel:
         # Matrice d'information de Fisher sur l'echantillon non dedouble -> covariance asymptotique.
         p_orig = sigmoid(Xs @ beta)
         s_orig = w * np.clip(p_orig * (1.0 - p_orig), 1e-9, None)
-        fisher = (Xs.T * s_orig) @ Xs + self.l2 * np.eye(Xs.shape[1])
+        fisher = (Xs.T * s_orig) @ Xs + ridge
         try:
             self.cov = np.linalg.inv(fisher)
         except np.linalg.LinAlgError:

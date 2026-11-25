@@ -68,6 +68,37 @@ class NumericContractsTests(unittest.TestCase):
         np.testing.assert_allclose(weighted.scales, clean.scales, atol=1e-12)
         np.testing.assert_allclose(weighted.weights, clean.weights, atol=1e-10)
 
+    def test_logistic_preserves_weighted_mirror_regularization_strength(self):
+        # Pour une feature constante, l'optimum penalise se ramene a une
+        # equation scalaire monotone, resolue ici independamment par dichotomie.
+        y = np.array([0] * 40 + [1] * 60, dtype=float)
+        w = np.linspace(0.25, 1.75, len(y))
+        l2 = 8.0
+        rate = np.average(y, weights=w)
+        lo, hi = 1e-8, 1.0 - 1e-8
+        for _ in range(60):
+            q = (lo + hi) / 2.0
+            residual = q + l2 * np.log(q / (1.0 - q)) / (2.0 * w.sum()) - rate
+            if residual > 0:
+                hi = q
+            else:
+                lo = q
+        expected = (lo + hi) / 2.0
+        model = LogisticModel(l2=l2).fit(np.ones((len(y), 1)), y, sample_weight=w)
+        np.testing.assert_allclose(model.predict_proba([[1.0]]), [expected], atol=1e-12)
+
+    def test_logistic_mirror_augmentation_matches_rescaled_regularization(self):
+        rng = np.random.default_rng(52)
+        X = rng.normal(size=(80, 4))
+        y = rng.integers(0, 2, len(X))
+        w = rng.uniform(0.0, 2.0, len(X))
+        model = LogisticModel(l2=3.0).fit(X, y, sample_weight=w)
+        mirrored = LogisticModel(l2=6.0).fit(
+            np.vstack([X, -X]), np.concatenate([y, 1 - y]), sample_weight=np.tile(w, 2)
+        )
+        np.testing.assert_allclose(model.predict_proba(X), mirrored.predict_proba(X), atol=1e-12)
+        np.testing.assert_allclose(model.predict_proba(X) + model.predict_proba(-X), 1.0, atol=1e-12)
+
     def test_explain_and_series_win_probability_validate_inputs(self):
         untrained = MatchPredictor(use_gbdt=False)
         with self.assertRaises(RuntimeError):
