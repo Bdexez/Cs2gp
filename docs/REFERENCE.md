@@ -241,6 +241,12 @@ cs2gp journal --journal data/journal.csv                 # the track record
 The journal is **append-only**: settling completes the rows, it never rewrites
 them. Both operations are idempotent.
 
+Journal summaries and filtered exports follow match dates, then emission time
+in UTC and pick ID. Legacy rows without an emission timestamp use the emission
+date. Raw journal loading preserves archive order. Settlement times are not
+stored, so the within-day ordering is a reporting convention rather than the
+actual sequence of match completions.
+
 ### The tipster's track record
 
 `cs2gp tipster-backtest` replays the whole strategy over the history, using at

@@ -193,6 +193,53 @@ class JournalTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             journal.scorecard(self.path, since=d2, until=d1)
 
+    def test_financial_history_is_independent_of_import_order(self):
+        picks = [replace(self.pick, date=self.day + dt.timedelta(days=i), match_id=f"m{i}",
+                         odds=3.0, stake=0.02) for i in range(4)]
+        results = group_matches([
+            MapResult(pick.match_id, pick.date, "a", "b", "mirage",
+                      13 if i == 2 else 5, 5 if i == 2 else 13, 1)
+            for i, pick in enumerate(picks)
+        ])
+        expected_money = expected_risk = None
+        for order in ([0, 1, 2, 3], [0, 1, 3, 2], [3, 2, 1, 0]):
+            with self.subTest(order=order):
+                path = self.path.with_name("".join(map(str, order)) + ".csv")
+                journal.record([picks[i] for i in order], path)
+                journal.settle(path, results)
+                archived = path.read_bytes()
+                money = journal.financial_summary(path)
+                self.assertEqual(money["equity_curve_flat"], [0.0, -1.0, -2.0, 0.0, -1.0])
+                self.assertEqual(money["max_drawdown_mise_fixe"], 2.0)
+                self.assertEqual(money["pire_serie_defaites"], 2)
+                self.assertEqual([s.pick.match_id for s in journal.scorecard(path).settled],
+                                 [p.match_id for p in picks])
+                risk = journal.bankroll_risk(path, samples=100, seed=0)
+                if expected_money is None:
+                    expected_money, expected_risk = money, risk
+                self.assertEqual(money, expected_money)
+                self.assertEqual(risk, expected_risk)
+                self.assertEqual(path.read_bytes(), archived)
+                # La lecture brute conserve l'ordre de l'archive.
+                self.assertEqual([row["match_id"] for row in journal.load(path)],
+                                 [picks[i].match_id for i in order])
+
+    def test_history_orders_same_day_emissions_in_utc_with_legacy_fallback(self):
+        rows = []
+        for name, issued in (("later", "2026-01-01T10:30:00+01:00"),
+                             ("earlier", "2026-01-01T09:00:00Z"),
+                             ("tie-b", "2026-01-01T09:00:00+00:00"),
+                             ("tie-a", "2026-01-01T09:00:00"), ("legacy", "")):
+            row = journal._row(replace(self.pick, match_id=name), self.day)
+            row["emis_a"], row["pick_id"] = issued, name
+            if name == "legacy":
+                del row["emis_a"]
+            rows.append(row)
+        expected = ["legacy", "earlier", "tie-a", "tie-b", "later"]
+        for order in (rows, rows[::-1]):
+            with self.subTest(order=[r["pick_id"] for r in order]):
+                self.assertEqual([r["pick_id"] for r in journal._filter_by_date(order)], expected)
+
     def test_bankroll_risk_bootstraps_settled_odds_from_journal(self):
         self.assertIsNone(journal.bankroll_risk(self.path))
         p1 = replace(self.pick, match_id="one", odds=2.0, stake=0.02)
