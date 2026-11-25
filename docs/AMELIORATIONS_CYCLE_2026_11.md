@@ -755,3 +755,19 @@ outillage domaine CS2 et sortie structuree).
   entier sont prepares a la taille du sous-ensemble ; aucun tableau d'indices
   couvrant tout le dataset n'est necessaire. Tests d'alignement de tous les
   champs, de pool absent, de selections vides et de bornes entieres non signees.
+
+## Cycle 63 : Fusion d'historiques sans conflits silencieux
+
+- **Metadonnees contradictoires** (`schema.py`) : les doublons sont compares
+  apres alignement des equipes. Une divergence de tier, LAN ou indice de map,
+  ou deux valeurs non vides differentes de tournoi/roster, est rejetee avec
+  le nom du champ en conflit. Ces valeurs dependaient auparavant de la source
+  lue en premier. Les valeurs par defaut de LAN, tier et indice restent des
+  valeurs effectives : le schema ne les distingue pas d'une absence a l'import.
+- **Enrichissement coherent** : normalisation des rosters avant comparaison ;
+  un tournoi connu est propage aux maps non renseignees de la meme rencontre.
+  Deux tournois connus differents dans une rencontre restent un conflit.
+  Les objets d'entree ne sont pas modifies.
+- **Tests** : conflits dans les deux ordres de sources, rosters et orientation,
+  enrichissement d'une serie a plusieurs maps et preservation d'un fichier
+  de sortie existant lorsque la commande `merge` echoue.

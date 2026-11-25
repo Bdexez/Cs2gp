@@ -1,5 +1,7 @@
 import csv
+import contextlib
 import datetime as dt
+import io
 from dataclasses import asdict, replace
 from pathlib import Path
 import tempfile
@@ -132,6 +134,54 @@ class SeriesTests(unittest.TestCase):
             normalize_team("Eternal-Fire", extra_aliases={"eternal-fire": "eternalfire"}),
             "eternalfire",
         )
+
+    def test_merge_rejects_conflicting_metadata_in_both_source_orders(self):
+        base = replace(self.first, best_of=1, event="One", roster_a=("p1",), roster_b=("p2",))
+        for field, value in (("event", "Two"), ("roster_a", ("other",)), ("roster_b", ("other",)),
+                             ("tier", "s"), ("lan", True), ("map_index", 1)):
+            other = replace(base, **{field: value})
+            for sources in (([base], [other]), ([other], [base])):
+                with self.subTest(field=field, sources=sources), \
+                        self.assertRaisesRegex(ValueError, f"conflit.*{field}"):
+                    merge_histories(sources)
+
+    def test_merge_normalizes_roster_order_and_aligns_orientation_before_comparing(self):
+        base = replace(self.first, best_of=1, roster_a=("p1", "p2"), roster_b=("q1",))
+        flipped = replace(base, team_a="b", team_b="a", rounds_a=base.rounds_b, rounds_b=base.rounds_a,
+                          roster_a=("Q1",), roster_b=(" P2 ", "P1"))
+        merged, stats = merge_histories([[base], [flipped]])
+        self.assertEqual(merged, [base])
+        self.assertEqual(stats["duplicates_skipped"], 1)
+        self.assertEqual(flipped.roster_b, (" P2 ", "P1"))
+
+    def test_merge_propagates_unambiguous_event_across_complementary_maps(self):
+        second = replace(self.first, map_name="nuke", map_index=1)
+        enriched = replace(self.first, event="LAN")
+        expected = [replace(self.first, event="LAN"), replace(second, event="LAN")]
+        for sources in (([self.first, second], [enriched]), ([enriched], [self.first, second])):
+            merged, stats = merge_histories(sources)
+            self.assertEqual(merged, expected)
+            self.assertTrue(group_matches(merged)[0].is_complete)
+            self.assertEqual(stats, {"total_in": 3, "unique_out": 2, "duplicates_skipped": 1})
+        self.assertEqual(self.first.event, "")
+        with self.assertRaisesRegex(ValueError, "conflit.*event"):
+            merge_histories([[enriched], [replace(second, event="Other")]])
+
+    def test_cli_merge_conflict_does_not_replace_an_existing_output(self):
+        from cs2gp.cli import main
+
+        base = replace(self.first, best_of=1)
+        with tempfile.TemporaryDirectory() as tmp:
+            one, two, output = (Path(tmp) / name for name in ("one.csv", "two.csv", "out.csv"))
+            write_csv(one, [base])
+            write_csv(two, [replace(base, lan=True)])
+            output.write_bytes(b"previous result")
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out), self.assertRaises(SystemExit) as raised:
+                main(["merge", str(one), str(two), "--out", str(output), "--json"])
+            self.assertIn("lan", str(raised.exception))
+            self.assertEqual(out.getvalue(), "")
+            self.assertEqual(output.read_bytes(), b"previous result")
 
 
 if __name__ == "__main__":

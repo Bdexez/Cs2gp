@@ -301,6 +301,9 @@ def merge_histories(sources: Sequence[Sequence[MapResult]]) -> tuple[list[MapRes
     for source in sources:
         for mp in source:
             total_in += 1
+            rosters = _roster(mp.roster_a), _roster(mp.roster_b)
+            if rosters != (mp.roster_a, mp.roster_b):
+                mp = replace(mp, roster_a=rosters[0], roster_b=rosters[1])
             key = (mp.match_id, mp.map_name)
             if key not in merged:
                 merged[key] = mp
@@ -314,10 +317,16 @@ def merge_histories(sources: Sequence[Sequence[MapResult]]) -> tuple[list[MapRes
                     rounds_a=mp.rounds_b, rounds_b=mp.rounds_a,
                     roster_a=mp.roster_b, roster_b=mp.roster_a,
                 )
-            if (cand.date != prev.date or cand.team_a != prev.team_a or cand.team_b != prev.team_b
-                    or cand.rounds_a != prev.rounds_a or cand.rounds_b != prev.rounds_b
-                    or cand.best_of != prev.best_of):
-                raise ValueError(f"conflit de resultat pour {mp.match_id} ({mp.map_name})")
+            strict = ("date", "team_a", "team_b", "rounds_a", "rounds_b", "best_of",
+                      "tier", "lan", "map_index")
+            conflicts = [name for name in strict if getattr(cand, name) != getattr(prev, name)]
+            optional = ("event", "roster_a", "roster_b")
+            conflicts.extend(name for name in optional
+                             if getattr(prev, name) and getattr(cand, name)
+                             and getattr(prev, name) != getattr(cand, name))
+            if conflicts:
+                raise ValueError(f"conflit de resultat pour {mp.match_id} ({mp.map_name}) : "
+                                 f"{', '.join(conflicts)}")
             # Enrichit les champs optionnels si l'une des sources les fournit
             merged[key] = replace(
                 prev,
@@ -326,7 +335,17 @@ def merge_histories(sources: Sequence[Sequence[MapResult]]) -> tuple[list[MapRes
                 roster_b=prev.roster_b or cand.roster_b,
             )
             duplicates += 1
-    out = sorted(merged.values(), key=lambda m: (m.date, m.match_id, m.map_index))
+    # Le tournoi est une propriete de la rencontre : une source peut ne le
+    # renseigner que sur certaines maps, sans contredire les valeurs vides.
+    events = {}
+    for mp in merged.values():
+        if mp.event:
+            if mp.match_id in events and events[mp.match_id] != mp.event:
+                raise ValueError(f"conflit de resultat pour {mp.match_id} : event")
+            events[mp.match_id] = mp.event
+    out = [replace(mp, event=events[mp.match_id]) if not mp.event and mp.match_id in events else mp
+           for mp in merged.values()]
+    out.sort(key=lambda m: (m.date, m.match_id, m.map_index))
     group_matches(out)
     return out, {"total_in": total_in, "unique_out": len(out), "duplicates_skipped": duplicates}
 
