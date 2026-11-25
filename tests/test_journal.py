@@ -271,6 +271,28 @@ class JournalTests(unittest.TestCase):
         self.assertFalse(money["roi_significant_5pct"])
         self.assertAlmostEqual(money["roi_erreur_type"], 4.0 / 15.0, places=12)
 
+    def test_bankroll_risk_reuses_recorded_stakes_and_groups_fixture_markets(self):
+        first = replace(self.pick, match_id="one", odds=2.0, stake=.01)
+        second = replace(first, market="handicap -0.5", stake=.02)
+        journal.record([first, second], self.path)
+        journal.settle(self.path, self.results)
+        risk = journal.bankroll_risk(self.path, samples=10)
+        self.assertEqual(risk["horizon"], 1)
+        self.assertEqual(risk["horizon_unit"], "fixture")
+        self.assertEqual(risk["stake_source"], "recorded")
+        self.assertEqual(risk["n_bets"], 2)
+        self.assertEqual(risk["n_groups"], 1)
+        self.assertAlmostEqual(risk["median_final"], 1.03, places=12)
+
+    def test_bankroll_risk_estimates_all_stakes_when_archive_is_incomplete(self):
+        first = replace(self.pick, match_id="one", odds=2.0, stake=.01)
+        second = replace(first, market="handicap -0.5", stake=None)
+        journal.record([first, second], self.path)
+        journal.settle(self.path, self.results)
+        risk = journal.bankroll_risk(self.path, samples=10)
+        self.assertEqual(risk["stake_source"], "estimated_kelly")
+        self.assertAlmostEqual(risk["median_final"], 1.05, places=12)
+
     def test_monthly_summary_groups_calibration_and_pnl_by_month(self):
         d1 = dt.date(2026, 1, 10)
         d2 = dt.date(2026, 2, 15)

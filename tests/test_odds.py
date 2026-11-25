@@ -225,6 +225,88 @@ class OddsValidationTests(unittest.TestCase):
                 self.assertAlmostEqual(result["median_max_drawdown_pct"], .05, places=12)
                 self.assertAlmostEqual(result["p95_max_drawdown_pct"], .05, places=12)
 
+    def test_bootstrap_samples_whole_fixtures_and_settles_their_markets_together(self):
+        from cs2gp.odds import bootstrap_bankroll
+
+        # Une seule rencontre : les trois marches donnent toujours +1 -1 +1.
+        seq = [(0.7, 2.0, won) for won in (1, 0, 1)]
+        result = bootstrap_bankroll(seq, mode="flat", groups=["m"] * 3, stake=2.0, samples=137)
+        self.assertEqual(result["horizon"], 1)
+        self.assertEqual(result["horizon_unit"], "fixture")
+        self.assertEqual(result["n_bets"], 3)
+        self.assertEqual(result["n_groups"], 1)
+        self.assertEqual(result["prob_profit"], 1.0)
+        for key in ("p05_final", "median_final", "p95_final"):
+            self.assertEqual(result[key], 2.0)
+        self.assertEqual(result["p95_max_drawdown"], 0.0)
+
+    def test_bootstrap_uses_provided_stakes_on_same_pre_fixture_capital(self):
+        from cs2gp.odds import bootstrap_bankroll
+
+        for outcomes, factor in (((1, 1), 1.03), ((1, 0), .99), ((0, 0), .97)):
+            with self.subTest(outcomes=outcomes):
+                result = bootstrap_bankroll([(0.8, 2.0, won) for won in outcomes],
+                                            groups=["m", "m"], stake_fractions=[.01, .02],
+                                            initial_bankroll=100.0, samples=2)
+                self.assertEqual(result["stake_source"], "provided")
+                self.assertAlmostEqual(result["median_final"], 100.0 * factor, places=12)
+                self.assertAlmostEqual(result["p95_max_drawdown_pct"], max(0.0, 1 - factor), places=12)
+
+    def test_bootstrap_preserves_fixtures_with_different_numbers_of_markets(self):
+        from cs2gp.odds import bootstrap_bankroll
+
+        # A comporte trois marches gagnants (+3), B un marche perdant (-1).
+        # Deux rencontres tirees donnent AA=+6, AB/BA=+2 ou BB=-2.
+        seq = [(0.7, 2.0, 1)] * 3 + [(0.7, 2.0, 0)]
+        samples, seed = 137, 31
+        draws = np.random.default_rng(seed).integers(0, 2, size=(samples, 2))
+        counts_b = draws.sum(axis=1)
+        result = bootstrap_bankroll(seq, mode="flat", groups=["a", "a", "a", "b"],
+                                    samples=samples, seed=seed)
+        self.assertEqual(result["horizon"], 2)
+        self.assertEqual(result["prob_profit"], np.mean(counts_b < 2))
+        self.assertEqual(result["p05_final"], np.quantile(6 - 4 * counts_b, .05))
+        self.assertEqual(result["p95_final"], np.quantile(6 - 4 * counts_b, .95))
+        self.assertEqual(result["p95_max_drawdown"], np.quantile(counts_b, .95))
+
+    def test_bootstrap_estimated_kelly_caps_total_fixture_exposure(self):
+        from cs2gp.odds import bootstrap_bankroll
+
+        seq = [(0.8, 2.0, 1)] * 3
+        for cap in (0.0, .05):
+            result = bootstrap_bankroll(seq, groups=["m"] * 3, cap=cap, samples=2)
+            self.assertEqual(result["stake_source"], "estimated_kelly")
+            self.assertAlmostEqual(result["median_final"], 1.0 + cap, places=12)
+
+    def test_bootstrap_single_bet_groups_preserve_seeded_independent_results(self):
+        from cs2gp.odds import bootstrap_bankroll
+
+        seq = [(0.7, 2.0, 1), (0.6, 2.0, 0), (0.8, 1.5, 1)]
+        for mode in ("flat", "kelly"):
+            base = bootstrap_bankroll(seq, mode=mode, samples=137, horizon=11, seed=42)
+            grouped = bootstrap_bankroll(seq, mode=mode, samples=137, horizon=11, seed=42,
+                                         groups=["a", "b", "c"])
+            for key in base.keys() - {"horizon_unit"}:
+                self.assertEqual(base[key], grouped[key], (mode, key))
+
+    def test_bootstrap_rejects_invalid_groups_and_stakes(self):
+        from cs2gp.odds import bootstrap_bankroll
+
+        seq = [(0.8, 2.0, 0)] * 2
+        cases = [dict(groups=["m"]), dict(groups=[[], []]),
+                 dict(stake_fractions={"invalid": .1}),
+                 dict(stake_fractions=[.1]), dict(stake_fractions=[-.1, .2]),
+                 dict(stake_fractions=[float("nan"), .1]),
+                 dict(groups=["m", "m"], stake_fractions=[.7, .5]),
+                 dict(mode="flat", stake_fractions=[.01, .02])]
+        for options in cases:
+            with self.subTest(options=options), self.assertRaises(ValueError):
+                bootstrap_bankroll(seq, **options)
+        # Engagement integral, perte totale : aucun capital negatif ou NaN.
+        result = bootstrap_bankroll(seq, groups=["m", "m"], stake_fractions=[.5, .5])
+        self.assertEqual(result["median_final"], 0.0)
+        self.assertEqual(result["p95_max_drawdown_pct"], 1.0)
+
 
 if __name__ == "__main__":
     unittest.main()

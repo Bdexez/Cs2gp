@@ -629,3 +629,29 @@ outillage domaine CS2 et sortie structuree).
 - **Tests** : rejet des NaN/infinis et bornes invalides, atomicite d'un lot
   contenant un pronostic invalide, conservation des fichiers endommages,
   message d'erreur CLI sans JSON NaN, precision numerique et ancien format.
+
+## Cycle 56 : Simulation de risque par rencontre et mises archivees
+
+- **Reechantillonnage par rencontre** (`odds.py`, `journal.py`) :
+  `bootstrap_bankroll(..., groups=...)` tire les marches d'un meme match
+  ensemble et les regle simultanement sur le capital disponible avant ce
+  match. Le journal utilise automatiquement `Pick.fixture_key`.
+  `horizon` compte alors les rencontres et le JSON l'explicite avec
+  `horizon_unit=fixture`, `n_groups` et `n_bets`. Sans groups, l'API conserve
+  la simulation pari par pari et ses tirages a graine fixe.
+- **Exposition utilisee** : `stake_fractions` fournit les fractions de capital
+  en mode Kelly. Le journal utilise les mises archivees si elles sont toutes
+  connues (`stake_source=recorded`). Sinon, toutes les mises sont reestimees
+  (`estimated_kelly`) et leur somme par rencontre est plafonnee a `cap`.
+  Les mises fournies sont preservees ; une somme depassant le capital d'une
+  rencontre est rejetee. La CLI affiche l'origine des mises et l'horizon
+  en matchs.
+- **Reproduction** : un match avec deux marches gagnants, cotes 2, mises
+  archivees de 1 % et 2 %, donnait auparavant 1,1025 de capital final,
+  apres recalcul et composition de deux mises a 5 %. Il donne maintenant
+  1,03, apres un seul reglement avec les fractions archivees.
+- **Verification** : cas de marches gagnants/perdants, groupes de tailles
+  differentes, exposition plafonnee ou nulle, perte du capital integral,
+  controle des entrees et equivalence avec l'ancien tirage pour un pari par
+  groupe. Le drawdown est mesure entre reglements de rencontres ; cette
+  simulation suppose les rencontres reechantillonnees independantes.
