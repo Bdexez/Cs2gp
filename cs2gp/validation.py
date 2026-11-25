@@ -20,6 +20,18 @@ def positive_integer(name: str, value: int) -> None:
         raise ValueError(f"{name} doit etre un entier strictement positif")
 
 
+def validate_feature_names(names, *, columns: int) -> tuple[str, ...]:
+    """Noms stables et uniques, ou tuple vide pour des features anonymes."""
+    if not isinstance(names, (tuple, list)):
+        raise ValueError("feature_names doit etre une liste ou un tuple de noms")
+    if (any(not isinstance(name, str) or not name.strip() for name in names)
+            or len(set(names)) != len(names)):
+        raise ValueError("feature_names doit contenir des noms uniques non vides")
+    if len(names) not in (0, columns):
+        raise ValueError("feature_names doit nommer chaque colonne de X")
+    return tuple(names)
+
+
 def binary_labels(y) -> np.ndarray:
     y = np.asarray(y, dtype=float)
     if y.ndim != 1 or y.size == 0 or not np.all((y == 0) | (y == 1)):

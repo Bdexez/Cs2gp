@@ -448,6 +448,12 @@ unrepresentable transformation raises `ValueError` and preserves fitted state.
 publishing them. Failed L2 selection, logistic fitting, GBDT fitting or
 temperature calibration preserves the previous fitted predictor and predictions.
 
+Training metadata follows the JSON loader's contract: feature names must be
+unique non-empty strings, one per column, or an empty sequence for anonymous
+features. Lists are copied into tuples. Training dates and evaluation cutoffs
+must be calendar `datetime.date` values, without a time component. The CSV/API
+import layer handles timestamp-to-date conversion before training.
+
 ```bash
 cs2gp train --no-gbdt --bundle models/analyzer.cs2gp
 cs2gp predict navi g2 --model models/analyzer.cs2gp

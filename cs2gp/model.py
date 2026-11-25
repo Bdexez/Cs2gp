@@ -29,7 +29,7 @@ from .csvio import atomic_write_bytes
 from .metrics import log_loss
 from .temporal import calibration_boundary, validate_dates
 from .validation import (binary_labels, feature_matrix, finite_number,
-                         observation_weights, positive_integer)
+                         observation_weights, positive_integer, validate_feature_names)
 
 RECENCY_HALFLIFE_DAYS = 540.0
 _MODEL_OPTIONS = ("l2", "use_gbdt", "gbdt_weight", "calibration_frac", "recency_halflife", "l2_grid")
@@ -48,6 +48,7 @@ def logit(p: np.ndarray) -> np.ndarray:
 def recency_weights(dates: list[dt.date], halflife: float = RECENCY_HALFLIFE_DAYS) -> np.ndarray:
     """Le meta CS2 bouge : un match d'il y a deux ans en dit moins que celui d'hier."""
     finite_number("halflife", halflife, strict=True)
+    validate_dates(dates, require_sorted=False)
     if not dates:
         return np.ones(0)
     last = max(dates)
@@ -120,8 +121,7 @@ class LogisticModel:
         finite_number("l2", self.l2)
         finite_number("tol", self.tol, strict=True)
         positive_integer("max_iter", self.max_iter)
-        if self.feature_names and len(self.feature_names) != X.shape[1]:
-            raise ValueError("feature_names doit nommer chaque colonne de X")
+        names = validate_feature_names(self.feature_names, columns=X.shape[1])
         # Une ligne de poids nul ne doit participer a aucune transformation,
         # meme si son carre ou sa projection deborderait en float64.
         active = w > 0.0
@@ -169,6 +169,7 @@ class LogisticModel:
         if not all(np.isfinite(value).all() for value in (beta, scales, resid, cov)):
             raise ValueError("l'entrainement a produit des parametres non finis")
         self.weights, self.scales, self.resid, self.cov = beta, scales, resid, cov
+        self.feature_names = names
         return self
 
     def decision(self, X: np.ndarray) -> np.ndarray:
@@ -260,6 +261,7 @@ def select_l2(
     """
     y = binary_labels(y)
     X = feature_matrix(X, rows=len(y))
+    feature_names = validate_feature_names(feature_names, columns=X.shape[1])
     finite_number("val_frac", val_frac, strict=True)
     if val_frac >= 1.0:
         raise ValueError("val_frac doit etre dans ]0, 1[")
@@ -356,9 +358,8 @@ class MatchPredictor:
             if len(dates) != len(y):
                 raise ValueError("une date est requise pour chaque resultat")
             validate_dates(dates)
-        self.feature_names = feature_names or self.feature_names
-        if self.feature_names and len(self.feature_names) != X.shape[1]:
-            raise ValueError("feature_names doit nommer chaque colonne de X")
+        names = validate_feature_names(feature_names, columns=X.shape[1])
+        self.feature_names = names or validate_feature_names(self.feature_names, columns=X.shape[1])
         self.trained_on = len(y)
         self.last_date = max(dates).isoformat() if dates else ""
 
@@ -504,16 +505,15 @@ class MatchPredictor:
         except (TypeError, OverflowError) as exc:
             raise ValueError("parametres de modele non numeriques") from exc
         names = payload["feature_names"]
-        if (not isinstance(names, list) or any(not isinstance(name, str) or not name for name in names)
-                or len(set(names)) != len(names)):
-            raise ValueError("feature_names doit contenir des noms uniques non vides")
+        if not isinstance(names, list):
+            raise ValueError("feature_names doit etre une liste de noms")
         finite_number("temperature", payload["temperature"], strict=True)
         if (weights.ndim != 1 or len(weights) == 0 or scales.shape != weights.shape
                 or not np.all(np.isfinite(weights)) or not np.all(np.isfinite(scales))
                 or np.any(scales <= 0) or resid.shape not in ((0,), (len(weights)-1,))
-                or not np.all(np.isfinite(resid))
-                or len(names) not in (0, len(weights))):
+                or not np.all(np.isfinite(resid))):
             raise ValueError("parametres de modele invalides")
+        names = validate_feature_names(names, columns=len(weights))
         has_gbdt = payload.get("has_gbdt", False)
         if not isinstance(has_gbdt, bool):
             raise ValueError("has_gbdt doit etre un booleen")

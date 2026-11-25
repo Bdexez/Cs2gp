@@ -6,7 +6,7 @@ from unittest.mock import patch
 import numpy as np
 
 from cs2gp.features import build_datasets
-from cs2gp.model import MatchPredictor, LogisticModel
+from cs2gp.model import MatchPredictor, LogisticModel, recency_weights, select_l2
 from cs2gp.schema import MapResult, group_matches
 from cs2gp.temporal import forward_splits
 
@@ -63,6 +63,33 @@ class TemporalTests(unittest.TestCase):
         dates = [dt.date(2025, 1, 1), dt.date(2024, 1, 1)]
         with self.assertRaisesRegex(ValueError, "chronologiquement"):
             forward_splits(dates, .4, 200, 150)
+
+    def test_non_calendar_dates_are_rejected_before_training_or_splitting(self):
+        n = 250
+        X = np.random.default_rng(7).normal(size=(n, 2))
+        y = (np.arange(n) % 2).astype(float)
+        cases = [[dt.datetime(2025, 1, 1) + dt.timedelta(hours=i) for i in range(n)],
+                 ["2025-01-01"] * n, [None] * n, list(range(n))]
+        for dates in cases:
+            for operation in (lambda: MatchPredictor(use_gbdt=False).fit(X, y, dates),
+                              lambda: select_l2(X, y, dates),
+                              lambda: forward_splits(dates, .4, 50, 30),
+                              lambda: recency_weights(dates)):
+                with self.subTest(kind=type(dates[0]).__name__), \
+                        patch.object(LogisticModel, "fit", side_effect=AssertionError("trop tot")), \
+                        self.assertRaisesRegex(ValueError, "date"):
+                    operation()
+
+    def test_recency_weights_keep_original_order_for_unsorted_calendar_dates(self):
+        dates = [dt.date(2025, 1, 2), dt.date(2025, 1, 1), dt.date(2025, 1, 3)]
+        np.testing.assert_array_equal(recency_weights(dates, halflife=1), [.5, .25, 1.0])
+        self.assertEqual(len(recency_weights([])), 0)
+
+    def test_evaluation_start_requires_a_calendar_date(self):
+        dates = [dt.date(2025, 1, 1) + dt.timedelta(days=i) for i in range(250)]
+        for start in (dt.datetime(2025, 3, 1), "2025-03-01", 123):
+            with self.subTest(start=start), self.assertRaisesRegex(ValueError, "evaluation_start"):
+                forward_splits(dates, .4, 50, 30, evaluation_start=start)
 
 
 if __name__ == "__main__":
