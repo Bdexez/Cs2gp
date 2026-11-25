@@ -6,6 +6,63 @@ from cs2gp.ratings import EloConfig, EloEngine, TeamRating
 from cs2gp.schema import MapResult
 
 
+class RatingChronologyTests(unittest.TestCase):
+    def setUp(self):
+        self.day = dt.date(2026, 1, 2)
+        self.engine = EloEngine()
+        self.engine.observe(MapResult("recent", self.day, "a", "b", "mirage", 13, 5,
+                                      best_of=1, roster_a=("p1", "p2", "p3")))
+
+    def test_backdated_results_are_rejected_before_any_state_changes(self):
+        original = copy.deepcopy(vars(self.engine))
+        for a, b in (("a", "b"), ("c", "d")):
+            old = MapResult("old", self.day - dt.timedelta(days=1), a, b, "nuke", 5, 13,
+                            best_of=1, roster_a=("p4", "p5", "p6"))
+            with self.subTest(teams=(a, b)), self.assertRaisesRegex(ValueError, "chronologique"):
+                self.engine.observe(old)
+            self.assertEqual(vars(self.engine), original)
+
+    def test_invalid_calendar_dates_do_not_register_teams_or_rosters(self):
+        original = copy.deepcopy(vars(self.engine))
+        for date in (None, "2026-01-03", dt.datetime(2026, 1, 3), False):
+            invalid = MapResult("invalid", date, "c", "d", "nuke", 13, 5,
+                                best_of=1, roster_a=("p1",))
+            with self.subTest(date=date), self.assertRaisesRegex(ValueError, "date calendaire"):
+                self.engine.observe(invalid)
+            self.assertEqual(vars(self.engine), original)
+
+    def test_same_day_and_later_results_remain_supported(self):
+        self.engine.observe(MapResult("same", self.day, "c", "d", "nuke", 13, 5, best_of=1))
+        tomorrow = self.day + dt.timedelta(days=1)
+        self.engine.observe(MapResult("next", tomorrow, "a", "b", "nuke", 5, 13, best_of=1))
+        self.assertEqual(self.engine.maps_played("a"), 2)
+        self.assertEqual(self.engine.teams["a"].last_date, tomorrow)
+
+    def test_copy_retains_chronology_and_simulations_leave_original_unchanged(self):
+        original = copy.deepcopy(vars(self.engine))
+        clone = self.engine.copy()
+        old = self.day - dt.timedelta(days=1)
+        with self.assertRaisesRegex(ValueError, "chronologique"):
+            clone.observe(MapResult("old", old, "c", "d", "nuke", 13, 5, best_of=1))
+        with self.assertRaisesRegex(ValueError, "chronologique"):
+            self.engine.simulate_outcome("c", "d", "nuke", old)
+        result = self.engine.simulate_outcome("a", "b", "nuke", self.day)
+        self.assertTrue(result)
+        self.assertEqual(vars(self.engine), original)
+
+    def test_feature_extractor_keeps_all_history_when_old_map_is_rejected(self):
+        from cs2gp.features import FeatureExtractor
+
+        fx = FeatureExtractor()
+        fx.observe_map(MapResult("recent", self.day, "a", "b", "mirage", 13, 5, best_of=1))
+        original = copy.deepcopy(vars(fx))
+        with self.assertRaisesRegex(ValueError, "chronologique"):
+            fx.observe_map(MapResult("old", self.day - dt.timedelta(days=1), "a", "b",
+                                     "nuke", 5, 13, best_of=1))
+        self.assertEqual(vars(fx.elo), vars(original.pop("elo")))
+        self.assertEqual({k: v for k, v in vars(fx).items() if k != "elo"}, original)
+
+
 class RatingOrientationTests(unittest.TestCase):
     def test_updates_do_not_depend_on_team_order_at_unequal_uncertainty(self):
         day = dt.date(2026, 1, 1)

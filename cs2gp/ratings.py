@@ -161,12 +161,14 @@ class EloEngine:
         # Coefficient global ecart de note -> ecart de rounds, appris en ligne.
         self._xy = 0.0
         self._xx = 0.0
+        self._last_observed_date: dt.date | None = None
 
     def copy(self) -> "EloEngine":
         """Retourne une copie independante de l'etat Elo pour simulations hypothetiques."""
         clone = EloEngine(EloConfig(**self.cfg.to_dict()))
         clone._xy = self._xy
         clone._xx = self._xx
+        clone._last_observed_date = self._last_observed_date
         clone.teams = {
             name: TeamRating(
                 rating=tr.rating,
@@ -417,6 +419,10 @@ class EloEngine:
 
     def observe(self, result: MapResult) -> None:
         """Integre une map jouee dans les notes."""
+        if type(result.date) is not dt.date:
+            raise ValueError("date doit etre une date calendaire")
+        if self._last_observed_date is not None and result.date < self._last_observed_date:
+            raise ValueError("les maps doivent etre observees dans l'ordre chronologique")
         a, b = result.team_a, result.team_b
         self._apply_roster_shock(a, result.roster_a)
         self._apply_roster_shock(b, result.roster_b)
@@ -501,3 +507,4 @@ class EloEngine:
         ta.map_counts[mname] = ta.map_counts.get(mname, 0) + 1
         tb.map_counts[mname] = tb.map_counts.get(mname, 0) + 1
         ta.map_last_dates[mname] = tb.map_last_dates[mname] = result.date
+        self._last_observed_date = result.date
