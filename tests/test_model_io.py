@@ -18,10 +18,44 @@ class ModelIntegrityTests(unittest.TestCase):
             model.save(path)
             original = json.loads(path.read_text())
             for changed in (dict(version=99), dict(scales=[0, 1]), dict(weights=[float("nan"), 1]),
-                            dict(temperature=0), dict(resid=[1, 2]), dict(feature_names=["one"])):
+                            dict(temperature=0), dict(resid=[1, 2]), dict(feature_names=["one"]),
+                            dict(version=True), dict(temperature=True), dict(temperature="1"),
+                            dict(has_gbdt="false"), dict(has_gbdt=1), dict(trained_on=-1),
+                            dict(trained_on=True), dict(trained_on=1.5), dict(last_date=123),
+                            dict(last_date="invalid"), dict(feature_names="ab"),
+                            dict(feature_names=["duplicate", "duplicate"]),
+                            dict(feature_names=[None, "x"]), dict(weights={"x": 1})):
                 with self.subTest(changed=changed), self.assertRaises(ValueError):
                     path.write_text(json.dumps({**original, **changed}))
                     MatchPredictor.load(path)
+
+    def test_model_json_requires_an_object_and_all_mandatory_parameters(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "model.json"
+            for payload in (None, [], "model", 42, {"version": 1}):
+                with self.subTest(payload=payload), self.assertRaises(ValueError):
+                    path.write_text(json.dumps(payload))
+                    MatchPredictor.load(path)
+
+    def test_model_rejects_covariance_that_would_produce_false_intervals(self):
+        rng = np.random.default_rng(9)
+        X = rng.normal(size=(60, 2))
+        model = MatchPredictor(use_gbdt=False).fit(X, (X[:, 0] > 0).astype(float))
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "model.json"
+            model.save(path)
+            original = json.loads(path.read_text())
+            for covariance in ([[1, 2], [2, 1]], [[-1, 0], [0, -1]],
+                               [[1, 5], [0, 1]], [[1, 0], [0, -1e-8]],
+                               [[float("inf"), 0], [0, 1]], {"x": 1}, [[1]]):
+                with self.subTest(covariance=covariance), self.assertRaisesRegex(ValueError, "covariance"):
+                    path.write_text(json.dumps({**original, "cov": covariance}))
+                    MatchPredictor.load(path)
+            # La tolerance aux arrondis et les anciens formats sans covariance restent supportes.
+            for covariance in ([[1, 1e-12], [0, 1]], [[1, 0], [0, -1e-12]], None):
+                path.write_text(json.dumps({**original, "cov": covariance}))
+                restored = MatchPredictor.load(path)
+                np.testing.assert_array_equal(restored.predict_proba(X), model.predict_proba(X))
 
     def test_untrained_save_fails_and_loaded_non_gbdt_preserves_flag(self):
         with tempfile.TemporaryDirectory() as tmp:

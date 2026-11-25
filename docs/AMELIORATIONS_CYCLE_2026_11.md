@@ -538,3 +538,21 @@ outillage domaine CS2 et sortie structuree).
   observes 25 % et 75 %, gradient penalise proche de zero et symetrie lors
   de l'inversion des equipes. Controle exploratoire de 200 graines aux
   probabilites extremes : aucune non-convergence observee apres correction.
+
+## Cycle 51 : Integrite numerique des modeles JSON
+
+- **Validation des covariances rechargees** (`model.py`) : rejet des matrices
+  non symetriques ou ayant une valeur propre negative au-dela de la tolerance
+  relative de 1e-10. Une covariance negative etait auparavant acceptee et
+  pouvait donner un intervalle de largeur nulle apres le clipping de variance.
+  Les modeles anciens sans covariance restent rechargeables.
+- **Contrat des metadonnees** (`model.py`) : un modele doit etre un objet JSON
+  contenant les parametres obligatoires, avec une version entiere, une
+  temperature positive finie, des noms de features uniques, un indicateur
+  GBDT booleen et des metadonnees d'entrainement valides. Les fichiers
+  incorrects produisent une `ValueError` au lieu d'erreurs d'attribut ou de
+  type non gerees. Tests des corruptions et des aller-retours d'instantanes.
+- **Validation avec GBDT reel** : environnement virtuel isole sous `/tmp`,
+  Python 3.14.10, NumPy 2.5.5 et scikit-learn 1.9.1. Les 257 tests passent
+  sans test ignore, dont les sauvegardes/rechargements de l'ensemble GBDT
+  et des instantanes complets.
