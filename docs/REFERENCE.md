@@ -454,6 +454,13 @@ features. Lists are copied into tuples. Training dates and evaluation cutoffs
 must be calendar `datetime.date` values, without a time component. The CSV/API
 import layer handles timestamp-to-date conversion before training.
 
+`Dataset.slice(selector)` applies the same row selection to features, labels,
+dates, metadata and optional pool features. It accepts Python slices, integer
+indices and boolean masks of exactly the dataset's length. A scalar index
+returns a one-row dataset; empty selections keep consistent array dimensions.
+Order and repeated indices are preserved, so callers remain responsible for
+chronological ordering before training.
+
 ```bash
 cs2gp train --no-gbdt --bundle models/analyzer.cs2gp
 cs2gp predict navi g2 --model models/analyzer.cs2gp

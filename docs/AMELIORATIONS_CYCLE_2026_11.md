@@ -739,3 +739,19 @@ outillage domaine CS2 et sortie structuree).
 - **Tests** : types/noms invalides, absence d'ajustement sur dates invalides,
   validation lors du repli L2 court, listes de noms mutables et aller-retour
   du modele, poids de recence dans l'ordre d'origine.
+
+## Cycle 62 : Selection de lignes coherente dans Dataset
+
+- **Masques et indices** (`features.py`) : `Dataset.slice()` resout une seule
+  selection de lignes avant de l'appliquer aux features, cibles, dates,
+  metadonnees et features du pool. L'iteration des booleens NumPy etait
+  auparavant utilisee comme indice de liste pour dates/meta et echouait.
+- **Contrat de forme** : support des masques booleens de longueur exacte,
+  des tranches Python et des indices entiers positifs ou negatifs. Un indice
+  scalaire retourne un dataset d'une ligne ; une selection vide conserve les
+  dimensions attendues. Ordre et repetitions sont preserves. Les selecteurs
+  invalides, masques de mauvaise longueur et indices hors limites sont rejetes.
+- **Cout de selection** : les indices d'une tranche ou d'un sous-ensemble
+  entier sont prepares a la taille du sous-ensemble ; aucun tableau d'indices
+  couvrant tout le dataset n'est necessaire. Tests d'alignement de tous les
+  champs, de pool absent, de selections vides et de bornes entieres non signees.
