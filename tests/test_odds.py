@@ -123,6 +123,43 @@ class OddsValidationTests(unittest.TestCase):
         self.assertLess(strong["p_value"], 0.01)
         self.assertGreater(strong["sharpe_ratio"], 0.5)
 
+    def test_roi_grouping_prevents_duplicate_markets_from_inventing_evidence(self):
+        bets = [(0.7, 2.0, 1)] * 8 + [(0.7, 2.0, 0)] * 2
+        baseline = roi_significance(bets)
+        for repeats in (1, 3, 20):
+            duplicated = [bet for bet in bets for _ in range(repeats)]
+            groups = [i for i in range(len(bets)) for _ in range(repeats)]
+            result = roi_significance(duplicated, groups=groups)
+            self.assertEqual(result["n_groups"], 10)
+            self.assertEqual(result["n"], 10 * repeats)
+            self.assertFalse(result["significant_5pct"])
+            for key in ("mean_return", "se_return", "t_stat", "p_value"):
+                self.assertAlmostEqual(result[key], baseline[key], places=12)
+        # L'ancienne hypothese d'independance surestime la preuve disponible.
+        self.assertTrue(roi_significance(bets * 3)["significant_5pct"])
+
+    def test_roi_clustered_error_matches_known_unequal_group_solution(self):
+        bets = [(0.7, 2.0, won) for won in (1, 1, 0, 1, 0)]
+        result = roi_significance(bets, groups=["a", "a", "b", "c", "c"])
+        self.assertEqual(result["n_groups"], 3)
+        self.assertAlmostEqual(result["mean_return"], .2)
+        # Scores des groupes : 1,6 ; -1,2 ; -0,4. CR1 : (3/2)*4,16/25.
+        self.assertAlmostEqual(result["se_return"], math.sqrt(.2496), places=12)
+        self.assertAlmostEqual(result["t_stat"], .2 / math.sqrt(.2496), places=12)
+        self.assertIsNone(roi_significance(bets, groups=["same"] * 5)["p_value"])
+        self.assertEqual(roi_significance([], groups=[])["n_groups"], 0)
+        for groups in (["a"], [[], [], [], [], []]):
+            with self.subTest(groups=groups), self.assertRaises(ValueError):
+                roi_significance(bets, groups=groups)
+
+    def test_roi_single_bet_groups_match_independent_calculation(self):
+        bets = [(0.7, 2.0, 1)] * 35 + [(0.7, 2.0, 0)] * 5
+        independent = roi_significance(bets)
+        grouped = roi_significance(bets, groups=list(range(len(bets))))
+        for key in ("mean_return", "se_return", "t_stat", "p_value"):
+            self.assertAlmostEqual(independent[key], grouped[key], places=12)
+        self.assertTrue(grouped["significant_5pct"])
+
     def test_equity_curve_tracks_flat_and_kelly_trajectories(self):
         seq = [(0.6, 2.0, 1), (0.6, 2.0, 0)]
         self.assertEqual(equity_curve(seq, mode="flat", stake=2.0), [0.0, 2.0, 0.0])

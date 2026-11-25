@@ -588,3 +588,25 @@ outillage domaine CS2 et sortie structuree).
   L'emission departage les pronostics d'une meme journee ; les indicateurs
   intrajournaliers suivent cette convention et ne reconstituent pas l'ordre
   reel de cloture des rencontres.
+
+## Cycle 54 : Incertitude du ROI regroupee par rencontre
+
+- **Erreur type par groupe (`roi_significance`)** (`odds.py`) : ajout de
+  `groups`, avec covariance sandwich CR1 pour la moyenne des rendements.
+  Pour G groupes, N paris et residus centres r, la variance vaut
+  `G/(G-1) * sum_g(sum_i_in_g(r_i)**2) / N**2`.
+  C'est le cas constante seule de la
+  [covariance regroupee de statsmodels](https://www.statsmodels.org/stable/_modules/statsmodels/stats/sandwich_covariance.html#cov_cluster).
+  La p-value utilise une approximation normale ; le seuil de 30 observations
+  s'applique maintenant aux groupes. Sans groupe explicite, chaque pari reste
+  une observation. Moins de deux groupes : erreur type et p-value indisponibles.
+- **Integration au journal** (`journal.py`, `cli.py`) : regroupement automatique
+  selon `Pick.fixture_key`, pour les identifiants stables et les anciennes
+  rencontres sans identifiant. Le JSON expose `matchs` et `roi_erreur_type` ;
+  le texte affiche le nombre de matchs derriere les paris.
+- **Tests** : dix rencontres avec huit gains et deux pertes deviennent
+  artificiellement significatives en traitant leurs trente marches comme
+  independants. Avec le regroupement, dupliquer les marches preserve
+  l'erreur type et la p-value ; dix rencontres restent dix observations.
+  Verification d'un cas analytique a groupes de tailles differentes et du
+  comportement independant existant.
