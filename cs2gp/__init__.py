@@ -8,25 +8,38 @@ __all__ = [
     "EloConfig",
     "Fixture",
     "Tipster",
+    "audit_fixtures",
     "audit_history",
+    "confusion_summary",
+    "devig",
+    "diff_analyzers",
+    "inspect_analyzer",
+    "roc_auc",
+    "sharpness",
     "walk_forward",
 ]
 
+_EXPORTS = {
+    "Analyzer": (".predict", "Analyzer"),
+    "EloConfig": (".ratings", "EloConfig"),
+    "Fixture": (".pronostic", "Fixture"),
+    "Tipster": (".pronostic", "Tipster"),
+    "audit_fixtures": (".audit", "audit_fixtures"),
+    "audit_history": (".audit", "audit_history"),
+    "confusion_summary": (".metrics", "confusion_summary"),
+    "devig": (".odds", "devig"),
+    "diff_analyzers": (".snapshot", "diff_analyzers"),
+    "inspect_analyzer": (".snapshot", "inspect_analyzer"),
+    "roc_auc": (".metrics", "roc_auc"),
+    "sharpness": (".metrics", "sharpness"),
+    "walk_forward": (".backtest", "walk_forward"),
+}
+
 
 def __getattr__(name: str):
-    if name == "Analyzer":
-        from .predict import Analyzer
-        return Analyzer
-    if name == "EloConfig":
-        from .ratings import EloConfig
-        return EloConfig
-    if name in ("Fixture", "Tipster"):
-        from . import pronostic
-        return getattr(pronostic, name)
-    if name == "audit_history":
-        from .audit import audit_history
-        return audit_history
-    if name == "walk_forward":
-        from .backtest import walk_forward
-        return walk_forward
+    if name in _EXPORTS:
+        from importlib import import_module
+
+        mod_name, attr = _EXPORTS[name]
+        return getattr(import_module(mod_name, __name__), attr)
     raise AttributeError(f"module 'cs2gp' has no attribute {name!r}")

@@ -7,7 +7,7 @@ import math
 
 import numpy as np
 
-from .validation import positive_integer, probability_pair
+from .validation import finite_number, positive_integer, probability_pair
 
 EPS = 1e-12
 
@@ -290,6 +290,43 @@ def sharpness(p) -> dict:
         "std_p": float(arr.std()),
         "mean_entropy": float(entropy.mean()),
         "pct_decisive_70": float(np.mean(conf >= 0.70)),
+    }
+
+
+def confusion_summary(y, p, *, threshold: float = 0.5) -> dict:
+    """Matrice de confusion ; p >= threshold predit la classe 1.
+
+    Un ratio sans denominateur vaut None. Le F1 vaut zero lorsqu'il y a
+    des faux positifs ou des faux negatifs sans aucun vrai positif.
+    """
+    y, p = probability_pair(y, p)
+    finite_number("threshold", threshold, maximum=1.0)
+    pred = p >= threshold
+    pos = y == 1.0
+    tp = int(np.sum(pred & pos))
+    fp = int(np.sum(pred & ~pos))
+    tn = int(np.sum(~pred & ~pos))
+    fn = int(np.sum(~pred & pos))
+    precision = tp / (tp + fp) if (tp + fp) else None
+    recall = tp / (tp + fn) if (tp + fn) else None
+    specificity = tn / (tn + fp) if (tn + fp) else None
+    f1_denominator = 2 * tp + fp + fn
+    f1 = 2 * tp / f1_denominator if f1_denominator else None
+    balanced_acc = (
+        0.5 * (recall + specificity)
+        if recall is not None and specificity is not None else None
+    )
+    return {
+        "threshold": float(threshold),
+        "tp": tp,
+        "fp": fp,
+        "tn": tn,
+        "fn": fn,
+        "precision": precision,
+        "recall": recall,
+        "specificity": specificity,
+        "f1": f1,
+        "balanced_accuracy": balanced_acc,
     }
 
 

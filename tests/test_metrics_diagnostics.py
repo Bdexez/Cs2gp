@@ -157,6 +157,47 @@ class MetricsDiagnosticsTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             metrics.sharpness([])
 
+    def test_confusion_summary_computes_counts_f1_and_balanced_accuracy(self):
+        y = [1, 1, 0, 0]
+        p = [0.8, 0.4, 0.3, 0.9]
+        c = metrics.confusion_summary(y, p, threshold=0.5)
+        self.assertEqual((c["tp"], c["fp"], c["tn"], c["fn"]), (1, 1, 1, 1))
+        self.assertAlmostEqual(c["precision"], 0.5)
+        self.assertAlmostEqual(c["recall"], 0.5)
+        self.assertAlmostEqual(c["f1"], 0.5)
+        self.assertAlmostEqual(c["balanced_accuracy"], 0.5)
+        with self.assertRaises(ValueError):
+            metrics.confusion_summary(y, p, threshold=1.5)
+
+    def test_confusion_summary_distinguishes_zero_f1_from_undefined(self):
+        cases = [
+            ([0, 1], [1, 0], 0.0),  # Toutes les predictions sont fausses.
+            ([1, 1], [0, 0], 0.0),  # Aucun positif predit.
+            ([0, 0], [1, 1], 0.0),  # Aucun positif observe.
+            ([0, 0], [0, 0], None),  # Aucun positif observe ou predit.
+            ([1, 1], [1, 1], 1.0),
+        ]
+        for y, p, expected in cases:
+            with self.subTest(y=y, p=p):
+                result = metrics.confusion_summary(y, p)
+                self.assertEqual(result["f1"], expected)
+                self.assertEqual(sum(result[k] for k in ("tp", "fp", "tn", "fn")), len(y))
+                if len(set(y)) == 1:
+                    self.assertIsNone(result["balanced_accuracy"])
+
+    def test_confusion_summary_threshold_boundaries_and_validation(self):
+        for threshold, counts in [(0.0, (1, 1, 0, 0)), (0.5, (1, 0, 1, 0)),
+                                  (1.0, (0, 0, 1, 1))]:
+            result = metrics.confusion_summary([0, 1], [0.0, 0.5], threshold=threshold)
+            self.assertEqual(tuple(result[k] for k in ("tp", "fp", "tn", "fn")), counts)
+        for threshold in (-0.1, 1.1, float("nan"), float("inf"), True, "0.5"):
+            with self.subTest(threshold=threshold), self.assertRaises(ValueError):
+                metrics.confusion_summary([0, 1], [0.1, 0.9], threshold=threshold)
+        for y, p in [([], []), ([0, 2], [0.1, 0.9]), ([0, 1], [0.5]),
+                     ([0, 1], [0.1, float("nan")])]:
+            with self.subTest(y=y, p=p), self.assertRaises(ValueError):
+                metrics.confusion_summary(y, p)
+
 
 if __name__ == "__main__":
     unittest.main()
