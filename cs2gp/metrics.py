@@ -190,21 +190,41 @@ def calibration_slope_intercept(y: np.ndarray, p: np.ndarray) -> dict:
         return {"intercept": None, "slope": None, "converged": False}
     X = np.column_stack([np.ones_like(z), z])
     beta = np.array([0.0, 1.0], dtype=float)
+    prior = beta.copy()
     converged = False
     l2 = 1e-6
+
+    def objective(coefficients):
+        # logaddexp reste fini meme pour des logits tres eloignes de zero.
+        loss = np.logaddexp(0.0, (1.0 - 2.0 * y) * (X @ coefficients)).sum()
+        return float(loss + 0.5 * l2 * np.sum((coefficients - prior) ** 2))
+
     for _ in range(60):
-        eta = np.clip(X @ beta, -30.0, 30.0)
+        eta = X @ beta
         q = 0.5 * (1.0 + np.tanh(0.5 * eta))
         w = np.clip(q * (1.0 - q), 1e-9, None)
-        grad = X.T @ (y - q) - l2 * (beta - np.array([0.0, 1.0]))
+        grad = X.T @ (y - q) - l2 * (beta - prior)
         hess = (X.T * w) @ X + l2 * np.eye(2)
         try:
             step = np.linalg.solve(hess, grad)
         except np.linalg.LinAlgError:
             break
-        beta += step
         if float(np.max(np.abs(step))) < 1e-8:
+            beta += step
             converged = True
+            break
+        # Un pas de Newton complet peut traverser l'optimum lorsque les
+        # probabilites initiales sont extremes. Amortir jusqu'a decroissance.
+        current = objective(beta)
+        descent = float(grad @ step)
+        fraction = 1.0
+        for _ in range(30):
+            candidate = beta + fraction * step
+            if objective(candidate) <= current - 1e-4 * fraction * descent + 4 * np.spacing(current):
+                beta = candidate
+                break
+            fraction *= 0.5
+        else:
             break
     return {
         "intercept": float(beta[0]),
