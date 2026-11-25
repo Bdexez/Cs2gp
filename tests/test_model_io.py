@@ -125,6 +125,7 @@ class ModelIntegrityTests(unittest.TestCase):
             path = Path(tmp) / "legacy.json"
             model.save(path)
             payload = json.loads(path.read_text())
+            payload["version"] = 1
             for name in ("use_gbdt", "calibration_frac", "recency_halflife", "l2_grid"):
                 payload.pop(name)
             payload["gbdt_weight"] = 0.0

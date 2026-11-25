@@ -101,6 +101,7 @@ class SnapshotTests(unittest.TestCase):
             manifest["training_options"].pop("l2_grid")
             for name in ("match.json", "map.json"):
                 payload = json.loads(files[name])
+                payload["version"] = 1
                 for option in ("use_gbdt", "calibration_frac", "recency_halflife", "l2_grid"):
                     payload.pop(option)
                 payload["gbdt_weight"] = 0.0

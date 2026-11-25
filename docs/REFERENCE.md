@@ -467,6 +467,15 @@ bundles require the same scikit-learn version and use pickle: load bundles only
 from trusted sources. `train --out models/match.json` retains the match-only
 JSON export and does not produce a complete analyzer.
 
+Standalone JSON models use format v2. A fitted GBDT lives beside the JSON in
+`gbdt-<sha256>.pkl`, named by the `gbdt_file` field. Saving writes the component
+first and atomically publishes the JSON last, so a failed publication preserves
+the previous readable generation. Earlier components remain available for
+readers of older JSON generations; identical content reuses one filename.
+Copy a standalone JSON together with its referenced component. Complete
+`.cs2gp` archives already contain that component. Legacy v1 JSON files with a
+fixed `<model>.gbdt.pkl` component remain readable.
+
 Both exports preserve the supported training settings: L2, requested GBDT use
 and blend weight, calibration fraction, recency half-life and optional L2 grid.
 `has_gbdt` indicates whether a GBDT was actually fitted; a small dataset may
