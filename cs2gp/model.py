@@ -31,6 +31,7 @@ from .validation import (binary_labels, feature_matrix, finite_number,
                          observation_weights, positive_integer)
 
 RECENCY_HALFLIFE_DAYS = 540.0
+_MODEL_OPTIONS = ("l2", "use_gbdt", "gbdt_weight", "calibration_frac", "recency_halflife", "l2_grid")
 
 
 def sigmoid(z: np.ndarray) -> np.ndarray:
@@ -309,6 +310,8 @@ class MatchPredictor:
 
     def __post_init__(self) -> None:
         self.validate_config()
+        if self.l2_grid is not None:
+            self.l2_grid = tuple(self.l2_grid)
 
     def validate_config(self) -> None:
         finite_number("l2", self.l2)
@@ -320,7 +323,7 @@ class MatchPredictor:
         if not isinstance(self.use_gbdt, bool):
             raise ValueError("use_gbdt doit etre un booleen")
         if self.l2_grid is not None:
-            if not self.l2_grid:
+            if not isinstance(self.l2_grid, (tuple, list)) or not self.l2_grid:
                 raise ValueError("l2_grid doit contenir au moins une valeur")
             for v in self.l2_grid:
                 finite_number("l2_grid", v)
@@ -442,11 +445,11 @@ class MatchPredictor:
     def save(self, path: str | Path) -> None:
         if self.logistic.weights is None or self.logistic.scales is None:
             raise RuntimeError("modele non entraine")
+        self.validate_config()
         path = Path(path)
         payload = {
             "version": 1,
-            "l2": self.l2,
-            "gbdt_weight": self.gbdt_weight if self.gbdt is not None else 0.0,
+            **{name: getattr(self, name) for name in _MODEL_OPTIONS},
             "temperature": self.temperature,
             "feature_names": list(self.feature_names),
             "weights": self.logistic.weights.tolist(),
@@ -457,11 +460,14 @@ class MatchPredictor:
             "last_date": self.last_date,
             "has_gbdt": self.gbdt is not None,
         }
+        blob = None
         if self.gbdt is not None:
             blob = pickle.dumps(self.gbdt)
-            atomic_write_bytes(path.with_suffix(".gbdt.pkl"), blob)
             payload["gbdt_sha256"] = hashlib.sha256(blob).hexdigest()
-        atomic_write_bytes(path, json.dumps(payload, indent=2).encode("utf-8"))
+        data = json.dumps(payload, indent=2, allow_nan=False).encode("utf-8")
+        if blob is not None:
+            atomic_write_bytes(path.with_suffix(".gbdt.pkl"), blob)
+        atomic_write_bytes(path, data)
 
     @classmethod
     def load(cls, path: str | Path) -> "MatchPredictor":
@@ -502,7 +508,9 @@ class MatchPredictor:
             raise ValueError("last_date doit etre une date ISO ou une chaine vide")
         if last_date:
             dt.date.fromisoformat(last_date)
-        m = cls(l2=payload["l2"], use_gbdt=has_gbdt, gbdt_weight=payload["gbdt_weight"])
+        options = {name: payload[name] for name in _MODEL_OPTIONS if name in payload}
+        options.setdefault("use_gbdt", has_gbdt)
+        m = cls(**options)
         m.temperature = payload["temperature"]
         m.feature_names = tuple(names)
         m.trained_on = trained_on
@@ -538,7 +546,8 @@ class MatchPredictor:
             m.gbdt = pickle.loads(data)
         else:
             m.gbdt = None
-            m.gbdt_weight = 0.0
+            if "use_gbdt" not in payload:
+                m.gbdt_weight = 0.0  # Comportement des anciens modeles sans configuration complete.
         return m
 
 
