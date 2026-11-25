@@ -66,7 +66,7 @@ class LogisticModel:
     cov: np.ndarray | None = None
     feature_names: tuple[str, ...] = ()
 
-    def _fit_residualizer(self, X: np.ndarray, w: np.ndarray) -> None:
+    def _fit_residualizer(self, X: np.ndarray, w: np.ndarray) -> np.ndarray:
         """Projette chaque colonne hors de la colonne 0 (l'ecart de niveau).
 
         Toutes les features sont fortement correlees a `elo_diff` : forme, pool,
@@ -79,21 +79,35 @@ class LogisticModel:
         contribution *nette* de l'ecart de niveau.
         """
         if not self.residualize or X.shape[1] < 2:
-            self.resid = np.zeros(max(0, X.shape[1] - 1))
-            return
+            return np.zeros(max(0, X.shape[1] - 1))
         base = X[:, 0]
-        w_base = w * base
-        denom = float(base @ w_base)
-        if denom < 1e-12:
-            self.resid = np.zeros(X.shape[1] - 1)
-            return
-        self.resid = np.array([float(w_base @ X[:, j]) / denom for j in range(1, X.shape[1])])
+        base_scale = float(np.max(np.abs(base)))
+        if base_scale == 0.0:
+            return np.zeros(X.shape[1] - 1)
+        normalized_base = base / base_scale
+        w_base = w * normalized_base
+        denom = float(normalized_base @ w_base)
+        if math.sqrt(denom) < 1e-6 / base_scale:
+            return np.zeros(X.shape[1] - 1)
+        projections = []
+        for j in range(1, X.shape[1]):
+            scale = max(float(np.max(np.abs(X[:, j]))), 1.0)
+            numerator = float(w_base @ (X[:, j] / scale))
+            # n * scale / (denom * base_scale), sans produits intermediaires
+            # hors plage alors que le coefficient final reste representable.
+            nm, ne = math.frexp(numerator)
+            sm, se = math.frexp(scale)
+            dm, de = math.frexp(denom)
+            bm, be = math.frexp(base_scale)
+            projections.append(math.ldexp((nm * sm) / (dm * bm), ne + se - de - be))
+        return np.asarray(projections)
 
-    def _apply_residual(self, X: np.ndarray) -> np.ndarray:
-        if self.resid is None or len(self.resid) == 0:
+    def _apply_residual(self, X: np.ndarray, resid: np.ndarray | None = None) -> np.ndarray:
+        resid = self.resid if resid is None else resid
+        if resid is None or len(resid) == 0:
             return X
         out = np.array(X, dtype=float, copy=True)
-        out[:, 1:] -= np.outer(out[:, 0], self.resid)
+        out[:, 1:] -= np.outer(out[:, 0], resid)
         return out
 
     def fit(self, X: np.ndarray, y: np.ndarray, sample_weight: np.ndarray | None = None) -> "LogisticModel":
@@ -105,11 +119,24 @@ class LogisticModel:
         positive_integer("max_iter", self.max_iter)
         if self.feature_names and len(self.feature_names) != X.shape[1]:
             raise ValueError("feature_names doit nommer chaque colonne de X")
-        self._fit_residualizer(X, w)
-        X = self._apply_residual(X)
+        # Une ligne de poids nul ne doit participer a aucune transformation,
+        # meme si son carre ou sa projection deborderait en float64.
+        active = w > 0.0
+        if not active.all():
+            X, y, w = X[active], y[active], w[active]
+        try:
+            with np.errstate(over="raise", invalid="raise", divide="raise"):
+                resid = self._fit_residualizer(X, w)
+                X = self._apply_residual(X, resid)
+                magnitudes = np.maximum(np.max(np.abs(X), axis=0), 1.0)
+                squared = X / magnitudes
+                np.square(squared, out=squared)
+                rms = np.sqrt(np.minimum(np.average(squared, axis=0, weights=w), 1.0))
+                scales = np.maximum(magnitudes * rms, 1e-6)
+        except (FloatingPointError, OverflowError) as exc:
+            raise ValueError("features hors de la plage numerique du pretraitement") from exc
         # Mise a l'echelle sans centrage : centrer casserait l'antisymetrie.
-        self.scales = np.maximum(np.sqrt(np.average(X**2, axis=0, weights=w)), 1e-6)
-        Xs = X / self.scales
+        Xs = X / scales
 
         # sigmoid(-z) = 1 - sigmoid(z) : chaque ligne miroir apporte les
         # memes gradient et Hessienne. Le facteur 2 preserve la penalite L2
@@ -128,15 +155,17 @@ class LogisticModel:
             beta += step
             if np.max(np.abs(step)) < self.tol:
                 break
-        self.weights = beta
         # Matrice d'information de Fisher sur l'echantillon non dedouble -> covariance asymptotique.
         p_orig = sigmoid(Xs @ beta)
         s_orig = w * np.clip(p_orig * (1.0 - p_orig), 1e-9, None)
         fisher = (Xs.T * s_orig) @ Xs + ridge
         try:
-            self.cov = np.linalg.inv(fisher)
+            cov = np.linalg.inv(fisher)
         except np.linalg.LinAlgError:
-            self.cov = np.linalg.pinv(fisher)
+            cov = np.linalg.pinv(fisher)
+        if not all(np.isfinite(value).all() for value in (beta, scales, resid, cov)):
+            raise ValueError("l'entrainement a produit des parametres non finis")
+        self.weights, self.scales, self.resid, self.cov = beta, scales, resid, cov
         return self
 
     def decision(self, X: np.ndarray) -> np.ndarray:

@@ -87,6 +87,45 @@ class NumericContractsTests(unittest.TestCase):
         model = LogisticModel(l2=l2).fit(np.ones((len(y), 1)), y, sample_weight=w)
         np.testing.assert_allclose(model.predict_proba([[1.0]]), [expected], atol=1e-12)
 
+    def test_zero_weight_extreme_rows_are_excluded_before_numeric_transformations(self):
+        rng = np.random.default_rng(11)
+        X = rng.normal(size=(60, 3))
+        y = (X[:, 0] > 0).astype(float)
+        clean = LogisticModel().fit(X, y)
+        with np.errstate(over="raise", invalid="raise", divide="raise"):
+            weighted = LogisticModel().fit(
+                np.vstack([X, [[1e300, -2e300, 3e300]]]), np.append(y, 0),
+                sample_weight=np.append(np.ones(len(y)), 0.0),
+            )
+        for name in ("weights", "scales", "resid", "cov"):
+            np.testing.assert_array_equal(getattr(weighted, name), getattr(clean, name))
+
+    def test_large_finite_features_preserve_predictions_and_covariance(self):
+        rng = np.random.default_rng(14)
+        X = rng.normal(size=(80, 3))
+        y = rng.integers(0, 2, len(X))
+        w = rng.uniform(.1, 2.0, len(X))
+        for residualize in (False, True):
+            clean = LogisticModel(residualize=residualize).fit(X, y, sample_weight=w)
+            with self.subTest(residualize=residualize), \
+                    np.errstate(over="raise", invalid="raise", divide="raise"):
+                large = LogisticModel(residualize=residualize).fit(X * 1e200, y, sample_weight=w)
+                np.testing.assert_allclose(large.predict_proba(X * 1e200), clean.predict_proba(X), atol=1e-12)
+                np.testing.assert_allclose(large.cov, clean.cov, atol=1e-12)
+                np.testing.assert_allclose(large.scales / 1e200, clean.scales, atol=1e-12)
+
+    def test_unrepresentable_preprocessing_fails_without_replacing_fitted_state(self):
+        rng = np.random.default_rng(2)
+        X = rng.normal(size=(60, 2))
+        model = LogisticModel().fit(X, (X[:, 0] > 0).astype(float))
+        before = {name: getattr(model, name).copy() for name in ("weights", "scales", "resid", "cov")}
+        predictions = model.predict_proba(X)
+        with self.assertRaisesRegex(ValueError, "plage numerique"):
+            model.fit([[1e-5, 1e308], [-1e-5, -1e308]], [1, 0])
+        for name, value in before.items():
+            np.testing.assert_array_equal(getattr(model, name), value)
+        np.testing.assert_array_equal(model.predict_proba(X), predictions)
+
     def test_logistic_mirror_augmentation_matches_rescaled_regularization(self):
         rng = np.random.default_rng(52)
         X = rng.normal(size=(80, 4))

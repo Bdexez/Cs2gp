@@ -655,3 +655,18 @@ outillage domaine CS2 et sortie structuree).
   controle des entrees et equivalence avec l'ancien tirage pour un pari par
   groupe. Le drawdown est mesure entre reglements de rencontres ; cette
   simulation suppose les rencontres reechantillonnees independantes.
+
+## Cycle 57 : Pretraitement logistique stable et publication atomique
+
+- **Poids nuls** (`model.py`) : exclusion des lignes de poids nul avant les
+  projections et les carres. Une ligne finie de l'ordre de 1e300 n'introduit
+  plus de NaN dans un entrainement auquel elle ne doit pas contribuer.
+- **Projection et RMS ponderes** : calcul sur des colonnes normalisees par
+  leur amplitude, puis retour a leur echelle. Les coefficients de projection
+  utilisent mantisses et exposants pour eviter les produits intermediaires
+  non representables. Le plancher historique des echelles reste de 1e-6.
+- **Etat appris preserve en cas d'echec** : projection, echelles, poids et
+  covariance sont publies ensemble apres validation de leur finitude. Un
+  pretraitement hors plage est rejete explicitement sans detruire un modele
+  deja appris. Tests des poids nuls extremes, de l'equivalence des predictions
+  et covariances avec des features multipliees par 1e200, et du refit invalide.

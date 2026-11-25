@@ -439,6 +439,11 @@ models and requires training again. If automatic momentum was enabled, its old
 estimate is cleared on import and recalculated during training using the new
 data and options. Explicitly configured momentum is preserved.
 
+`LogisticModel.fit()` also publishes its learned parameters together after
+checking they are finite. Zero-weight rows are excluded before preprocessing;
+weighted projections and RMS scaling avoid squaring large raw values. An
+unrepresentable transformation raises `ValueError` and preserves fitted state.
+
 ```bash
 cs2gp train --no-gbdt --bundle models/analyzer.cs2gp
 cs2gp predict navi g2 --model models/analyzer.cs2gp
