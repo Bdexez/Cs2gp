@@ -667,6 +667,14 @@ usable at large amplitudes and offsets. Near-constant columns retain the
 absolute standard-deviation threshold of `1e-12`; reported correlations stay
 within `[-1, 1]`. Empty or insufficient data returns no correlation pairs.
 
+Fixture auditing evaluates team coverage before each fixture's date. JSON
+fields `duplicate_match_ids` and `no_prior_history` identify reused identifiers
+and fixtures without earlier results; either makes `ok` false. Date/pair
+collisions are detected even when only one row lacks a match ID, after team
+alias resolution. Distinct IDs permit multiple meetings of the same pair.
+`Fixture.match_id` must be a string (empty if unknown); surrounding whitespace
+is stripped consistently with CSV imports.
+
 `backtest --json` includes a `confusion` object at threshold 0.5 (`p >= 0.5`
 predicts team A): counts `tp`, `fp`, `tn`, `fn`, precision, recall, specificity,
 F1 and balanced accuracy. Ratios with a zero denominator are `null`; F1 is

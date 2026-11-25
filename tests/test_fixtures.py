@@ -37,6 +37,14 @@ class FixtureValidationTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     implied(value)
 
+    def test_fixture_identifiers_are_strings_and_are_trimmed_consistently(self):
+        fixture = Fixture("2026-01-01", "a", "b", match_id=" source-42 ")
+        self.assertEqual(fixture.match_id, "source-42")
+        self.assertEqual(Fixture("2026-01-01", "a", "b", match_id="  ").match_id, "")
+        for match_id in (None, 42, True, []):
+            with self.subTest(match_id=match_id), self.assertRaisesRegex(ValueError, "match_id"):
+                Fixture("2026-01-01", "a", "b", match_id=match_id)
+
 
 if __name__ == "__main__":
     unittest.main()

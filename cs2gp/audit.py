@@ -202,9 +202,13 @@ def audit_fixtures(fixtures: Sequence, analyzer) -> dict:
     incomplete_odds: list[str] = []
     arbitrage: list[str] = []
     past_fixtures: list[str] = []
+    no_prior_history: list[str] = []
+    duplicate_ids = sorted(mid for mid, count in Counter(f.match_id for f in fixtures if f.match_id).items()
+                           if count > 1)
     latest_history = max((m.date for m in analyzer.matches), default=None)
     with_odds = 0
     pair_days: Counter = Counter()
+    pairs_without_id = set()
     for fx in fixtures:
         if latest_history is not None and fx.date < latest_history:
             past_fixtures.append(fx.label)
@@ -218,23 +222,34 @@ def audit_fixtures(fixtures: Sequence, analyzer) -> dict:
             arbitrage.append(fx.label)
         elif fx.odds_over is not None and fx.odds_under is not None and overround(fx.odds_over, fx.odds_under) < 1.0:
             arbitrage.append(fx.label)
-        if not fx.match_id:
-            pair_days[(fx.date, tuple(sorted((fx.team_a, fx.team_b))))] += 1
         resolved = []
-        for raw in (fx.team_a, fx.team_b):
-            try:
-                resolved.append(analyzer.resolve_team(raw))
-            except ValueError:
-                if raw not in unknown:
-                    unknown.append(raw)
-        if len(resolved) == 2:
-            ctx = analyzer.fx.match_context(resolved[0], resolved[1], fx.date)
-            if ctx["maps_played_min"] < 25 or ctx["days_idle_max"] > 60:
-                thin_or_stale.append(fx.label)
-    collisions = sum(1 for c in pair_days.values() if c > 1)
+        if not analyzer.matches or analyzer.matches[0].date >= fx.date:
+            no_prior_history.append(fx.label)
+        else:
+            state = analyzer._scouting_state(fx.date)
+            for raw in (fx.team_a, fx.team_b):
+                try:
+                    resolved.append(analyzer._resolve_team(raw, state))
+                except ValueError:
+                    if raw not in unknown:
+                        unknown.append(raw)
+            if len(resolved) == 2:
+                ctx = state.match_context(resolved[0], resolved[1], fx.date)
+                if ctx["maps_played_min"] < 25 or ctx["days_idle_max"] > 60:
+                    thin_or_stale.append(fx.label)
+        pair = tuple(sorted(resolved if len(resolved) == 2 else (fx.team_a, fx.team_b)))
+        key = fx.date, pair
+        pair_days[key] += 1
+        if not fx.match_id:
+            pairs_without_id.add(key)
+    collisions = sum(1 for key in pairs_without_id if pair_days[key] > 1)
     warnings: list[str] = []
     if unknown:
-        warnings.append(f"equipe(s) inconnue(s) dans l'historique : {', '.join(sorted(unknown))}.")
+        warnings.append(f"equipe(s) inconnue(s) a la date des affiches : {', '.join(sorted(unknown))}.")
+    if no_prior_history:
+        warnings.append(f"{len(no_prior_history)} affiche(s) sans resultat anterieur a leur date.")
+    if duplicate_ids:
+        warnings.append(f"identifiant(s) de rencontre duplique(s) : {', '.join(duplicate_ids)}.")
     if thin_or_stale:
         warnings.append(f"{len(thin_or_stale)} affiche(s) a historique mince ou ancien (confiance faible).")
     if incomplete_odds:
@@ -262,7 +277,9 @@ def audit_fixtures(fixtures: Sequence, analyzer) -> dict:
         "incomplete_odds_pairs": incomplete_odds,
         "arbitrage_fixtures": arbitrage,
         "past_fixtures": past_fixtures,
+        "no_prior_history": no_prior_history,
+        "duplicate_match_ids": duplicate_ids,
         "missing_match_id_collisions": collisions,
         "warnings": warnings,
-        "ok": not unknown and not incomplete_odds and collisions == 0,
+        "ok": not unknown and not incomplete_odds and collisions == 0 and not duplicate_ids and not no_prior_history,
     }

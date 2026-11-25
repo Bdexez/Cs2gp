@@ -157,6 +157,79 @@ class AuditTests(unittest.TestCase):
         self.assertEqual(len(res["past_fixtures"]), 1)
         self.assertTrue(any("avant le dernier match connu" in w for w in res["warnings"]))
 
+    def fixture_history(self, count=1):
+        from cs2gp.predict import Analyzer
+
+        day = dt.date(2026, 1, 1)
+        maps = [MapResult(f"m{i}", day + dt.timedelta(days=i), "navi", "g2", "mirage", 13, 5, 1)
+                for i in range(count)]
+        return day, Analyzer(warmup_maps=0).load_maps(maps)
+
+    def test_fixture_audit_rejects_duplicate_ids_and_allows_distinct_ids(self):
+        from cs2gp.audit import audit_fixtures
+        from cs2gp.pronostic import Fixture
+
+        day, an = self.fixture_history()
+        future = day + dt.timedelta(days=1)
+        duplicate = [Fixture(future, "navi", "g2", match_id=" shared "),
+                     Fixture(future + dt.timedelta(days=1), "g2", "navi", match_id="shared")]
+        report = audit_fixtures(duplicate, an)
+        self.assertFalse(report["ok"])
+        self.assertEqual(report["duplicate_match_ids"], ["shared"])
+        distinct = [Fixture(future, "navi", "g2", match_id="one"),
+                    Fixture(future, "g2", "navi", match_id="two")]
+        self.assertTrue(audit_fixtures(distinct, an)["ok"])
+
+    def test_fixture_audit_detects_mixed_id_collisions_after_alias_resolution(self):
+        from cs2gp.audit import audit_fixtures
+        from cs2gp.pronostic import Fixture
+
+        day, an = self.fixture_history()
+        future = day + dt.timedelta(days=1)
+        fixtures = [Fixture(future, "nav", "g2"), Fixture(future, "g2", "navi", match_id="known")]
+        report = audit_fixtures(fixtures, an)
+        self.assertFalse(report["ok"])
+        self.assertEqual(report["unknown_teams"], [])
+        self.assertEqual(report["missing_match_id_collisions"], 1)
+        other_day = [fixtures[0], Fixture(future + dt.timedelta(days=1), "g2", "navi")]
+        self.assertEqual(audit_fixtures(other_day, an)["missing_match_id_collisions"], 0)
+
+    def test_fixture_audit_uses_only_prior_history_for_confidence_and_team_resolution(self):
+        from cs2gp.audit import audit_fixtures
+        from cs2gp.predict import Analyzer
+        from cs2gp.pronostic import Fixture
+
+        day, an = self.fixture_history(30)
+        historical = Fixture(day + dt.timedelta(days=1), "navi", "g2", match_id="old")
+        report = audit_fixtures([historical], an)
+        self.assertEqual(report["thin_or_stale"], [historical.label])
+        missing = Fixture(day, "navi", "g2")
+        unavailable = audit_fixtures([missing], an)
+        self.assertFalse(unavailable["ok"])
+        self.assertEqual(unavailable["no_prior_history"], [missing.label])
+        extra = MapResult("later", day + dt.timedelta(days=31), "newteam", "navi", "mirage", 13, 5, 1)
+        an.load_maps([*an.maps, extra])
+        unknown = audit_fixtures([Fixture(historical.date, "newteam", "navi")], an)
+        self.assertEqual(unknown["unknown_teams"], ["newteam"])
+        self.assertFalse(unknown["ok"])
+        empty = audit_fixtures([historical], Analyzer().load_maps([]))
+        self.assertFalse(empty["ok"])
+        self.assertEqual(empty["no_prior_history"], [historical.label])
+
+    def test_cli_fixture_audit_json_exposes_duplicate_identifiers(self):
+        day, an = self.fixture_history()
+        with tempfile.TemporaryDirectory() as tmp:
+            data, fixtures = Path(tmp) / "history.csv", Path(tmp) / "fixtures.csv"
+            write_csv(data, an.maps)
+            fixtures.write_text("date,team_a,team_b,match_id\n2026-01-02,navi,g2,same\n"
+                                "2026-01-03,g2,navi,same\n")
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(main(["audit", "--data", str(data), "--fixtures", str(fixtures), "--json"]), 0)
+            report = json.loads(out.getvalue())["fixtures"]
+            self.assertEqual(report["duplicate_match_ids"], ["same"])
+            self.assertFalse(report["ok"])
+
 
 if __name__ == "__main__":
     unittest.main()
