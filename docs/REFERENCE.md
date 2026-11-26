@@ -326,6 +326,9 @@ teams; same-day maps are supported. A backdated observation is rejected before
 changing ratings, rosters or the global round-difference regression. Engine
 copies retain this boundary, including hypothetical outcome simulations. To
 simulate an earlier date, replay the earlier history into a separate engine.
+Elo and Glicko probabilities use a stable logistic calculation: large finite
+rating gaps saturate towards 0 or 1 without exponent overflow. Small gaps
+between large ratings and representable underdog probabilities are preserved.
 
 **2. Features, in a single chronological pass.** Each row is computed with the
 state of the teams *before* the match, then the state is updated. The same object

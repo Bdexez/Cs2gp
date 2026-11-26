@@ -112,7 +112,21 @@ class EloConfig:
 
 def expected_score(rating_a: float, rating_b: float) -> float:
     """Probabilite qu'une equipe notee `rating_a` batte une equipe notee `rating_b`."""
-    return 1.0 / (1.0 + 10.0 ** ((rating_b - rating_a) / SCALE))
+    return _expected_from_scaled_gap(_scaled_rating_gap(rating_a, rating_b))
+
+
+def _scaled_rating_gap(rating_a: float, rating_b: float) -> float:
+    a, b = float(rating_a), float(rating_b)
+    gap = a - b
+    # Soustraire d'abord conserve les petits ecarts autour d'un grand offset.
+    # Normaliser d'abord seulement lorsque cette soustraction deborde.
+    return a / SCALE - b / SCALE if math.isinf(gap) else gap / SCALE
+
+
+def _expected_from_scaled_gap(gap: float) -> float:
+    # Seule une puissance <= 1 est calculee, meme pour un tres grand ecart.
+    tail = math.pow(10.0, -abs(gap))
+    return 1.0 / (1.0 + tail) if gap >= 0.0 else tail / (1.0 + tail)
 
 
 def g_factor(rd: float) -> float:
@@ -456,10 +470,11 @@ class EloEngine:
             # a somme nulle impose au contraire le meme deplacement aux deux, ce
             # qui est faux des que les deux ne sont pas aussi bien connues.
             ga, gb = g_factor(rd_a), g_factor(rd_b)
-            exp_a = 1.0 / (1.0 + 10.0 ** (-gb * (ra - rb) / SCALE))
+            scaled_gap = _scaled_rating_gap(ra, rb)
+            exp_a = _expected_from_scaled_gap(gb * scaled_gap)
             # Chaque attente utilise l'incertitude de SON adversaire.
             # Reutiliser 1-exp_a introduisait un biais selon l'ordre des equipes.
-            exp_b = 1.0 / (1.0 + 10.0 ** (-ga * (rb - ra) / SCALE))
+            exp_b = _expected_from_scaled_gap(-ga * scaled_gap)
             var_a = 1.0 / max(Q * Q * gb * gb * exp_a * (1 - exp_a), 1e-12)
             var_b = 1.0 / max(Q * Q * ga * ga * exp_b * (1 - exp_b), 1e-12)
             den_a = 1.0 / (rd_a * rd_a) + 1.0 / var_a
