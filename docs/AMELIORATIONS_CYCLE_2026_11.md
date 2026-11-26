@@ -803,3 +803,21 @@ outillage domaine CS2 et sortie structuree).
   resultats et rosters futurs, exclusion de tout le jour cible, resolution
   des alias sur les seules equipes anterieures, lectures pures, invalidation
   et bornes du cache, erreurs sur dates invalides et sorties JSON des trois commandes.
+
+## Cycle 66 : Audit des identites et de l'historique disponible des fixtures
+
+- **Identifiants dupliques** (`audit.py`, `pronostic.py`) : la carte signale
+  les `duplicate_match_ids` et son statut `ok` devient faux. Les identifiants
+  de `Fixture` sont des chaines nettoyees de leurs espaces externes.
+- **Collisions mixtes** : une paire/date est controlee sur toute la carte et
+  signalee des qu'au moins une affiche manque d'identifiant. Une seule ligne
+  sans identifiant face a une ligne identifiee passait auparavant inapercue.
+  Les noms resolus evitent de manquer une collision due a un alias.
+- **Contexte temporel** : la confiance et la resolution des equipes utilisent
+  l'etat avant la date de chaque affiche. Les rencontres sans resultat
+  anterieur sont exposees dans `no_prior_history` et rendent `ok` faux.
+  Une equipe ou un volume de maps observes seulement plus tard ne rendent
+  plus artificiellement fiable une affiche historique.
+- **Tests** : doublons entre dates differentes, identifiants distincts valides,
+  collisions mixtes avec alias, historique mince, absent ou posterieur,
+  validation des identifiants API et rapport CLI JSON.

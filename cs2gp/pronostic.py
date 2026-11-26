@@ -85,6 +85,9 @@ class Fixture:
     match_id: str = ""
 
     def __post_init__(self):
+        if not isinstance(self.match_id, str):
+            raise ValueError("match_id doit etre une chaine, vide si inconnu")
+        self.match_id = self.match_id.strip()
         self.date = parse_date(self.date)
         self.team_a, self.team_b = normalize_team(self.team_a or ""), normalize_team(self.team_b or "")
         if not self.team_a or not self.team_b or self.team_a == self.team_b:
