@@ -836,3 +836,19 @@ outillage domaine CS2 et sortie structuree).
   collision pour une meme paire et un meme format : un report est possible.
 - **Tests** : collisions avant deduplication, conflits entre marches, archive
   contradictoire et preservation du fichier, reports et alias compatibles.
+
+## Cycle 68 : Ordre chronologique garanti dans le moteur Elo
+
+- **Garde avant mutation** (`ratings.py`) : une map anterieure a la derniere
+  observation est rejetee avant l'enregistrement d'une equipe, le choc de
+  roster ou les mises a jour des notes et de la regression globale. Le moteur
+  pouvait auparavant faire reculer `last_date` et integrer un resultat ancien
+  a partir d'un etat contenant deja des resultats futurs.
+- **Frontiere globale** : le controle couvre aussi les equipes encore inconnues,
+  car la regression est partagee entre toutes les equipes. Les cartes du meme
+  jour restent acceptees ; les dates doivent etre des dates calendaires.
+- **Copies et simulations** : la copie conserve la date limite. Une simulation
+  historique exige un moteur reconstruit sur son historique anterieur.
+- **Tests** : rejet sans aucune mutation, roster modifie ou nouvelles equipes,
+  dates invalides, cartes du meme jour, copies, simulations et preservation
+  des historiques de forme et H2H du `FeatureExtractor`.

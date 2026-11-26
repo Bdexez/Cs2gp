@@ -321,6 +321,11 @@ something.
 (team, map) pair. Three refinements over a textbook Elo: damped margin of victory
 (crushing an underdog earns little), K modulated by the event tier, and regression
 towards the mean after inactivity or a roster change.
+`EloEngine.observe` requires calendar dates in nondecreasing order across all
+teams; same-day maps are supported. A backdated observation is rejected before
+changing ratings, rosters or the global round-difference regression. Engine
+copies retain this boundary, including hypothetical outcome simulations. To
+simulate an earlier date, replay the earlier history into a separate engine.
 
 **2. Features, in a single chronological pass.** Each row is computed with the
 state of the teams *before* the match, then the state is updated. The same object
