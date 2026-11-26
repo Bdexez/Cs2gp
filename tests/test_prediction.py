@@ -3,6 +3,8 @@ from dataclasses import replace
 import unittest
 from unittest.mock import patch
 
+import numpy as np
+
 from cs2gp.backtest import walk_forward
 from cs2gp.predict import Analyzer, combine_probability
 from cs2gp.pronostic import Fixture, Tipster, fit_decider_temperature, simulate_tipster
@@ -103,6 +105,41 @@ class PredictionParityTests(unittest.TestCase):
     def test_date_before_first_result_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "aucun resultat anterieur"):
             self.an.predict("a", "b", on=dt.date(2020, 1, 1))
+
+    def test_invalid_prediction_and_snapshot_dates_are_rejected_before_retraining(self):
+        snapshots = dict(self.an._snapshots)
+        for on in (False, True, 0, "", [], "2025-01-01", dt.datetime(2025, 1, 1)):
+            for operation in (lambda: self.an.predict("a", "b", on=on),
+                              lambda: self.an.as_of(on)):
+                with self.subTest(on=on), \
+                        patch.object(Analyzer, "train", side_effect=AssertionError("reentrainement")), \
+                        self.assertRaisesRegex(ValueError, "date calendaire"):
+                    operation()
+        with self.assertRaisesRegex(ValueError, "date calendaire"):
+            self.an.as_of(None)
+        self.assertEqual(self.an._snapshots, snapshots)
+
+    def test_invalid_format_and_venue_are_rejected_before_snapshot_lookup(self):
+        invalid = [dict(best_of=bo) for bo in (0, 2, 4, -1, True, 3.0, "3", None)]
+        invalid += [dict(lan=lan) for lan in ("false", "", 0, 1, None)]
+        for options in invalid:
+            with self.subTest(options=options), \
+                    patch.object(self.an, "as_of", side_effect=AssertionError("reconstruction")), \
+                    self.assertRaisesRegex(ValueError, next(iter(options))):
+                self.an.predict("a", "b", **options)
+
+    def test_numpy_integer_format_is_normalized_for_prediction_serialization(self):
+        import json
+
+        a, b = self.an.known_teams()[:2]
+        on = max(m.date for m in self.an.matches) + dt.timedelta(days=1)
+        for bo in (1, 3, 5):
+            with self.subTest(bo=bo):
+                actual = self.an.predict(a, b, best_of=np.int64(bo), lan=True, on=on)
+                expected = self.an.predict(a, b, best_of=bo, lan=True, on=on)
+                self.assertEqual(actual, expected)
+                self.assertIs(type(actual.best_of), int)
+                self.assertEqual(json.loads(json.dumps(actual.to_dict()))["best_of"], bo)
 
     def test_aliases_resolve_for_in_memory_history_too(self):
         resolved = self.an.resolve_team("mousesports")
