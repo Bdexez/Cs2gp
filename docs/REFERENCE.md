@@ -527,6 +527,11 @@ Probability and policy inputs must be finite and within their domains. In
 particular, abstention must be between 0.5 and 1 and calibration temperature
 must be positive. The implemented bo3/bo5 veto requires seven distinct maps;
 a series distribution requires exactly `best_of` ordered, distinct maps.
+Direct `Analyzer.predict` calls require an integer best-of of 1, 3 or 5 and
+a boolean `lan`; NumPy integer formats are converted to native integers for
+JSON output. A date must be a calendar `datetime.date`; only `on=None` uses
+today. `Analyzer.as_of` also requires a calendar date. Invalid requests fail
+before historical reconstruction or model evaluation.
 
 ## Measuring, and distrusting flattering numbers
 

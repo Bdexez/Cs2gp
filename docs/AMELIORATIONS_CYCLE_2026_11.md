@@ -870,3 +870,18 @@ outillage domaine CS2 et sortie structuree).
   scalaires NumPy sans avertissement, faible probabilite 1e-300, offsets,
   mises a jour dans les deux orientations avec ou sans Glicko/marge de victoire,
   grands K et simulations qui preservent le moteur d'origine.
+
+## Cycle 70 : Parametres de prediction controles avant reconstruction
+
+- **Dates explicites** (`predict.py`) : seul `on=None` selectionne aujourd'hui.
+  `False`, zero et chaine vide produisaient silencieusement une prediction au
+  jour courant. `as_of` rejette explicitement toute date non calendaire,
+  y compris les horodatages, avant comparaison ou creation d'un instantane.
+- **Format et lieu** : bo1/bo3/bo5 entier et `lan` booleen sont controles avant
+  de reconstruire l'historique. Une chaine `"false"` etait interpretee comme
+  vraie pour les features LAN et restee telle quelle dans la prediction.
+- **Serialisation** : les entiers NumPy valides de `best_of` sont convertis en
+  entiers Python pour produire un JSON standard et conserver le meme resultat.
+- **Tests** : dates fausses et types invalides sans reentrainement ni mutation
+  du cache ; formats et lieu invalides sans consultation historique ; parite
+  et serialisation JSON des trois formats NumPy valides.

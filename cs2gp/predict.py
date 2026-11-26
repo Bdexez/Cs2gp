@@ -11,6 +11,7 @@ from .markets import project_veto, series_distribution
 from .model import MatchPredictor, map_predictor
 from .ratings import EloConfig
 from .schema import Match, MapResult, group_matches, normalize_team, read_csv
+from .validation import positive_integer
 
 # Plafond de confiance. Aucun modele base sur des resultats passes ne peut
 # honnetement depasser ce seuil sur un match unique.
@@ -307,6 +308,8 @@ class Analyzer:
         """Reconstruit features, modeles et momentum avec les seuls jours anterieurs."""
         if self.match_model is None:
             raise RuntimeError("modele non entraine")
+        if type(on) is not dt.date:
+            raise ValueError("on doit etre une date calendaire")
         if self.matches and self.matches[-1].date < on:
             return self
         key = (on, self.momentum, self._momentum_auto)
@@ -522,7 +525,6 @@ class Analyzer:
     def movers(self, window_days: int = 30, min_maps: int = 20, top: int = 5) -> dict:
         """Equipes en plus forte hausse et baisse Elo sur les `window_days` derniers jours."""
         from .ratings import EloEngine
-        from .validation import positive_integer
 
         positive_integer("window_days", window_days)
         positive_integer("top", top)
@@ -717,7 +719,13 @@ class Analyzer:
     ) -> Prediction:
         if self.match_model is None or self.fx is None:
             raise RuntimeError("modele non entraine")
-        on = on or dt.date.today()
+        positive_integer("best_of", best_of)
+        if best_of not in (1, 3, 5):
+            raise ValueError("best_of doit etre 1, 3 ou 5")
+        best_of = int(best_of)
+        if not isinstance(lan, bool):
+            raise ValueError("lan doit etre un booleen")
+        on = dt.date.today() if on is None else on
         past = self.as_of(on)
         if past is not self:
             return past.predict(team_a, team_b, best_of, lan, on)
