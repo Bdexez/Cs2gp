@@ -246,6 +246,12 @@ Journal entries are validated before use: probabilities must be finite in
 Unknown result statuses are rejected rather than counted as losses. Invalid
 CSV rows report their physical line number; invalid batches leave the archive
 intact. Numeric values retain their full floating-point precision on disk.
+Rows sharing a nonempty match ID must agree on the normalized team pair and
+best-of format, including before duplicate picks are ignored. Conflicts in an
+existing archive block reading and settlement as well as appending. Multiple
+markets, reversed team order and rescheduled dates remain supported; the date
+and event label alone cannot distinguish a reschedule from an ID reused for
+the same pair and format.
 
 Journal summaries and filtered exports follow match dates, then emission time
 in UTC and pick ID. Legacy rows without an emission timestamp use the emission

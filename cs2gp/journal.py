@@ -83,6 +83,7 @@ def load(path: str | Path) -> list[dict]:
         return []
     # Les 17 colonnes du format initial restent requises ; les ajouts sont optionnels.
     rows = []
+    fixtures = {}
     for line, row in read_rows(path, COLUMNS[:17]):
         try:
             pick = _pick_from_row(row)
@@ -97,6 +98,7 @@ def load(path: str | Path) -> list[dict]:
             if row["emis_le"]:
                 parse_date(row["emis_le"])
             _chronological_key(row)
+            _check_fixture_identity(pick, fixtures)
         except (ValueError, KeyError, TypeError, OverflowError) as exc:
             raise ValueError(f"ligne {line} invalide dans {path}: {exc}") from exc
         rows.append(row)
@@ -193,6 +195,17 @@ def _pick_from_row(row: dict) -> Pick:
     return pick
 
 
+def _check_fixture_identity(pick: Pick, fixtures: dict) -> None:
+    """Un identifiant stable garde ses equipes et son format, meme si reporte."""
+    if not pick.match_id:
+        return
+    identity = (tuple(sorted((normalize_team(pick.team_a), normalize_team(pick.team_b)))),
+                pick.best_of)
+    previous = fixtures.setdefault(pick.match_id, identity)
+    if previous != identity:
+        raise ValueError(f"match_id {pick.match_id!r}: equipes ou best_of contradictoires")
+
+
 def record(picks: Iterable[Pick], path: str | Path, issued: dt.date | None = None,
            *, complete_card: bool = False) -> int:
     """Ajoute des pronostics au journal. Les doublons sont ignores.
@@ -209,9 +222,13 @@ def record(picks: Iterable[Pick], path: str | Path, issued: dt.date | None = Non
     with _locked(path):
         existing = load(path)
         known = {pick_id(_pick_from_row(r)) for r in existing}
+        fixtures = {}
+        for row in existing:
+            _check_fixture_identity(_pick_from_row(row), fixtures)
         added = []
         for pick in picks:
             _validate_pick(pick)
+            _check_fixture_identity(pick, fixtures)
             identity = pick_id(pick)
             if identity not in known:
                 added.append(_row(pick, issued, complete_card))

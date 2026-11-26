@@ -821,3 +821,18 @@ outillage domaine CS2 et sortie structuree).
 - **Tests** : doublons entre dates differentes, identifiants distincts valides,
   collisions mixtes avec alias, historique mince, absent ou posterieur,
   validation des identifiants API et rapport CLI JSON.
+
+## Cycle 67 : Identite des rencontres protegee dans le journal
+
+- **Avant deduplication** (`journal.py`) : un meme identifiant non vide doit
+  garder sa paire d'equipes normalisee et son format. Deux affiches partageant
+  un identifiant et une selection pouvaient auparavant etre silencieusement
+  reduites a une seule ligne, meme avec des adversaires differents.
+- **Lecture et ecriture** : les archives contradictoires sont refusees avec
+  leur ligne physique, y compris au pointage et dans les bilans. Un conflit
+  dans un lot ne modifie aucun octet de l'archive.
+- **Compatibilite** : alias, orientation inverse, marches multiples et reports
+  de date restent acceptes. Date et tournoi ne constituent pas une preuve de
+  collision pour une meme paire et un meme format : un report est possible.
+- **Tests** : collisions avant deduplication, conflits entre marches, archive
+  contradictoire et preservation du fichier, reports et alias compatibles.
